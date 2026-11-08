@@ -1,0 +1,69 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/*
+ * A paleta do Vernákula: o petróleo e o dourado do logo (livro e castelo ao pôr
+ * do sol). Só troca os tokens do Guia de Arte do núcleo; regra de desenho nova
+ * não entra aqui.
+ */
+
+:root {
+  --ceu-alto: #f6e8c8;
+  --ceu-baixo: #ebc485;
+  --silhueta: #d1a865;
+  --silhueta-perto: #b48a4c;
+  --papel: #fbf4e4;
+  --papel-forte: #f1e4c6;
+  --tinta: #12333d;
+  --tinta-suave: #3f6068;
+  --borda: #12333d;
+  --sombra: rgba(18, 51, 61, 0.3);
+  --topo: #12333d;
+  --topo-texto: #f6ead0;
+  --topo-filete: #d9a441;
+  --destaque: #1f4b57;
+  --destaque-texto: #fbf4e4;
+  --frio: #a8772a;
+  --frio-claro: #f4e1b0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --ceu-alto: #061419;
+    --ceu-baixo: #12333d;
+    --silhueta: #0b252c;
+    --silhueta-perto: #05141a;
+    --papel: #18353f;
+    --papel-forte: #21434e;
+    --tinta: #f6ead0;
+    --tinta-suave: #cdbb92;
+    --borda: #04131a;
+    --sombra: rgba(0, 0, 0, 0.5);
+    --topo: #061419;
+    --topo-texto: #f6ead0;
+    --topo-filete: #d9a441;
+    --destaque: #d9a441;
+    --destaque-texto: #0b1f26;
+    --frio: #d9a441;
+    --frio-claro: #2a3f33;
+  }
+}
+
+:root[data-tema='escuro'] {
+  --ceu-alto: #061419;
+  --ceu-baixo: #12333d;
+  --silhueta: #0b252c;
+  --silhueta-perto: #05141a;
+  --papel: #18353f;
+  --papel-forte: #21434e;
+  --tinta: #f6ead0;
+  --tinta-suave: #cdbb92;
+  --borda: #04131a;
+  --sombra: rgba(0, 0, 0, 0.5);
+  --topo: #061419;
+  --topo-texto: #f6ead0;
+  --topo-filete: #d9a441;
+  --destaque: #d9a441;
+  --destaque-texto: #0b1f26;
+  --frio: #d9a441;
+  --frio-claro: #2a3f33;
+}

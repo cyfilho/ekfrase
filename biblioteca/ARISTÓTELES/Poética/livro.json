@@ -1,0 +1,19 @@
+{
+  "comentario": "A ficha do livro na Biblioteca do Ekfrase (editável pela Administração da Biblioteca: Abrir-Biblioteca-Admin.cmd). ano negativo = antes de Cristo.",
+  "id": "poetica",
+  "titulo": "Poética",
+  "subtitulo": "Edição crítica, bilíngue (grego–português) e didática comparada",
+  "autor": "Aristóteles",
+  "ano": -335,
+  "titulo_original": "Περὶ ποιητικῆς",
+  "traducao": "Alcy Filho",
+  "editora": "Editora Ékfrase",
+  "ano_traducao": 2026,
+  "idioma": "pt-BR",
+  "idioma_original": "grc",
+  "categoria": "filosofia",
+  "generos": ["teoria-literaria", "estetica", "grecia-antiga", "bilingue"],
+  "licenca": "CC BY-SA 4.0",
+  "descricao": "O tratado de Aristóteles sobre a arte poética, a tragédia e a epopeia, em quatro leituras: a tradução filológica rigorosa, com notas e aparato crítico; uma versão acessível para iniciantes; as duas lado a lado; e a tradução ao lado do original grego, que também vem inteiro. Com introdução a Aristóteles e bibliografia crítica.",
+  "capa": { "fundo": "#4a1a17", "detalhe": "#e6c27a", "simbolo": "folha" }
+}

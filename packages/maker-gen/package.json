@@ -1,0 +1,14 @@
+{
+  "name": "@ekfrase/maker-gen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Geradores do Ékfrase (deterministas e congelados por versão): campos, litoral e biomas",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ekfrase/maker-core": "0.1.0"
+  }
+}

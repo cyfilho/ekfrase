@@ -1,0 +1,31 @@
+{
+  "name": "ekfrase-plataforma",
+  "private": true,
+  "description": "Ekfrase: apps livres para ensinar, aprender e criar (ekfrase.com)",
+  "license": "MPL-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "maker": "npm run dev -w @ekfrase/maker",
+    "biblioteca": "npm run dev -w @ekfrase/biblioteca",
+    "vernakula": "npm run dev -w @ekfrase/vernakula",
+    "chave": "node scripts/chave.ts",
+    "arte": "node scripts/arte/gerar.mjs",
+    "typecheck": "tsc -p packages/nucleo --noEmit && tsc -p packages/interface --noEmit && tsc -p packages/arquivo --noEmit && tsc -p packages/maker-core --noEmit && tsc -p packages/maker-doc --noEmit && tsc -p packages/maker-gen --noEmit && tsc -p packages/maker-render --noEmit && tsc -p apps/maker --noEmit && tsc -p apps/biblioteca --noEmit && tsc -p apps/vernakula --noEmit && tsc -p tsconfig.tests.json --noEmit",
+    "test": "vitest run",
+    "build": "npm run build -w @ekfrase/maker && npm run build -w @ekfrase/biblioteca && npm run build -w @ekfrase/vernakula",
+    "conferir": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  }
+}

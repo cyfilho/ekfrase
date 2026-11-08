@@ -1,0 +1,17 @@
+{
+  "name": "@ekfrase/interface",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peças de interface comuns a todos os apps Ekfrase (botão de tema, seletor de idioma…), em Preact",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@ekfrase/nucleo": "0.1.0",
+    "html2canvas-pro": "2.5.2",
+    "preact": "11.1.0"
+  }
+}

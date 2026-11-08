@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/*
+ * A paleta da Biblioteca: o verde-cobre da cúpula e o dourado das letras na lombada. Só troca os
+ * tokens do Guia de Arte do núcleo; regra de desenho nova não entra aqui.
+ */
+
+:root {
+  --ceu-alto: #eef0e2;
+  --ceu-baixo: #cfd9bf;
+  --silhueta: #a9bb9b;
+  --silhueta-perto: #87a083;
+  --papel: #faf6ea;
+  --papel-forte: #ece6d0;
+  --tinta: #1d3d33;
+  --tinta-suave: #4b6a5f;
+  --borda: #1d3d33;
+  --sombra: rgba(29, 61, 51, 0.3);
+  --topo: #1d3d33;
+  --topo-texto: #f4ead2;
+  --topo-filete: #e0c172;
+  --destaque: #2f5d50;
+  --destaque-texto: #faf6ea;
+  --frio: #9b3442;
+  --frio-claro: #f3dcc8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --ceu-alto: #0b1714;
+    --ceu-baixo: #1d3d33;
+    --silhueta: #12261f;
+    --silhueta-perto: #08130f;
+    --papel: #183129;
+    --papel-forte: #21403a;
+    --tinta: #f4ead2;
+    --tinta-suave: #c9c09c;
+    --borda: #050d0a;
+    --sombra: rgba(0, 0, 0, 0.5);
+    --topo: #0b1714;
+    --topo-texto: #f4ead2;
+    --topo-filete: #e0c172;
+    --destaque: #e0c172;
+    --destaque-texto: #10201b;
+    --frio: #e08a8f;
+    --frio-claro: #3a2a2c;
+  }
+}
+
+:root[data-tema='escuro'] {
+  --ceu-alto: #0b1714;
+  --ceu-baixo: #1d3d33;
+  --silhueta: #12261f;
+  --silhueta-perto: #08130f;
+  --papel: #183129;
+  --papel-forte: #21403a;
+  --tinta: #f4ead2;
+  --tinta-suave: #c9c09c;
+  --borda: #050d0a;
+  --sombra: rgba(0, 0, 0, 0.5);
+  --topo: #0b1714;
+  --topo-texto: #f4ead2;
+  --topo-filete: #e0c172;
+  --destaque: #e0c172;
+  --destaque-texto: #10201b;
+  --frio: #e08a8f;
+  --frio-claro: #3a2a2c;
+}

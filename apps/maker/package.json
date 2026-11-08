@@ -1,0 +1,26 @@
+{
+  "name": "@ekfrase/maker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ekfrase Maker: mapas e worldbuilding (grade hexagonal hierárquica, documento colaborativo, gerador e renderizador)",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ekfrase/arquivo": "0.1.0",
+    "@ekfrase/interface": "0.1.0",
+    "@ekfrase/maker-core": "0.1.0",
+    "@ekfrase/maker-doc": "0.1.0",
+    "@ekfrase/maker-gen": "0.1.0",
+    "@ekfrase/maker-render": "0.1.0",
+    "@ekfrase/nucleo": "0.1.0",
+    "@fontsource/atkinson-hyperlegible-next": "5.3.0",
+    "@fontsource/cinzel": "5.3.0",
+    "@fontsource/cormorant-garamond": "5.3.0",
+    "preact": "11.1.0"
+  }
+}

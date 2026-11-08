@@ -1,0 +1,1176 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/* Tema: papel, tinta e as 7 cores do diagrama (docs/img/hex-7-filhos.svg). O canvas lê estas variáveis. */
+:root {
+  --paper: #f6f1e6;
+  --paper-raised: #fbf8f1;
+  --paper-sunk: #ece4d2;
+  --ink: #2b2a33;
+  --ink-soft: #5c5a66;
+  --line: rgba(43, 42, 51, 0.14);
+  --grid: rgba(43, 42, 51, 0.26);
+  --grid-upper: rgba(43, 42, 51, 0.42);
+  --accent: #17707a;
+  --accent-ink: #ffffff;
+  --hover: rgba(23, 112, 122, 0.75);
+  --hatch-blue: #1f5fae;
+  --hatch-red: #c0392b;
+  --vignette: rgba(92, 70, 40, 0.16);
+  --grain: 0.35;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 10px 30px -18px rgba(60, 45, 20, 0.45),
+    0 2px 6px -2px rgba(60, 45, 20, 0.18);
+
+  --kid-0: #f0c75e;
+  --kid-1: #7fbfa8;
+  --kid-2: #e08e6f;
+  --kid-3: #86a7dc;
+  --kid-4: #b99bd6;
+  --kid-5: #a8c66c;
+  --kid-6: #e8a2bd;
+
+  /* Biomas (Fase 3): tons naturais, nada de paleta de 8 bits. --relief-light clareia as alturas. */
+  --biome-ocean: #8fbccc;
+  --biome-deep: #2e5b7e;
+  --biome-tundra: #d6d9cc;
+  --biome-desert: #e2c48b;
+  --biome-plain: #bccf8a;
+  --biome-forest: #5e9558;
+  --biome-swamp: #6b8a6a;
+  --relief-light: #f4efe2;
+  --coast: rgba(43, 42, 51, 0.7);
+
+  --font-ui: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
+  --radius: 14px;
+  --panel-width: 360px;
+}
+
+/* Escuro: segue o aparelho, a não ser que a pessoa escolha no botão de tema do topo (data-tema). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --paper: #1c1d24;
+    --paper-raised: #24262f;
+    --paper-sunk: #16171d;
+    --ink: #ece6d6;
+    --ink-soft: #a9a59a;
+    --line: rgba(236, 230, 214, 0.12);
+    --grid: rgba(236, 230, 214, 0.2);
+    --grid-upper: rgba(236, 230, 214, 0.36);
+    --accent: #4fb6bf;
+    --accent-ink: #10181a;
+    --hover: rgba(79, 182, 191, 0.8);
+    --hatch-blue: #6f9fe6;
+    --hatch-red: #e6735f;
+    --vignette: rgba(0, 0, 0, 0.35);
+    --grain: 0.25;
+    --biome-ocean: #3f6f86;
+    --biome-deep: #15324a;
+    --biome-tundra: #a9ada3;
+    --biome-desert: #b49561;
+    --biome-plain: #879a5c;
+    --biome-forest: #3f6d3c;
+    --biome-swamp: #4a6249;
+    --relief-light: #d8d2c2;
+    --coast: rgba(236, 230, 214, 0.65);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.7);
+  }
+}
+
+:root[data-tema='escuro'] {
+  --paper: #1c1d24;
+  --paper-raised: #24262f;
+  --paper-sunk: #16171d;
+  --ink: #ece6d6;
+  --ink-soft: #a9a59a;
+  --line: rgba(236, 230, 214, 0.12);
+  --grid: rgba(236, 230, 214, 0.2);
+  --grid-upper: rgba(236, 230, 214, 0.36);
+  --accent: #4fb6bf;
+  --accent-ink: #10181a;
+  --hover: rgba(79, 182, 191, 0.8);
+  --hatch-blue: #6f9fe6;
+  --hatch-red: #e6735f;
+  --vignette: rgba(0, 0, 0, 0.35);
+  --grain: 0.25;
+  --biome-ocean: #3f6f86;
+  --biome-deep: #15324a;
+  --biome-tundra: #a9ada3;
+  --biome-desert: #b49561;
+  --biome-plain: #879a5c;
+  --biome-forest: #3f6d3c;
+  --biome-swamp: #4a6249;
+  --relief-light: #d8d2c2;
+  --coast: rgba(236, 230, 214, 0.65);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.7);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.45 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-width);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top top'
+    'stage panel'
+    'foot foot';
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* O rodapé de todo app Ekfrase (a marca fica só aqui), numa linha. */
+.rodape-maker {
+  grid-area: foot;
+  border-top: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+
+.rodape-maker .ekf-rodape {
+  color: var(--ink-soft);
+}
+
+.rodape-maker .ekf-familia {
+  color: var(--ink);
+}
+
+/* A tela inicial (quem não entrou): cobre o editor, com o céu do Ekfrase ao fundo. */
+.entrada-maker {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: auto;
+  background: linear-gradient(to bottom, var(--ceu-alto), var(--ceu-baixo));
+}
+
+/* Sem conta: só a tela inicial aparece (o editor fica fora de vista até a pessoa entrar). */
+.so-entrada .app {
+  display: none;
+}
+
+.so-entrada .entrada-maker {
+  position: static;
+  min-height: 100dvh;
+}
+
+/* Meus mundos (a nuvem) */
+.mundos {
+  list-style: none;
+  margin: 0 0 0.8rem;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mundos li {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+}
+
+.mundos li.aberto {
+  box-shadow: inset 5px 0 0 var(--destaque);
+}
+
+.mundos li div:first-child {
+  display: grid;
+  overflow-wrap: anywhere;
+}
+
+.mundos small {
+  color: var(--tinta-suave);
+}
+
+/* Barra do topo */
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand > div {
+  min-width: 0;
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  image-rendering: pixelated;
+}
+
+#acoes-topo {
+  flex: none;
+}
+
+h1 {
+  margin: 0;
+  font: 600 24px/1.1 var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+select,
+.btn,
+.chip {
+  font: inherit;
+  color: var(--ink);
+}
+
+select {
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+/* Área do mapa */
+.stage {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+
+#map.dragging {
+  cursor: grabbing;
+}
+
+#map:focus-visible {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.hud {
+  position: absolute;
+  margin: 0;
+  pointer-events: none;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.hud-level {
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-raised) 88%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--ink-soft);
+  backdrop-filter: blur(6px);
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#map.painting {
+  cursor: crosshair;
+}
+
+.hud-tools {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 340px);
+}
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper-raised) 92%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+}
+
+.seg-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 13px var(--font-ui);
+  cursor: pointer;
+}
+
+.seg-btn[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tool-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tool-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tool-btn[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.biome-pick {
+  display: flex;
+  gap: 4px;
+}
+
+.biome-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  box-shadow: 0 0 0 1px var(--line) inset;
+  cursor: pointer;
+}
+
+.biome-btn[aria-pressed='true'] {
+  border-color: var(--ink);
+  transform: translateY(-1px);
+}
+
+
+.hud-loading {
+  right: 70px;
+  top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-raised) 88%, transparent);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hud-zoom {
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.icon-btn:hover {
+  background: var(--paper-sunk);
+}
+
+.icon-btn:active {
+  transform: scale(0.96);
+}
+
+.icon-btn.small {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.hud-scale {
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.scale-bar {
+  height: 8px;
+  border: 2px solid var(--ink);
+  border-top: none;
+  background: linear-gradient(90deg, var(--ink) 0 50%, transparent 50% 100%) bottom / 100% 3px no-repeat;
+}
+
+.hud-hint {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-raised) 80%, transparent);
+  color: var(--ink-soft);
+  font-size: 12px;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+
+.toast {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  box-shadow: var(--shadow);
+}
+
+/* Painel */
+.panel {
+  grid-area: panel;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-left: 1px solid var(--line);
+  background: var(--paper-sunk);
+}
+
+.card {
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font: 600 17px/1.2 var(--font-display);
+}
+
+.card-head h2 {
+  margin: 0;
+}
+
+h3 {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.muted {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.small {
+  font-size: 12px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.ladder {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder span.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  align-items: center;
+}
+
+.facts dt {
+  color: var(--ink-soft);
+}
+
+.facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+code,
+.address {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.address {
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: var(--paper-sunk);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  background: var(--paper-sunk);
+}
+
+.chip-parent {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.kids {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.kids .chip {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.kids .digit {
+  margin-left: auto;
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid rgba(43, 42, 51, 0.5);
+}
+
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.toggle input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-row .btn {
+  margin-top: 0;
+  flex: 1;
+}
+
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.btn-secondary:hover {
+  filter: none;
+  background: var(--paper-sunk);
+}
+
+.btn:disabled,
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.grow {
+  flex: 1;
+  margin: 0;
+}
+
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.3 var(--font-display);
+}
+
+.field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.field-row .field input {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.input-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+}
+
+.swatch.inline {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
+.legend-biomes {
+  grid-template-columns: 1fr 1fr;
+}
+
+.legend-biomes .sw {
+  width: 18px;
+  border: 1px solid var(--line);
+}
+
+#world-use-basic {
+  margin-top: 6px;
+}
+
+.status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+}
+
+.status.unsaved {
+  background: color-mix(in srgb, var(--hatch-red) 18%, transparent);
+  color: var(--hatch-red);
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mark-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+
+.mark-btn[aria-pressed='true'] {
+  border-color: var(--ink);
+}
+
+.marks .chip {
+  font-family: var(--font-ui);
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sw {
+  width: 30px;
+  height: 16px;
+  flex: none;
+  border-radius: 3px;
+}
+
+.sw-ideal {
+  height: 0;
+  border-top: 3px dashed var(--ink);
+  border-radius: 0;
+}
+
+.sw-overhang {
+  border: 1px solid var(--hatch-blue);
+  background: repeating-linear-gradient(-45deg, var(--hatch-blue) 0 2px, transparent 2px 6px),
+    color-mix(in srgb, var(--hatch-blue) 18%, transparent);
+}
+
+.sw-uncovered {
+  border: 1px solid var(--hatch-red);
+  background: repeating-linear-gradient(45deg, var(--hatch-red) 0 2px, transparent 2px 6px),
+    color-mix(in srgb, var(--hatch-red) 22%, transparent);
+}
+
+.sw-parent {
+  height: 0;
+  border-top: 3px solid var(--accent);
+  border-radius: 0;
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.sw-upper {
+  height: 0;
+  border-top: 2px solid var(--grid-upper);
+  border-radius: 0;
+}
+
+/*
+ * Telas estreitas (celular): o topo numa linha (a logo, o nome e os botões-ícone), o mapa em cima
+ * com o HUD empilhado à esquerda, o painel embaixo (a página rola) e o rodapé no fim. Nada passa
+ * da largura da tela (360 px sem rolagem lateral).
+ */
+@media (max-width: 820px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 62svh auto auto;
+    grid-template-areas: 'top' 'stage' 'panel' 'foot';
+    height: auto;
+  }
+
+  .panel {
+    border-left: none;
+    border-top: 1px solid var(--line);
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .topbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .hud-hint {
+    display: none;
+  }
+
+  /* o nível em cima; Explorar/Editar e Mapa/Satélite logo abaixo, à esquerda */
+  .hud-level {
+    top: 8px;
+    left: 8px;
+    max-width: calc(100% - 16px);
+    gap: 6px;
+    padding: 4px 10px 4px 4px;
+    font-size: 12px;
+  }
+
+  .hud-tools {
+    top: 48px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: none;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .seg-btn {
+    padding: 6px 11px;
+  }
+
+  /* modo Editar: a paleta vira uma faixa embaixo do mapa, que rola para o lado */
+  .hud-palette {
+    top: auto;
+    left: 8px;
+    right: 56px;
+    bottom: 8px;
+  }
+
+  .palette {
+    width: auto;
+    max-height: 9.5rem;
+  }
+
+  .label-form {
+    max-width: calc(100% - 16px);
+  }
+}
+
+@media (max-width: 600px) {
+  .subtitle {
+    display: none;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+
+  .logo {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* Paleta de ferramentas e pincéis à esquerda, como nos editores de imagem */
+.hud-palette {
+  top: 64px;
+  left: 16px;
+  bottom: 56px;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 156px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper-raised) 96%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  scrollbar-width: thin;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.palette .tool-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: 11px;
+}
+
+.palette .tool-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.brush-pick {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.brush-group {
+  grid-column: 1 / -1;
+  margin: 4px 0 -2px;
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.brush-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 58px;
+  padding: 0 0 4px;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  box-shadow: 0 0 0 1px var(--line) inset;
+  color: #1d2618;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.brush-btn svg {
+  width: 26px;
+  height: 26px;
+  margin-bottom: auto;
+  margin-top: 6px;
+  fill: #1d2618;
+  opacity: 0.85;
+}
+
+.brush-btn .brush-name {
+  width: 100%;
+  padding: 1px 2px;
+  background: color-mix(in srgb, #fbf7ee 82%, transparent);
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: -0.01em;
+  color: #22201c;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brush-btn[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow:
+    0 0 0 2px var(--paper-raised) inset,
+    0 2px 6px rgb(0 0 0 / 0.25);
+}
+
+.brush-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.palette .brush-info {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.icon-btn.danger {
+  color: #a3352a;
+}
+
+.label-form {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+
+.label-form input,
+.label-form select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px var(--font-display);
+}
+
+.label-form .btn {
+  margin: 0;
+  width: auto;
+}
+
+#label-card select {
+  padding: 7px 8px;
+}
+
+/* Botão "Passeio" do topo: leva à Torre do Maker no castelo. */

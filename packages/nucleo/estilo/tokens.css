@@ -1,0 +1,97 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/*
+ * Guia de Arte Ekfrase 0.2 — cores, fontes e medidas de toda a interface.
+ * Estas são as cores da MARCA Ekfrase (o castelo: arenito, terracota, verde-azulado,
+ * tinta marrom). Cada app pode trocar a paleta num arquivo próprio (o Vernákula
+ * usa petróleo e dourado: apps/vernakula/src/tema.css), mas nunca inventa cor fora
+ * dos tokens.
+ *
+ * Fontes livres (OFL): Cormorant Garamond nos títulos, Atkinson Hyperlegible Next
+ * no texto e nos botões (feita para leitura fácil), Cinzel só em detalhes
+ * decorativos curtos (a marca no rodapé, etiquetas).
+ */
+
+:root {
+  --px: 2px; /* o "pixel de arte" da interface: bordas e degraus são múltiplos dele */
+
+  --fonte-titulo: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  --fonte-texto: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  --fonte-decorativa: 'Cinzel', 'Cormorant Garamond', Georgia, serif;
+
+  /* claro: pergaminho e tinta */
+  --ceu-alto: #f3e6c8;
+  --ceu-baixo: #e8cf9e;
+  --silhueta: #d4b98a;
+  --silhueta-perto: #c7a873;
+  --papel: #fbf3e2;
+  --papel-forte: #f3e6cb;
+  --tinta: #3b2416;
+  --tinta-suave: #6d4a33;
+  --borda: #5a3a24;
+  --sombra: rgba(59, 36, 22, 0.28);
+  --topo: #3b2416;
+  --topo-texto: #f8eedb;
+  --topo-filete: #c8562a;
+  --destaque: #c8562a;
+  --destaque-texto: #fff6e6;
+  --frio: #3f7577;
+  --frio-claro: #d5e6e1;
+  --erro: #9c1f1f;
+  --erro-fundo: #f6d4cc;
+  --foco: #2d6fb3;
+
+  --largura-max: 72rem;
+  color-scheme: light;
+}
+
+/* escuro: o castelo à noite */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --ceu-alto: #0f1420;
+    --ceu-baixo: #1f2433;
+    --silhueta: #0a0e16;
+    --silhueta-perto: #06090f;
+    --papel: #26222e;
+    --papel-forte: #302a3a;
+    --tinta: #efe3c8;
+    --tinta-suave: #c4b394;
+    --borda: #0b0a0e;
+    --sombra: rgba(0, 0, 0, 0.5);
+    --topo: #0b0a0e;
+    --topo-texto: #efe3c8;
+    --topo-filete: #e0743f;
+    --destaque: #e0743f;
+    --destaque-texto: #1b1722;
+    --frio: #79b3ad;
+    --frio-claro: #22383a;
+    --erro: #ff9b8f;
+    --erro-fundo: #4a1f1f;
+    --foco: #8cc4ff;
+    color-scheme: dark;
+  }
+}
+
+:root[data-tema='escuro'] {
+  --ceu-alto: #0f1420;
+  --ceu-baixo: #1f2433;
+  --silhueta: #0a0e16;
+  --silhueta-perto: #06090f;
+  --papel: #26222e;
+  --papel-forte: #302a3a;
+  --tinta: #efe3c8;
+  --tinta-suave: #c4b394;
+  --borda: #0b0a0e;
+  --sombra: rgba(0, 0, 0, 0.5);
+  --topo: #0b0a0e;
+  --topo-texto: #efe3c8;
+  --topo-filete: #e0743f;
+  --destaque: #e0743f;
+  --destaque-texto: #1b1722;
+  --frio: #79b3ad;
+  --frio-claro: #22383a;
+  --erro: #ff9b8f;
+  --erro-fundo: #4a1f1f;
+  --foco: #8cc4ff;
+  color-scheme: dark;
+}

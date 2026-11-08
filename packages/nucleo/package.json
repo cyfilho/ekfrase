@@ -1,0 +1,12 @@
+{
+  "name": "@ekfrase/nucleo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Núcleo da plataforma Ekfrase: idiomas, textos, Guia de Arte (estilo) e utilidades comuns a todos os apps",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./estilo/*": "./estilo/*"
+  }
+}

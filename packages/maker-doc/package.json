@@ -1,0 +1,17 @@
+{
+  "name": "@ekfrase/maker-doc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Documento do Ékfrase: CRDT (Yjs), comandos com desfazer e mundo no arquivo .ekfr",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ekfrase/arquivo": "0.1.0",
+    "@ekfrase/maker-core": "0.1.0",
+    "fflate": "^0.8.3",
+    "yjs": "^13.6.33"
+  }
+}

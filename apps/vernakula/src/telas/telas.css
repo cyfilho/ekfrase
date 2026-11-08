@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/* Textos da escola */
+.texto {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.texto.trocado {
+  border-left-width: calc(var(--px) * 3);
+  border-left-color: var(--frio);
+}
+
+.texto .padrao {
+  margin: 0;
+  color: var(--tinta-suave);
+}
+
+.texto .rotulo {
+  font-family: var(--fonte-decorativa);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.linha-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.linha-acoes .chave {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+  word-break: break-all;
+}
+
+.linha-acoes .ok {
+  color: var(--frio);
+  font-weight: 700;
+}
+
+.erro-curto {
+  color: var(--erro);
+  font-weight: 700;
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@ekfrase/arquivo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "O arquivo .ekfr de todos os apps Ekfrase: envelope, identificação, registro de quem abre cada tipo e a entrega de um app para outro",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ekfr": "./src/ekfr.ts",
+    "./registro": "./src/registro.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}

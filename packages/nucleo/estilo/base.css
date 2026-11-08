@@ -1,0 +1,450 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/* [hidden] precisa vencer qualquer display de classe (lição do Vernákula e do Persis). */
+[hidden] {
+  display: none !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  /* o céu: um degradê só, nenhuma imagem baixada */
+  background: linear-gradient(to bottom, var(--ceu-alto), var(--ceu-baixo)) fixed;
+  color: var(--tinta);
+  font-family: var(--fonte-texto);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+
+/*
+ * O horizonte ao fundo: colinas que se repetem e o castelo de 5 torres, em pixel
+ * art (scripts/arte/gerar.mjs). São MÁSCARAS: a cor vem do tema (--silhueta),
+ * então claro e escuro usam a mesma imagem.
+ */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::before {
+  height: 90px;
+  background: var(--silhueta);
+  -webkit-mask: url('./img/horizonte-colinas.png') repeat-x left bottom / 600px 90px;
+  mask: url('./img/horizonte-colinas.png') repeat-x left bottom / 600px 90px;
+}
+
+body::after {
+  height: 168px;
+  background: var(--silhueta-perto);
+  -webkit-mask: url('./img/horizonte-castelo.png') no-repeat right 8% bottom / 240px 168px;
+  mask: url('./img/horizonte-castelo.png') no-repeat right 8% bottom / 240px 168px;
+  opacity: 0.85;
+}
+
+/* Celular: o castelo do fundo ficaria atrás da folha; aparece menor, no canto. */
+@media (max-width: 40rem) {
+  body::after {
+    height: 84px;
+    -webkit-mask-size: 120px 84px;
+    mask-size: 120px 84px;
+    -webkit-mask-position: right 2% bottom;
+    mask-position: right 2% bottom;
+  }
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+
+h1 {
+  font-size: 2.1rem;
+  margin: 0 0 0.35rem;
+}
+
+img.pixel {
+  image-rendering: pixelated;
+}
+
+.so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* ---------- traço fino de 1 pixel de arte, cantos retos ---------- */
+.botao,
+input,
+select {
+  border: var(--px) solid var(--borda);
+  border-radius: 0;
+}
+
+/* ---------- casca ---------- */
+.casca {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--topo);
+  color: var(--topo-texto);
+  border-bottom: var(--px) solid var(--topo-filete);
+  box-shadow: 0 var(--px) 0 0 var(--borda);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--topo-texto);
+  text-decoration: none;
+}
+
+.marca img {
+  width: 48px;
+  height: 48px;
+}
+
+.topo-acoes {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.escolha {
+  min-width: 0;
+}
+
+select {
+  font: inherit;
+  font-size: 0.95rem;
+  background: var(--papel);
+  color: var(--tinta);
+  padding: 0.3rem 0.5rem;
+  min-height: 2.5rem;
+}
+
+/* Celular: as escolhas do topo dividem a largura (nunca rolagem lateral a 360 px). */
+@media (max-width: 34rem) {
+  .topo-acoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .topo-acoes select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.conteudo {
+  flex: 1;
+  width: 100%;
+  max-width: var(--largura-max);
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+}
+
+/*
+ * A folha de papel: traço fino, sombra em degrau (luz do alto à esquerda) e
+ * as quatro cantoneiras de metal em pixel art.
+ */
+.painel {
+  position: relative;
+  background:
+    url('./img/canto-se.png') no-repeat left top / 28px 28px,
+    url('./img/canto-sd.png') no-repeat right top / 28px 28px,
+    url('./img/canto-ie.png') no-repeat left bottom / 28px 28px,
+    url('./img/canto-id.png') no-repeat right bottom / 28px 28px,
+    var(--papel);
+  border: var(--px) solid var(--borda);
+  padding: 1.75rem 1.5rem;
+  box-shadow: 4px 4px 0 0 var(--sombra);
+}
+
+.entrar {
+  max-width: 26rem;
+  margin: 1.5rem auto;
+}
+
+.lema {
+  margin-top: 0;
+  color: var(--tinta-suave);
+  font-family: var(--fonte-titulo);
+  font-size: 1.2rem;
+  font-style: italic;
+}
+
+form {
+  display: grid;
+  gap: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 700;
+}
+
+input {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.6rem 0.75rem;
+  min-height: 2.75rem;
+  background: var(--papel-forte);
+  color: var(--tinta);
+  width: 100%;
+}
+
+/* ---------- botões ---------- */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.1rem;
+  background: var(--papel-forte);
+  color: var(--tinta);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  position: relative;
+  box-shadow: var(--px) var(--px) 0 0 var(--borda);
+}
+
+.botao.principal {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+
+.botao:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* apertar "afunda" um pixel de arte */
+.botao:active:not(:disabled) {
+  top: var(--px);
+  left: var(--px);
+  box-shadow: none;
+}
+
+.botao:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.botao[aria-busy='true'] {
+  cursor: progress;
+}
+
+.link-abaixo {
+  margin: 1rem 0 0;
+  text-align: center;
+}
+
+/* O botão de tema: desenho pixel + o nome do tema para onde ele leva. */
+.botao-tema {
+  min-height: 2.75rem;
+  padding: 0.3rem 0.8rem;
+  background: var(--papel);
+  color: var(--tinta);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.icone-px {
+  flex: none;
+}
+
+.erro {
+  background: var(--erro-fundo);
+  color: var(--erro);
+  border-left: calc(var(--px) * 2) solid var(--erro);
+  padding: 0.6rem 0.75rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+}
+
+.etiquetas li {
+  background: var(--frio-claro);
+  color: var(--tinta);
+  border: var(--px) solid var(--frio);
+  padding: 0.1rem 0.6rem;
+  font-family: var(--fonte-decorativa);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.obras {
+  color: var(--tinta-suave);
+}
+
+.carregando {
+  text-align: center;
+  font-family: var(--fonte-titulo);
+  font-size: 1.3rem;
+}
+
+/* ---------- rodapé: aqui (e só aqui) aparece a marca Ekfrase dentro de um app ---------- */
+.rodape {
+  padding: 1rem 1rem 1.5rem;
+  text-align: center;
+  color: var(--tinta-suave);
+  font-size: 0.9rem;
+}
+
+.rodape p {
+  margin: 0.35rem 0;
+}
+
+.familia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+.familia img {
+  width: 48px;
+  height: 36px;
+}
+
+.familia .nome-marca {
+  font-family: var(--fonte-decorativa);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- peças comuns de tela ---------- */
+textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.5rem 0.65rem;
+  background: var(--papel-forte);
+  color: var(--tinta);
+  border: var(--px) solid var(--borda);
+  width: 100%;
+  resize: vertical;
+}
+
+.pilha {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.pilha > p,
+.pilha > h1 {
+  margin: 0;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.botao.pequeno {
+  min-height: 2.25rem;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+.dica {
+  color: var(--tinta-suave);
+  font-weight: 400;
+  font-size: 0.92rem;
+}
+
+.aviso-ok {
+  background: var(--frio-claro);
+  color: var(--tinta);
+  border-left: calc(var(--px) * 2) solid var(--frio);
+  padding: 0.6rem 0.75rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.marcar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+}
+
+.marcar input {
+  width: auto;
+  min-height: 0;
+}
+
+.filtros {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.filtros p {
+  margin: 0;
+}
+
+a {
+  color: var(--tinta);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--tinta-suave);
+}

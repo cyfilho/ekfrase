@@ -1,0 +1,24 @@
+# Segredos e dados reais: NUNCA no Git (os repositórios serão abertos; DEC-P012)
+/segredos.php
+/ponte/segredos.php
+/ponte/armazenamento/
+*.sql.gz
+/dados-reais/
+/_backup/
+
+# Node / build
+node_modules/
+dist/
+publicacao/
+coverage/
+test-results/
+playwright-report/
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+__MACOSX/
+
+# Biblioteca: o acervo é gerado de biblioteca/ por scripts/biblioteca.ts
+/apps/biblioteca/public/acervo/

@@ -1,0 +1,584 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/*
+ * As peças comuns (topo, botões-ícone, menus, janelas, feedback, conta, rodapé,
+ * tela inicial do app). Tudo com o prefixo .ekf- e só com os tokens do Guia de
+ * Arte (packages/nucleo/estilo/tokens.css): funciona também num app que não usa
+ * o base.css (o Maker).
+ */
+
+.ekf-topo,
+.ekf-entrada-app,
+.ekf-janela,
+.ekf-rodape,
+.ekf-menu-lista {
+  font-family: var(--fonte-texto);
+  box-sizing: border-box;
+}
+
+.ekf-topo *,
+.ekf-entrada-app *,
+.ekf-janela *,
+.ekf-menu-lista * {
+  box-sizing: border-box;
+}
+
+/* ---------- topo ---------- */
+.ekf-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--topo);
+  color: var(--topo-texto);
+  border-bottom: var(--px) solid var(--topo-filete);
+  box-shadow: 0 var(--px) 0 0 var(--borda);
+  position: relative;
+  z-index: 20;
+}
+
+.ekf-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--topo-texto);
+  text-decoration: none;
+  font-family: var(--fonte-decorativa);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 0.08em;
+}
+
+.ekf-marca img {
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.ekf-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+}
+
+/* O botão-ícone: um quadrado de 40 px (bom para o dedo), sombra em degrau. */
+.ekf-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: var(--px) solid var(--borda);
+  background: var(--papel);
+  color: var(--tinta);
+  box-shadow: var(--px) var(--px) 0 0 var(--borda);
+  cursor: pointer;
+  position: relative;
+  text-decoration: none;
+  flex: none;
+}
+
+.ekf-icone:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.ekf-icone:active:not(:disabled) {
+  top: var(--px);
+  left: var(--px);
+  box-shadow: none;
+}
+
+.ekf-icone[aria-pressed='true'],
+.ekf-icone[aria-expanded='true'] {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+
+.ekf-icone[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.ekf-icone:focus-visible,
+.ekf-botao:focus-visible,
+.ekf-link:focus-visible,
+.ekf-menu-lista > :focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* Celular estreito: os ícones ficam um pouco menores para caber a marca. */
+@media (max-width: 26rem) {
+  .ekf-icone {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .ekf-acoes {
+    gap: 0.25rem;
+  }
+
+  .ekf-marca span {
+    font-size: 1.1rem;
+  }
+}
+
+/* ---------- menu (idioma, conta) ---------- */
+.ekf-menu {
+  position: relative;
+}
+
+.ekf-menu-lista {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 13rem;
+  max-width: calc(100vw - 1.5rem);
+  display: grid;
+  padding: 0.3rem;
+  background: var(--papel);
+  color: var(--tinta);
+  border: var(--px) solid var(--borda);
+  box-shadow: 4px 4px 0 0 var(--sombra);
+  z-index: 30;
+}
+
+.ekf-menu-lista > button,
+.ekf-menu-lista > a {
+  display: block;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  background: none;
+  color: var(--tinta);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ekf-menu-lista > button:hover,
+.ekf-menu-lista > a:hover {
+  background: var(--papel-forte);
+}
+
+.ekf-menu-lista > [aria-checked='true'] {
+  font-weight: 700;
+  box-shadow: inset 4px 0 0 var(--destaque);
+}
+
+.ekf-menu-cabeca {
+  margin: 0;
+  padding: 0.4rem 0.7rem 0.5rem;
+  border-bottom: 1px solid var(--borda);
+  display: grid;
+  overflow-wrap: anywhere;
+}
+
+.ekf-menu-cabeca small {
+  color: var(--tinta-suave);
+}
+
+/* a foto de perfil: no botão do topo (pequena) e no cabeçalho do menu */
+.ekf-foto {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border: 1px solid currentColor;
+}
+
+.ekf-foto.grande {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0.3rem;
+}
+
+/* ---------- botões de texto ---------- */
+.ekf-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.1rem;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+  color: var(--tinta);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  box-shadow: var(--px) var(--px) 0 0 var(--borda);
+}
+
+.ekf-botao.principal {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+
+.ekf-botao:active:not(:disabled) {
+  top: var(--px);
+  left: var(--px);
+  box-shadow: none;
+}
+
+.ekf-botao:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ekf-link {
+  border: 0;
+  background: none;
+  padding: 0.2rem 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ekf-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------- janela ---------- */
+.ekf-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 0.75rem;
+  background: rgba(10, 8, 14, 0.55);
+}
+
+.ekf-janela {
+  width: min(32rem, 100%);
+  max-height: calc(100dvh - 1.5rem);
+  overflow: auto;
+  padding: 1rem 1.1rem 1.2rem;
+  background: var(--papel);
+  color: var(--tinta);
+  border: var(--px) solid var(--borda);
+  box-shadow: 6px 6px 0 0 var(--sombra);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.ekf-janela > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.ekf-janela h2 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.ekf-fechar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+  color: var(--tinta);
+  cursor: pointer;
+  flex: none;
+}
+
+/* ---------- formulários ---------- */
+.ekf-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ekf-campo {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 700;
+}
+
+.ekf-campo small {
+  font-weight: 400;
+  color: var(--tinta-suave);
+}
+
+.ekf-campo input:not([type='file']),
+.ekf-campo textarea {
+  font: inherit;
+  font-weight: 400;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
+  border: var(--px) solid var(--borda);
+  border-radius: 0;
+  background: var(--papel-forte);
+  color: var(--tinta);
+}
+
+.ekf-campo textarea {
+  resize: vertical;
+}
+
+.ekf-campo input[type='file'] {
+  font: inherit;
+  font-weight: 400;
+  max-width: 100%;
+}
+
+.ekf-robo {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.ekf-trocar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0;
+}
+
+.ekf-dica {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+}
+
+.ekf-aviso {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px dashed var(--borda);
+  font-size: 0.92rem;
+}
+
+.ekf-erro {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  background: var(--erro-fundo);
+  color: var(--erro);
+  border: var(--px) solid var(--erro);
+  font-weight: 700;
+}
+
+.ekf-ok {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  background: var(--frio-claro);
+  color: var(--tinta);
+  border: var(--px) solid var(--frio);
+}
+
+/* ---------- feedback ---------- */
+.ekf-tipos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.ekf-tipo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.7rem;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ekf-tipo:has(input:checked) {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+
+.ekf-print {
+  display: grid;
+  grid-template-columns: auto 6rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border: var(--px) solid var(--borda);
+  cursor: pointer;
+}
+
+.ekf-print img {
+  width: 6rem;
+  height: 4.5rem;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--borda);
+}
+
+.ekf-print span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.ekf-print small {
+  color: var(--tinta-suave);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 26rem) {
+  .ekf-print {
+    grid-template-columns: auto 1fr;
+  }
+
+  .ekf-print img {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    height: 6rem;
+  }
+}
+
+/* ---------- rodapé ---------- */
+.ekf-rodape {
+  padding: 1rem 1rem 1.4rem;
+  text-align: center;
+  color: var(--tinta-suave);
+  font-size: 0.9rem;
+}
+
+.ekf-rodape p {
+  margin: 0.3rem 0;
+}
+
+.ekf-rodape.compacto {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 1rem;
+}
+
+.ekf-rodape.compacto p {
+  margin: 0;
+}
+
+.ekf-familia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+.ekf-familia img {
+  image-rendering: pixelated;
+}
+
+.ekf-nome-marca {
+  font-family: var(--fonte-decorativa);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- tela inicial do app ---------- */
+.ekf-entrada-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  color: var(--tinta);
+}
+
+.ekf-entrada-miolo {
+  flex: 1;
+  width: 100%;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+}
+
+.ekf-heroi {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.ekf-heroi-logo {
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.ekf-heroi h1 {
+  margin: 0 0 0.3rem;
+  font-family: var(--fonte-titulo);
+  font-size: clamp(2rem, 7vw, 3rem);
+  line-height: 1;
+}
+
+.ekf-heroi p {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--tinta-suave);
+}
+
+.ekf-formas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+.ekf-forma {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.1rem 1.1rem 1.2rem;
+  background: var(--papel);
+  border: var(--px) solid var(--borda);
+  box-shadow: 4px 4px 0 0 var(--sombra);
+}
+
+.ekf-forma h2 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 1.5rem;
+}
+
+.ekf-forma p {
+  margin: 0;
+  flex: 1;
+}
+
+.ekf-forma .icone-px {
+  color: var(--destaque);
+}
+
+@media (max-width: 30rem) {
+  .ekf-heroi {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .ekf-heroi-logo {
+    width: 72px;
+    height: 72px;
+  }
+}

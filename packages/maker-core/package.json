@@ -1,0 +1,11 @@
+{
+  "name": "@ekfrase/maker-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Núcleo do Ékfrase (sem DOM): hierarquia hexagonal de abertura 7",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

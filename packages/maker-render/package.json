@@ -1,0 +1,15 @@
+{
+  "name": "@ekfrase/maker-render",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Renderizador do Ékfrase (sem DOM): estilo pixel art por ladrilhos, calculado do mundo",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ekfrase/maker-core": "0.1.0",
+    "@ekfrase/maker-gen": "0.1.0"
+  }
+}

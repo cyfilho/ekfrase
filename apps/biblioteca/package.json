@@ -1,0 +1,23 @@
+{
+  "name": "@ekfrase/biblioteca",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Biblioteca do Ekfrase: obras em domínio público traduzidas por Alcy Filho, com leitor de EPUB próprio",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "acervo": "node ../../scripts/biblioteca.ts",
+    "dev": "npm run acervo && vite",
+    "build": "npm run acervo && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ekfrase/interface": "0.1.0",
+    "@ekfrase/nucleo": "0.1.0",
+    "@fontsource/atkinson-hyperlegible-next": "5.3.0",
+    "@fontsource/cinzel": "5.3.0",
+    "@fontsource/cormorant-garamond": "5.3.0",
+    "@fontsource/gfs-didot": "5.3.0",
+    "preact": "11.1.0"
+  }
+}

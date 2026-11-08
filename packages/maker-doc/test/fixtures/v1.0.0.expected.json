@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "name": "Reino de Açaí — mapa 1",
+    "createdWith": "ekfrase-test@0.0.0"
+  },
+  "world": {
+    "seed": "serra do mar",
+    "extentKm": {
+      "ns": 900,
+      "ew": 1400
+    },
+    "s0M": 1,
+    "generator": {
+      "id": "org.ekfrase.generator.none",
+      "version": "0.0.0",
+      "params": {}
+    },
+    "style": "pixel"
+  },
+  "edits": {
+    "0:1234567:-7654321": {
+      "note": {
+        "text": "ponte",
+        "tags": [
+          "velha",
+          "pedra"
+        ]
+      }
+    },
+    "17:0:0": {
+      "climate": null
+    },
+    "3:-12:7": {
+      "height": 412.5,
+      "terrain": "forest"
+    }
+  },
+  "features": {
+    "id-2": {
+      "kind": "road",
+      "pointsKm": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 3.25,
+          "y": -1
+        },
+        {
+          "x": 7,
+          "y": 2
+        }
+      ],
+      "props": {
+        "surface": "dirt"
+      }
+    }
+  },
+  "entities": {
+    "id-1": {
+      "type": "site",
+      "posKm": {
+        "x": -12.5,
+        "y": 40
+      },
+      "components": {
+        "name": "Vila Nova",
+        "population": 1200
+      }
+    }
+  },
+  "annotations": {
+    "id-3": {
+      "kind": "note",
+      "data": {
+        "text": "Fronteira disputada"
+      }
+    },
+    "id-4": {
+      "kind": "measurement",
+      "data": {
+        "mode": "polyline",
+        "transport": "foot"
+      }
+    }
+  },
+  "plugins": {
+    "org.ekfrase.transport.medieval": {
+      "version": "1.0.0",
+      "source": "builtin"
+    }
+  }
+}
