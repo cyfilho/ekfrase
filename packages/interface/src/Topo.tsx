@@ -49,7 +49,7 @@ export function useFoto(): string | null {
 
 /**
  * Quem entrou: a foto (ou o ícone), o nome, a conta Ekfrase (personagem, foto, inventário, apps),
- * o feedback recebido (só a equipe) e Sair. Sem conta: nada, ou, com `comEntrar`, o botão Entrar
+ * a área da equipe (feedback, pedidos de escola; só a equipe) e Sair. Sem conta: nada, ou, com `comEntrar`, o botão Entrar
  * (a conta Ekfrase é opcional: passear e baixar não pedem conta, DEC-P050).
  */
 export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void; comEntrar?: boolean }) {
@@ -89,8 +89,8 @@ export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void
             {t('nucleo.inventario.titulo')}
           </a>
           {conta.equipe && (
-            <a role="menuitem" href="/#/feedback">
-              {t('nucleo.feedback.recebido')}
+            <a role="menuitem" href="/#/equipe">
+              {t('nucleo.equipe.titulo')}
             </a>
           )}
           <button

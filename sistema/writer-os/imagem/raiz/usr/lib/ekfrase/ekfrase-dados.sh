@@ -1,0 +1,112 @@
+#!/bin/bash
+# SPDX-License-Identifier: MPL-2.0
+#
+# A PARTIÇÃO DE DADOS do Writer OS (PLANO §6.1 e §6.1b). Roda como root, uma vez por boot, antes da
+# sessão (ekfrase-dados.service), sem shell para ninguém:
+#
+#   - a memória: /run/ekfrase/ram (tmpfs de 256 MB, só do writer), o destino de última hora (§4.5);
+#   - o disco de boot: o que está montado em /run/live/medium (remontado só leitura). Só mexe nele
+#     se estiver no barramento USB (pendrive, SSD portátil, HD externo; nunca um disco interno);
+#   - a partição EKFRASE-DADOS: se não existe e o disco só tem a partição de boot, cria com o resto
+#     do disco (exFAT; ext4 a partir de 1 TB) e formata (rótulo EKFR-DADOS: o exFAT aceita só 11);
+#   - confere (fsck) e monta em /dados (do writer, noexec, nosuid, nodev);
+#   - o fuso escolhido no primeiro uso (sistema.json) vale de novo;
+#   - conta o que achou em /run/ekfrase/dados.json: {"modo": "pendrive" | "sem-dados", "motivo": …}.
+#
+# Nunca apaga nem reformata uma partição que já existe.
+set -u
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+RUN=/run/ekfrase
+DADOS=/dados
+PARTE_ROTULO=EKFRASE-DADOS
+FS_ROTULO=EKFR-DADOS
+MINIMO_MB=512
+WRITER=1000
+
+mkdir -p "$RUN" "$DADOS"
+chmod 0755 "$RUN"
+
+relatar() {
+  printf '{"modo":"%s","motivo":"%s"}\n' "$1" "$2" > "$RUN/dados.json"
+  chmod 0644 "$RUN/dados.json"
+  echo "ekfrase-dados: $1 $2"
+  exit 0
+}
+
+mkdir -p "$RUN/ram"
+mountpoint -q "$RUN/ram" || mount -t tmpfs -o size=256M,mode=0700,uid=$WRITER,gid=$WRITER,nosuid,nodev,noexec tmpfs "$RUN/ram"
+
+udevadm settle -t 30 || true
+
+MEDIO=$(findmnt -no SOURCE /run/live/medium 2>/dev/null | head -1)
+[ -n "$MEDIO" ] || relatar sem-dados sem-medio
+mount -o remount,ro /run/live/medium 2>/dev/null || true
+PAI=$(lsblk -no PKNAME "$MEDIO" 2>/dev/null | head -1 | tr -d ' ')
+[ -n "$PAI" ] || relatar sem-dados sem-medio
+DISCO=/dev/$PAI
+[ -b "$DISCO" ] || relatar sem-dados sem-medio
+[ "$(lsblk -dno TRAN "$DISCO" | tr -d ' ')" = usb ] || relatar sem-dados nao-usb
+[ "$(lsblk -dno RO "$DISCO" | tr -d ' ')" != 1 ] || relatar sem-dados protegido
+
+parte_dados() { lsblk -nrpo NAME,PARTLABEL "$DISCO" | awk -v r="$PARTE_ROTULO" '$2 == r { print $1; exit }'; }
+
+PARTE=$(parte_dados)
+if [ -z "$PARTE" ]; then
+  # só num disco que tem SÓ a partição de boot: nunca mexe numa partição de outra pessoa
+  [ "$(lsblk -nrpo TYPE "$DISCO" | grep -c '^part$')" = 1 ] || relatar sem-dados outras-particoes
+  # a imagem é menor que o disco: a cópia da GPT vai para o fim de verdade
+  sgdisk -e "$DISCO" >/dev/null 2>&1 || true
+  INICIO=$(sgdisk -F "$DISCO" 2>/dev/null | tail -1)
+  FIM=$(sgdisk -E "$DISCO" 2>/dev/null | tail -1)
+  SETOR=$(blockdev --getss "$DISCO")
+  case "$INICIO$FIM" in '' | *[!0-9]*) relatar sem-dados sem-espaco ;; esac
+  [ $(((FIM - INICIO + 1) * SETOR / 1048576)) -ge $MINIMO_MB ] || relatar sem-dados sem-espaco
+  if [ "$(lsblk -bdno SIZE "$DISCO" | tr -d ' ')" -ge 1000000000000 ]; then FS=ext4 TIPO=8300; else FS=exfat TIPO=0700; fi
+  sgdisk -n "2:$INICIO:$FIM" -t "2:$TIPO" -c "2:$PARTE_ROTULO" "$DISCO" >/dev/null || relatar sem-dados nao-cria
+  # a partição 1 está em uso: o kernel aprende só a nova
+  partx -a -n 2 "$DISCO" 2>/dev/null || partx -u "$DISCO" 2>/dev/null || true
+  udevadm settle -t 30 || true
+  PARTE=$(parte_dados)
+  [ -n "$PARTE" ] || relatar sem-dados nao-cria
+  if [ "$FS" = ext4 ]; then
+    mkfs.ext4 -q -F -L "$FS_ROTULO" -E root_owner=$WRITER:$WRITER "$PARTE" || relatar sem-dados nao-formata
+  else
+    mkfs.exfat -L "$FS_ROTULO" "$PARTE" >/dev/null || relatar sem-dados nao-formata
+  fi
+  echo "ekfrase-dados: criei $PARTE ($FS)"
+fi
+
+TIPO_FS=$(blkid -o value -s TYPE "$PARTE" 2>/dev/null)
+case "$TIPO_FS" in
+  exfat)
+    # tirar o pendrive no susto deixa o exFAT "sujo": conserta antes de montar
+    fsck.exfat -y "$PARTE" >/dev/null 2>&1 || true
+    mount -t exfat -o uid=$WRITER,gid=$WRITER,fmask=0077,dmask=0077,noexec,nosuid,nodev,noatime "$PARTE" "$DADOS" || relatar sem-dados nao-monta
+    ;;
+  ext4)
+    e2fsck -p "$PARTE" >/dev/null 2>&1 || true
+    mount -t ext4 -o noexec,nosuid,nodev,noatime "$PARTE" "$DADOS" || relatar sem-dados nao-monta
+    chown $WRITER:$WRITER "$DADOS"
+    chmod 0700 "$DADOS"
+    ;;
+  *) relatar sem-dados nao-monta ;;
+esac
+
+if ! (touch "$DADOS/.ekfrase-grava" && rm -f "$DADOS/.ekfrase-grava"); then
+  umount "$DADOS" || true
+  relatar sem-dados nao-grava
+fi
+mkdir -p "$DADOS/Ekfrase Writer"
+[ "$TIPO_FS" = exfat ] || chown $WRITER:$WRITER "$DADOS/Ekfrase Writer"
+
+# o fuso do primeiro uso (o /etc está na memória: volta ao padrão a cada boot)
+SJ="$DADOS/Ekfrase Writer/sistema.json"
+if [ -f "$SJ" ]; then
+  FUSO=$(grep -o '"fuso"[[:space:]]*:[[:space:]]*"[A-Za-z0-9_+/-]*"' "$SJ" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+  case "$FUSO" in
+    '' | *..*) ;;
+    *) [ -f "/usr/share/zoneinfo/$FUSO" ] && ln -sf "/usr/share/zoneinfo/$FUSO" /etc/localtime ;;
+  esac
+fi
+
+relatar pendrive ""

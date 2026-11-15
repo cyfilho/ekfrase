@@ -1,0 +1,105 @@
+{
+  "caso": "conflito-base-nula",
+  "descricao": "Base null quando o servidor já tem o registro (dois aparelhos criaram o mesmo id, ou o aparelho perdeu o que sabia): conflito.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-bbbbbbbb",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Do celular",
+              "texto": "— Do celular.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000001-0000-bbbbbbbb",
+                "texto": "1731400000001-0000-bbbbbbbb"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Do computador",
+              "texto": "— Do computador.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000002-0000-aaaaaaaa",
+                "texto": "1731400000002-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000001-0000-bbbbbbbb",
+                "apagado": false,
+                "dados": {
+                  "historia": "0193a000-0000-7000-8000-000000000900",
+                  "titulo": "Do celular",
+                  "texto": "— Do celular.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                  "palavras": 5,
+                  "ordem": "a0",
+                  "_v": {
+                    "titulo": "1731400000001-0000-bbbbbbbb",
+                    "texto": "1731400000001-0000-bbbbbbbb"
+                  }
+                },
+                "seq": "$n=s1"
+              }
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "caso": "mesmo-id-em-outra-conta",
+  "descricao": "A chave é (conta, id): o mesmo id vive separado em cada conta, até em coleções diferentes, e cada um avança sozinho.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "historias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "Ana 1"
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=a1"
+            }
+          ],
+          "cursor": "$n=a1"
+        }
+      }
+    },
+    {
+      "nota": "Mesmo id, outra coleção: na conta da Bia é outro registro.",
+      "quem": "bia",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "personagens",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "nome": "Bia 1"
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=b1"
+            }
+          ],
+          "cursor": "$n=b1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "historias",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "Ana 2"
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>a1=a2"
+            }
+          ],
+          "cursor": "$n=a2"
+        }
+      }
+    },
+    {
+      "nota": "O da Bia não andou junto.",
+      "quem": "bia",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "personagens",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "nome": "Bia 1"
+              },
+              "seq": "$n=b1"
+            }
+          ],
+          "cursor": "$n=b1",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "A base da Ana não vale na conta da Bia.",
+      "quem": "bia",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "personagens",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "nome": "Bia 3"
+            },
+            "base": "1731400000002-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "personagens",
+                "versao": "1731400000001-0000-aaaaaaaa",
+                "apagado": false,
+                "dados": {
+                  "nome": "Bia 1"
+                },
+                "seq": "$n=b1"
+              }
+            }
+          ],
+          "cursor": "$n=b1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "historias",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "Ana 2"
+              },
+              "seq": "$n=a2"
+            }
+          ],
+          "cursor": "$n=a2",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

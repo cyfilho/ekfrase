@@ -72,7 +72,7 @@
   "doc.confirmDiscard": "Há alterações não salvas. Descartar e continuar?",
   "doc.opened": "Aberto: {name}",
   "doc.savedAs": "Salvo como {file}",
-  "doc.hint": "Salvar guarda o mundo na nuvem, na sua conta. Exportar baixa um arquivo .ekfr; Importar abre um (os .ekfrase antigos também abrem).",
+  "doc.hint": "Tudo se salva sozinho: na nuvem, na sua conta, e num rascunho neste navegador. Salvar (Ctrl+S) manda para a nuvem na hora. Exportar baixa um arquivo .ekfr; Importar abre um (os .ekfrase antigos também abrem).",
   "error.doc.other-app": "Este arquivo é de outro app da família Ekfrase.",
   "file.otherApp": "Este arquivo é do {app}, não do Maker. Abrir no {app}?",
   "file.unknownApp": "Este arquivo é de um app da família Ekfrase que esta versão ainda não conhece ({app}). Atualize a página e tente de novo.",
@@ -123,7 +123,7 @@
   "world.generator": "Gerador: {id}",
   "world.noGenerator": "Este documento não tem gerador (foi criado antes da Fase 3).",
   "world.useBasic": "Usar o gerador básico",
-  "world.hint": "Cada clique em Gerar cria um mundo novo e aleatório. Um mapa salvo sempre abre igual. Para repetir um mundo de propósito, digite a semente e tecle Enter.",
+  "world.hint": "Gerar cria um mundo novo e aleatório; se o atual já tem algo feito, ele continua salvo em Meus mundos e o novo abre ao lado. Um mapa salvo sempre abre igual. Para repetir um mundo de propósito, digite a semente e tecle Enter.",
   "terrain.title": "Terreno gerado",
   "terrain.biome": "Bioma",
   "terrain.elevation": "Altitude",
@@ -190,5 +190,13 @@
   "label.save": "Salvar",
   "brush.houseShort": "Casas",
   "entry.description": "Desenhe mundos inteiros: continentes, cordilheiras, matas e mares, do globo inteiro até a rua de uma cidade.",
-  "local.aviso": "Modo local: sem o servidor do Ekfrase, o mundo não vai para a nuvem. Use Exportar para guardar o arquivo .ekfr."
+  "local.aviso": "Modo local: sem o servidor do Ekfrase, o mundo não vai para a nuvem. Use Exportar para guardar o arquivo .ekfr.",
+  "view.panelHide": "Esconder o painel (mais espaço para o mapa)",
+  "view.panelShow": "Mostrar o painel",
+  "view.fullscreen": "Tela cheia: só o mapa (F)",
+  "view.fullscreenExit": "Sair da tela cheia (Esc)",
+  "cloud.auto.saving": "Salvando na nuvem…",
+  "cloud.auto.saved": "Salvo na nuvem às {time}",
+  "cloud.auto.error": "Ainda não deu para salvar na nuvem. As mudanças estão guardadas neste navegador e o Maker tenta de novo em instantes.",
+  "world.newKept": "Mundo novo. O anterior continua salvo em Meus mundos."
 }

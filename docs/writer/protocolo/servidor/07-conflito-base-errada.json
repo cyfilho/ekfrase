@@ -1,0 +1,224 @@
+{
+  "caso": "conflito-base-errada",
+  "descricao": "Base diferente da versao gravada: não grava e devolve a linha do servidor. O aparelho mescla e reenvia com base = servidor.versao.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Um",
+              "texto": "— Um.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000001-0000-aaaaaaaa",
+                "texto": "1731400000001-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "nota": "O celular avança.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-bbbbbbbb",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Dois, do celular",
+              "texto": "— Dois, do celular.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000002-0000-bbbbbbbb",
+                "texto": "1731400000002-0000-bbbbbbbb"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "O computador ainda conhecia a versão 1: conflito, mesmo com versao maior.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Três, do computador",
+              "texto": "— Três, do computador.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000003-0000-aaaaaaaa",
+                "texto": "1731400000003-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000002-0000-bbbbbbbb",
+                "apagado": false,
+                "dados": {
+                  "historia": "0193a000-0000-7000-8000-000000000900",
+                  "titulo": "Dois, do celular",
+                  "texto": "— Dois, do celular.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                  "palavras": 5,
+                  "ordem": "a0",
+                  "_v": {
+                    "titulo": "1731400000002-0000-bbbbbbbb",
+                    "texto": "1731400000002-0000-bbbbbbbb"
+                  }
+                },
+                "seq": "$n=s2"
+              }
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "Nada mudou no servidor.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000002-0000-bbbbbbbb",
+              "apagado": false,
+              "dados": {
+                "historia": "0193a000-0000-7000-8000-000000000900",
+                "titulo": "Dois, do celular",
+                "texto": "— Dois, do celular.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                "palavras": 5,
+                "ordem": "a0",
+                "_v": {
+                  "titulo": "1731400000002-0000-bbbbbbbb",
+                  "texto": "1731400000002-0000-bbbbbbbb"
+                }
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Reenvio depois de mesclar.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000004-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Mesclado",
+              "texto": "— Mesclado.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000004-0000-aaaaaaaa",
+                "texto": "1731400000004-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000002-0000-bbbbbbbb"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s2=s3"
+            }
+          ],
+          "cursor": "$n=s3"
+        }
+      }
+    }
+  ]
+}

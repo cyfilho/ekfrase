@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+
+/*
+ * A paleta do Writer, "tinta e papel" (DEC-P062): marfim (o papel), sépia (o destaque) e tinta
+ * azul-noite. Troca os tokens do Guia de Arte do núcleo e acrescenta os que só o Writer usa:
+ * --aviso (o âmbar do "só na memória"; --aviso-no-topo, o mesmo sobre o topo), --capa-1 a 6 (as capas feitas por código) e --folha (a
+ * folha de escrever). Regra de desenho nova não entra aqui.
+ */
+
+:root {
+  --ceu-alto: #f6eedb;
+  --ceu-baixo: #e7d8b6;
+  --silhueta: #d3c09a;
+  --silhueta-perto: #bfa87c;
+  --papel: #fbf6e9;
+  --papel-forte: #f1e7d0;
+  --tinta: #1b2440;
+  --tinta-suave: #4a5273;
+  --borda: #1b2440;
+  --sombra: rgba(27, 36, 64, 0.28);
+  --topo: #1b2440;
+  --topo-texto: #f6efdc;
+  --topo-filete: #a4703a;
+  --destaque: #7a4a21;
+  --destaque-texto: #fbf6e9;
+  --frio: #2f4a7a;
+  --frio-claro: #dfe5f0;
+  --aviso: #8a5a00;
+  --aviso-fundo: #f6e3b0;
+  /* o aviso sobre o topo azul-noite (a nuvem com problema) */
+  --aviso-no-topo: #f6e3b0;
+  --capa-1: #1b2440;
+  --capa-2: #7a4a21;
+  --capa-3: #2f4a7a;
+  --capa-4: #5b3a52;
+  --capa-5: #2f5548;
+  --capa-6: #6b2f2f;
+  --capa-detalhe: #e6c98a;
+  --folha: #fdf9ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    --ceu-alto: #0a0e1a;
+    --ceu-baixo: #141a2e;
+    --silhueta: #0c1120;
+    --silhueta-perto: #070a13;
+    --papel: #1a2036;
+    --papel-forte: #242b47;
+    --tinta: #efe6cf;
+    --tinta-suave: #bfb596;
+    --borda: #05070e;
+    --sombra: rgba(0, 0, 0, 0.5);
+    --topo: #0a0e1a;
+    --topo-texto: #efe6cf;
+    --topo-filete: #c89a5b;
+    --destaque: #d9ab6a;
+    --destaque-texto: #141a2c;
+    --frio: #9db4e0;
+    --frio-claro: #25304f;
+    --aviso: #f0c060;
+    --aviso-fundo: #3d3115;
+    --aviso-no-topo: #f0c060;
+    --capa-1: #2a3560;
+    --capa-2: #8a5a2c;
+    --capa-3: #3a5a92;
+    --capa-4: #6b4762;
+    --capa-5: #3a6657;
+    --capa-6: #7d3a3a;
+    --capa-detalhe: #e6c98a;
+    --folha: #161b2e;
+  }
+}
+
+:root[data-tema='escuro'] {
+  --ceu-alto: #0a0e1a;
+  --ceu-baixo: #141a2e;
+  --silhueta: #0c1120;
+  --silhueta-perto: #070a13;
+  --papel: #1a2036;
+  --papel-forte: #242b47;
+  --tinta: #efe6cf;
+  --tinta-suave: #bfb596;
+  --borda: #05070e;
+  --sombra: rgba(0, 0, 0, 0.5);
+  --topo: #0a0e1a;
+  --topo-texto: #efe6cf;
+  --topo-filete: #c89a5b;
+  --destaque: #d9ab6a;
+  --destaque-texto: #141a2c;
+  --frio: #9db4e0;
+  --frio-claro: #25304f;
+  --aviso: #f0c060;
+  --aviso-fundo: #3d3115;
+  --aviso-no-topo: #f0c060;
+  --capa-1: #2a3560;
+  --capa-2: #8a5a2c;
+  --capa-3: #3a5a92;
+  --capa-4: #6b4762;
+  --capa-5: #3a6657;
+  --capa-6: #7d3a3a;
+  --capa-detalhe: #e6c98a;
+  --folha: #161b2e;
+}

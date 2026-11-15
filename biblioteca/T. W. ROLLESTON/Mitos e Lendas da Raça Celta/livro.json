@@ -1,0 +1,19 @@
+{
+  "comentario": "A ficha do livro na Biblioteca do Ekfrase (editável pela Administração da Biblioteca: Abrir-Biblioteca-Admin.cmd). ano negativo = antes de Cristo.",
+  "id": "mitos-e-lendas-da-raca-celta",
+  "titulo": "Mitos e Lendas da Raça Celta",
+  "subtitulo": "Edição crítica, bilíngue (inglês–português) e didática comparada",
+  "autor": "T. W. Rolleston",
+  "ano": 1911,
+  "titulo_original": "Myths & Legends of the Celtic Race",
+  "traducao": "Alcy Filho",
+  "editora": "Editora Ékfrase",
+  "ano_traducao": 2026,
+  "idioma": "pt-BR",
+  "idioma_original": "en",
+  "cdd": "299.16",
+  "generos": ["mitologia", "celtas", "folclore", "bilingue"],
+  "licenca": "CC BY-SA 4.0",
+  "descricao": "O clássico de Rolleston sobre os mitos e lendas dos povos celtas, do ciclo de Ulster e Cuchulain aos feitos de Finn e dos Fianna, do Gales de Taliesin e do Mabinogion às lendas bretãs. Em cinco partes: tradução filológica com notas e poemas bárdicos em dupla versão, versão fácil de ler para iniciantes, as duas lado a lado, o original inglês e o glossário integral.",
+  "capa": { "fundo": "#10301f", "detalhe": "#d9b45a", "simbolo": "folha" }
+}

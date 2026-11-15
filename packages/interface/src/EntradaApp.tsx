@@ -9,9 +9,10 @@
  * No passeio, o mesmo papel é do hall da torre do app no castelo.
  */
 import type { Tradutor } from '@ekfrase/nucleo';
+import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
 import { FormConta, type ModoConta } from './Conta.tsx';
-import { IconeBaixar, IconeNuvem, IconeTroca } from './icones.tsx';
+import { IconeBaixar, IconeNuvem, IconePendrive, IconeTroca } from './icones.tsx';
 import { Janela } from './Janela.tsx';
 import type { Conta } from './ponte.ts';
 import { RodapeEkfrase } from './Rodape.tsx';
@@ -26,21 +27,38 @@ export interface EntradaAppProps {
   logo: string;
   nome: string;
   descricao: string;
-  /** Quem chega pode criar a própria conta (no Vernákula, quem cria é a escola). */
+  /** Quem chega pode criar a própria conta (no Vernákula também, desde as escolas pedidas: DEC-P059). */
   podeCriar: boolean;
   /** O app guarda arquivos que se exportam e importam (o .ekfr do Maker). */
   arquivos: boolean;
   /** Entrou: o app abre. */
   aoEntrar: (c: Conta) => void;
   /** Em vez da janela de entrar, o app tem a própria tela (o Vernákula). */
-  entrarProprio?: () => void;
+  entrarProprio?: (modo: ModoConta) => void;
   aoTrocarIdioma?: (codigo: string) => void;
+  /**
+   * Mais uma forma de usar, própria do app (os textos vêm dele): o "escrever sem conta" do Writer,
+   * que guarda tudo só neste aparelho. Aparece como o primeiro cartão.
+   */
+  outraForma?: { icone?: VNode; titulo: string; texto: string; botao: string; aoEscolher: () => void };
+  /**
+   * O app para o computador: sem isto, o cartão diz "Em breve" (até o Motor); com `aoEscolher`, o
+   * botão Baixar leva à página de download do app; `null` esconde o cartão (já está no computador).
+   */
+  computador?: { aoEscolher: () => void } | null;
+  /** O app num pendrive (o Writer OS): botão que leva à página dele; sem isto, o cartão não aparece. */
+  pendrive?: { aoEscolher: () => void } | null;
+  /**
+   * Quem já tem onde escrever (conta ou "sem conta") e voltou ao hall: no lugar de "Escrever sem conta"
+   * e "Online" (entrar), um só cartão que abre o app.
+   */
+  emCasa?: { icone?: VNode; titulo: string; texto: string; botao: string; aoEscolher: () => void };
 }
 
 export function EntradaApp(p: EntradaAppProps) {
   const { t } = p;
   const [janela, setJanela] = useState<ModoConta | null>(null);
-  const abrir = (m: ModoConta) => (p.entrarProprio ? p.entrarProprio() : setJanela(m));
+  const abrir = (m: ModoConta) => (p.entrarProprio ? p.entrarProprio(m) : setJanela(m));
   return (
     <div class="ekf-entrada-app">
       <TopoEkfrase t={t} tr={p.tr} app={p.app} passeio={`/#/torre/${p.app}`} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
@@ -53,6 +71,31 @@ export function EntradaApp(p: EntradaAppProps) {
           </div>
         </section>
         <ul class="ekf-formas">
+          {p.emCasa && (
+            <li class="ekf-forma">
+              {p.emCasa.icone ?? <IconeNuvem tamanho={36} />}
+              <h2>{p.emCasa.titulo}</h2>
+              <p>{p.emCasa.texto}</p>
+              <div class="ekf-linha">
+                <button type="button" class="ekf-botao principal" data-teste="entrada-abrir" onClick={p.emCasa.aoEscolher}>
+                  {p.emCasa.botao}
+                </button>
+              </div>
+            </li>
+          )}
+          {!p.emCasa && p.outraForma && (
+            <li class="ekf-forma">
+              {p.outraForma.icone}
+              <h2>{p.outraForma.titulo}</h2>
+              <p>{p.outraForma.texto}</p>
+              <div class="ekf-linha">
+                <button type="button" class="ekf-botao principal" data-teste="entrada-outra-forma" onClick={p.outraForma.aoEscolher}>
+                  {p.outraForma.botao}
+                </button>
+              </div>
+            </li>
+          )}
+          {!p.emCasa && (
           <li class="ekf-forma">
             <IconeNuvem tamanho={36} />
             <h2>{t('nucleo.entrada.online.titulo')}</h2>
@@ -68,16 +111,37 @@ export function EntradaApp(p: EntradaAppProps) {
               )}
             </div>
           </li>
-          <li class="ekf-forma">
-            <IconeBaixar tamanho={36} />
-            <h2>{t('nucleo.entrada.computador.titulo')}</h2>
-            <p>{t('nucleo.entrada.computador.texto')}</p>
-            <div class="ekf-linha">
-              <button type="button" class="ekf-botao" disabled>
-                {t('nucleo.entrada.computador.breve')}
-              </button>
-            </div>
-          </li>
+          )}
+          {p.computador !== null && (
+            <li class="ekf-forma">
+              <IconeBaixar tamanho={36} />
+              <h2>{t('nucleo.entrada.computador.titulo')}</h2>
+              <p>{t('nucleo.entrada.computador.texto')}</p>
+              <div class="ekf-linha">
+                {p.computador ? (
+                  <button type="button" class="ekf-botao" data-teste="entrada-computador" onClick={p.computador.aoEscolher}>
+                    {t('nucleo.entrada.computador.baixar')}
+                  </button>
+                ) : (
+                  <button type="button" class="ekf-botao" disabled>
+                    {t('nucleo.entrada.computador.breve')}
+                  </button>
+                )}
+              </div>
+            </li>
+          )}
+          {p.pendrive && (
+            <li class="ekf-forma">
+              <IconePendrive tamanho={36} />
+              <h2>{t('nucleo.entrada.pendrive.titulo')}</h2>
+              <p>{t('nucleo.entrada.pendrive.texto')}</p>
+              <div class="ekf-linha">
+                <button type="button" class="ekf-botao" data-teste="entrada-pendrive" onClick={p.pendrive.aoEscolher}>
+                  {t('nucleo.entrada.pendrive.ver')}
+                </button>
+              </div>
+            </li>
+          )}
           {p.arquivos && (
             <li class="ekf-forma">
               <IconeTroca tamanho={36} />

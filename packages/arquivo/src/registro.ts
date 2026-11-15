@@ -26,6 +26,14 @@ export interface AppNoRegistro {
 
 export const REGISTRO: readonly AppNoRegistro[] = [
   { id: 'maker', endereco: '/maker/', abre: [{ tipo: 'mundo', maior: 1 }] },
+  {
+    id: 'writer',
+    endereco: '/writer/',
+    abre: [
+      { tipo: 'historia', maior: 1 },
+      { tipo: 'ideias', maior: 1 },
+    ],
+  },
 ];
 
 export const appDoRegistro = (id: string): AppNoRegistro | undefined => REGISTRO.find((a) => a.id === id);

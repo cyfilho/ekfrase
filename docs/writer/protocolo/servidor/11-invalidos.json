@@ -1,0 +1,442 @@
+{
+  "caso": "invalidos",
+  "descricao": "Registro malformado é recusado sozinho (\"invalido\"); os outros do mesmo pedido seguem. O id do resultado é o recebido (null se não era texto).",
+  "passos": [
+    {
+      "nota": "Na ordem: um bom; id em maiúsculas; id que é UUID v4; id com variante errada; id com quebra de linha no fim; id que não é texto; sem id; coleção que não sincroniza; coleção desconhecida; versao com 12 dígitos; versao com hex maiúsculo; versao que não é texto; apagado que não é booleano; sem apagado; dados que é lista; dados que é texto; dados nulo; sem dados; base malformada; base que não é texto; sem base (tem de vir, nem que seja null); um texto, um null e uma lista no lugar do registro; outro bom.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193A000-0000-7000-8000-00000000000A",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-4000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-c000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000051\n",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": 12,
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000052",
+            "colecao": "versoes_cena",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000053",
+            "colecao": "Cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000054",
+            "colecao": "ideias",
+            "versao": "173140000000-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000055",
+            "colecao": "ideias",
+            "versao": "1731400000001-000A-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000056",
+            "colecao": "ideias",
+            "versao": 1731400000001,
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000057",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": 0,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000050",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000058",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": [],
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000059",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": "{}",
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000060",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": null,
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000050",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000061",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": "ontem"
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000062",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": 0
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000050",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            }
+          },
+          "não sou um objeto",
+          null,
+          [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "x"
+              },
+              "base": null
+            }
+          ],
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            },
+            {
+              "id": "0193A000-0000-7000-8000-00000000000A",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-4000-8000-000000000001",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-c000-000000000001",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000051\n",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": null,
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": null,
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000052",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000053",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000054",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000055",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000056",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000057",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000050",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000058",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000059",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000060",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000050",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000061",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000062",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000050",
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": null,
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": null,
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": null,
+              "estado": "recusado",
+              "erro": "invalido"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "A coleção de um id não muda: mandar o mesmo id em outra coleção é recusado.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "x"
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "recusado",
+              "erro": "invalido"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "Só os dois bons foram gravados.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "x"
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "x"
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    }
+  ]
+}
