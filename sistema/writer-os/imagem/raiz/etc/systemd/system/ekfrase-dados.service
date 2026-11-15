@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MPL-2.0
+# A partição de dados do Writer OS (PLANO §6.1): cria no primeiro boot, confere e monta em /dados.
+[Unit]
+Description=Ekfrase Writer OS: a partição de dados
+After=local-fs.target systemd-udevd.service
+Before=ekfrase-sessao.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/ekfrase/ekfrase-dados.sh
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

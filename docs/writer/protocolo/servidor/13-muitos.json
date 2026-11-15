@@ -1,0 +1,164 @@
+{
+  "caso": "muitos",
+  "descricao": "Um pedido leva de 1 a 500 registros: 501 é recusado inteiro (\"muitos\") e nada é gravado; 500 passam. Sem \"limite\", mudancas devolve até 500.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": {
+          "$repete": {
+            "id": "0193a000-0000-7000-8000-{i}",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": "{i}"
+            },
+            "base": null
+          },
+          "vezes": 501
+        }
+      },
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "muitos",
+          "limite": 500
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": {
+          "$repete": {
+            "id": "0193a000-0000-7000-8000-{i}",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": "{i}"
+            },
+            "base": null
+          },
+          "vezes": 500
+        }
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": {
+            "$repete": {
+              "id": "0193a000-0000-7000-8000-{i}",
+              "estado": "aceito",
+              "seq": "$n"
+            },
+            "vezes": 500
+          },
+          "cursor": "$n>0=s500"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000009000",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {},
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000009000",
+              "estado": "aceito",
+              "seq": "$n>s500=s501"
+            }
+          ],
+          "cursor": "$n=s501"
+        }
+      }
+    },
+    {
+      "nota": "São 501 no servidor: vêm 500 e \"mais\" avisa.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": {
+            "$repete": {
+              "id": "0193a000-0000-7000-8000-{i}",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": "{i}"
+              },
+              "seq": "$n"
+            },
+            "vezes": 500
+          },
+          "cursor": "$n=s500",
+          "mais": true
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s500}",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000009000",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {},
+              "seq": "$n=s501"
+            }
+          ],
+          "cursor": "$n=s501",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

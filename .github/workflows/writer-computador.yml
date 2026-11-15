@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Ekfrase Writer no computador (sistema/writer-os/casca): quando uma tag writer-v* chega aqui
+# (por exemplo writer-v0.1.0), monta a casca no Windows (instalador NSIS) e no Linux (AppImage),
+# roda o roteiro da casca e cria o Release com os dois arquivos. A página de download do Writer
+# (ekfrase.com/writer/#/computador) baixa de releases/latest. Sem certificado de assinatura por
+# enquanto (o Windows mostra o aviso do SmartScreen; a página explica o passo a passo).
+name: Writer no computador
+
+on:
+  push:
+    tags: ['writer-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  instalador:
+    name: ${{ matrix.os }} — roteiro e instalador
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: sistema/writer-os/casca
+      - name: Electron no Linux (o sandbox do Chromium precisa de namespaces sem privilégio)
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Roteiro da casca (teclado, travas, cifra, espelho)
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run teclado -- --so-casca
+      - run: npm run casca:instalador
+      - uses: actions/upload-artifact@v4
+        with:
+          name: writer-instalador-${{ runner.os }}
+          path: |
+            sistema/writer-os/casca/instalador/Ekfrase-Writer-Setup.exe
+            sistema/writer-os/casca/instalador/Ekfrase-Writer.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: instalador
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: arquivos
+          merge-multiple: true
+      - name: Criar o Release com os dois instaladores
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          versao="${GITHUB_REF_NAME#writer-v}"
+          gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY"             --title "Ekfrase Writer $versao no computador"             --notes "Windows: Ekfrase-Writer-Setup.exe. Linux: Ekfrase-Writer.AppImage. Na primeira vez, o Windows mostra o aviso do SmartScreen (o instalador ainda não tem certificado): Mais informações, Executar assim mesmo. Passo a passo em https://ekfrase.com/writer/#/computador"

@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MPL-2.0
+# A sessão do Writer OS (ekfrase-sessao.service). Não há autenticação (o systemd não pede): só a
+# conta e a sessão do logind (pam_systemd), que dá ao writer a tela, o teclado e o "sessão ativa"
+# que o polkit confere.
+account  required  pam_unix.so
+session  required  pam_unix.so
+session  required  pam_systemd.so

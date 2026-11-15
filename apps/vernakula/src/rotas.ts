@@ -5,10 +5,10 @@ import { useEffect, useState } from 'preact/hooks';
 /**
  * As telas por endereço (#/conta, #/textos…): o botão Voltar do celular e do
  * navegador funciona, e dá para guardar o link de uma tela. Algumas levam um
- * parâmetro depois da barra (#/redefinir/<código do e-mail>).
+ * parâmetro depois da barra (#/redefinir/<código do e-mail>, #/convite/<código>).
  */
-export type Rota = 'inicio' | 'entrar' | 'conta' | 'textos' | 'esqueci' | 'redefinir';
-const ROTAS: readonly Rota[] = ['inicio', 'entrar', 'conta', 'textos', 'esqueci', 'redefinir'];
+export type Rota = 'inicio' | 'entrar' | 'criar' | 'conta' | 'textos' | 'esqueci' | 'redefinir' | 'escolas' | 'pedir' | 'admin' | 'convite';
+const ROTAS: readonly Rota[] = ['inicio', 'entrar', 'criar', 'conta', 'textos', 'esqueci', 'redefinir', 'escolas', 'pedir', 'admin', 'convite'];
 
 export interface Endereco {
   rota: Rota;

@@ -145,6 +145,22 @@ select {
   height: 48px;
 }
 
+/* o nome do app com, embaixo, o nome da escola (ou organização) em que a pessoa entrou */
+.marca-nomes {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.marca-escola {
+  font-family: var(--fonte-texto);
+  font-weight: 400;
+  font-size: 0.85rem;
+  line-height: 1.15;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
 .topo-acoes {
   display: flex;
   gap: 0.6rem;

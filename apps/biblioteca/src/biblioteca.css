@@ -57,6 +57,11 @@
   box-shadow: var(--px) var(--px) 0 0 var(--borda);
 }
 
+/* o número da classe da CDD no botão da estante (DEC-P058) */
+.chip .cdd-num {
+  font-weight: 700;
+}
+
 .chip small {
   color: var(--tinta-suave);
   font-weight: 400;

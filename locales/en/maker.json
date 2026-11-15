@@ -72,7 +72,7 @@
   "doc.confirmDiscard": "There are unsaved changes. Discard them and continue?",
   "doc.opened": "Opened: {name}",
   "doc.savedAs": "Saved as {file}",
-  "doc.hint": "Save keeps the world in the cloud, in your account. Export downloads an .ekfr file; Import opens one (old .ekfrase files open too).",
+  "doc.hint": "Everything saves by itself: to the cloud, in your account, and to a draft in this browser. Save (Ctrl+S) sends it to the cloud right away. Export downloads an .ekfr file; Import opens one (old .ekfrase files open too).",
   "error.doc.other-app": "This file belongs to another Ekfrase app.",
   "file.otherApp": "This file belongs to {app}, not the Maker. Open it in {app}?",
   "file.unknownApp": "This file comes from an Ekfrase app this version does not know yet ({app}). Reload the page and try again.",
@@ -123,7 +123,7 @@
   "world.generator": "Generator: {id}",
   "world.noGenerator": "This document has no generator (it was created before Phase 3).",
   "world.useBasic": "Use the basic generator",
-  "world.hint": "Every click on Generate creates a new random world. A saved map always opens the same. To repeat a world on purpose, type the seed and press Enter.",
+  "world.hint": "Generate creates a new random world; if the current one already has work in it, it stays saved in My worlds and the new one opens instead. A saved map always opens the same. To repeat a world on purpose, type the seed and press Enter.",
   "terrain.title": "Generated terrain",
   "terrain.biome": "Biome",
   "terrain.elevation": "Elevation",
@@ -190,5 +190,13 @@
   "label.save": "Save",
   "brush.houseShort": "Houses",
   "entry.description": "Draw whole worlds: continents, mountain ranges, forests and seas, from the whole globe down to a city street.",
-  "local.aviso": "Local mode: without the Ekfrase server, the world is not saved to the cloud. Use Export to keep the .ekfr file."
+  "local.aviso": "Local mode: without the Ekfrase server, the world is not saved to the cloud. Use Export to keep the .ekfr file.",
+  "view.panelHide": "Hide the panel (more room for the map)",
+  "view.panelShow": "Show the panel",
+  "view.fullscreen": "Full screen: just the map (F)",
+  "view.fullscreenExit": "Exit full screen (Esc)",
+  "cloud.auto.saving": "Saving to the cloud…",
+  "cloud.auto.saved": "Saved to the cloud at {time}",
+  "cloud.auto.error": "Couldn't save to the cloud yet. Your changes are kept in this browser and Maker will try again shortly.",
+  "world.newKept": "New world. The previous one is still saved in My worlds."
 }

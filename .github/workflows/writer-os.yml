@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Ekfrase Writer OS e o Gravador: quando uma tag writer-os-v* chega aqui (por exemplo writer-os-v0.1.0,
+# a mesma versão da casca do Writer), monta a imagem, roda os testes no QEMU, assina com o lacre da
+# Ekfrase (minisign, segredo EKFRASE_MINISIGN_CHAVE), monta o Gravador no Windows (.exe portátil) e no
+# Linux (AppImage) e cria o Release com tudo. O Gravador baixa a imagem deste Release; a página
+# ekfrase.com/writer/os/ oferece o Gravador. Sem certificado de assinatura por enquanto.
+name: Writer OS e Gravador
+
+on:
+  push:
+    tags: ['writer-os-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  imagem:
+    name: Imagem, testes no QEMU e o lacre
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: sistema/writer-os/casca
+      - name: A tag é a versão da casca (ou uma de teste dela, writer-os-vX.Y.Z-teste.N)
+        run: |
+          VERSAO=$(node -p "require('./sistema/writer-os/casca/package.json').version")
+          [[ "$GITHUB_REF_NAME" =~ ^writer-os-v${VERSAO//./\\.}(-teste\.[0-9]+)?$ ]] || { echo "A tag ($GITHUB_REF_NAME) não é writer-os-v$VERSAO nem writer-os-v$VERSAO-teste.N"; exit 1; }
+          echo "VERSAO=$VERSAO" >> "$GITHUB_ENV"
+      - run: node sistema/writer-os/casca/scripts/montar.ts --os --sem-abrir
+      - name: Montar a imagem (Debian trixie, num contêiner)
+        run: |
+          docker run --rm --privileged -e VERSAO="$VERSAO" -e DONO="$(id -u):$(id -g)" \
+            -v "$PWD:/src" -w /src debian:trixie bash sistema/writer-os/imagem/montar.sh
+      - name: QEMU, OVMF e KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 ovmf dosfstools minisign
+      - run: python3 tests/writer-os/qemu.py --imagem "sistema/writer-os/imagem/saida/ekfrase-writer-os-$VERSAO-teste.img" --prints prints-writer-os
+      - name: Comprimir e assinar
+        env:
+          CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
+        run: |
+          test -n "$CHAVE" || { echo "Falta o segredo EKFRASE_MINISIGN_CHAVE."; exit 1; }
+          cd sistema/writer-os/imagem/saida
+          xz -T0 -6 "ekfrase-writer-os-$VERSAO.img"
+          sha256sum "ekfrase-writer-os-$VERSAO.img.xz" > "ekfrase-writer-os-$VERSAO.img.xz.sha256"
+          ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "ekfrase-writer-os-$VERSAO.img.xz" -t "Ekfrase Writer OS $VERSAO" < /dev/null
+          rm -f "$RUNNER_TEMP/minisign.key"
+          minisign -V -p "$GITHUB_WORKSPACE/sistema/writer-os/imagem/minisign.pub" -m "ekfrase-writer-os-$VERSAO.img.xz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: writer-os-imagem
+          path: |
+            sistema/writer-os/imagem/saida/*.img.xz
+            sistema/writer-os/imagem/saida/*.sha256
+            sistema/writer-os/imagem/saida/*.minisig
+          if-no-files-found: error
+          compression-level: 0
+
+  gravador:
+    name: Gravador (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: sistema/writer-os/gravador
+      - name: Electron no Linux
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run gravador:roteiro
+      - run: npm run gravador:pacote
+        env:
+          # o Gravador de uma tag de teste vê as pré-releases de teste (src/nucleo/origem.ts); o do público, nunca
+          EKFRASE_GRAVADOR_CANAL: ${{ contains(github.ref_name, '-teste.') && 'teste' || 'estavel' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gravador-${{ runner.os }}
+          path: |
+            sistema/writer-os/gravador/instalador/Ekfrase-Gravador.exe
+            sistema/writer-os/gravador/instalador/Ekfrase-Gravador.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: [imagem, gravador]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: arquivos
+          merge-multiple: true
+      - name: Criar o Release (a imagem com o lacre e o Gravador)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          versao="${GITHUB_REF_NAME#writer-os-v}"
+          if [[ "$GITHUB_REF_NAME" == *-teste.* ]]; then
+            # pré-release: o releases/latest, a página ekfrase.com/writer/os/ e o Gravador do público não a veem
+            gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "Ekfrase Writer OS $versao (TESTE)" \
+              --notes "Versão de TESTE, para conferir num computador de verdade antes de publicar. O Gravador DESTA página baixa a imagem de teste; o Gravador do público ignora esta versão."
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" \
+            --title "Ekfrase Writer OS $versao" \
+            --notes "Para criar o pendrive: baixe o Gravador (Windows: Ekfrase-Gravador.exe; Linux: Ekfrase-Gravador.AppImage), que baixa e confere a imagem sozinho. Para o Rufus ou o balenaEtcher: o .img.xz (confira o .sha256 e o lacre .minisig com a chave em sistema/writer-os/imagem/minisign.pub). Passo a passo em https://ekfrase.com/writer/os/"

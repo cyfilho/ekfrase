@@ -1,0 +1,171 @@
+{
+  "caso": "outra-conta",
+  "descricao": "Uma conta não vê nem altera o que é da outra, nem sabendo o id e a versao.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Da Ana",
+              "texto": "— Da Ana.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000001-0000-aaaaaaaa",
+                "texto": "1731400000001-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=a1"
+            }
+          ],
+          "cursor": "$n=a1"
+        }
+      }
+    },
+    {
+      "nota": "A Bia não vê o registro da Ana.",
+      "quem": "bia",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "A Bia manda o mesmo id com a base da Ana: para o servidor é um registro NOVO da Bia (não há conflito a revelar, nem linha da Ana a tocar).",
+      "quem": "bia",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-bbbbbbbb",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Tentativa da Bia",
+              "texto": "— Tentativa da Bia.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000002-0000-bbbbbbbb",
+                "texto": "1731400000002-0000-bbbbbbbb"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=b1"
+            }
+          ],
+          "cursor": "$n=b1"
+        }
+      }
+    },
+    {
+      "nota": "O da Ana continua como estava.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "historia": "0193a000-0000-7000-8000-000000000900",
+                "titulo": "Da Ana",
+                "texto": "— Da Ana.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                "palavras": 5,
+                "ordem": "a0",
+                "_v": {
+                  "titulo": "1731400000001-0000-aaaaaaaa",
+                  "texto": "1731400000001-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=a1"
+            }
+          ],
+          "cursor": "$n=a1",
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "bia",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000002-0000-bbbbbbbb",
+              "apagado": false,
+              "dados": {
+                "historia": "0193a000-0000-7000-8000-000000000900",
+                "titulo": "Tentativa da Bia",
+                "texto": "— Tentativa da Bia.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                "palavras": 5,
+                "ordem": "a0",
+                "_v": {
+                  "titulo": "1731400000002-0000-bbbbbbbb",
+                  "texto": "1731400000002-0000-bbbbbbbb"
+                }
+              },
+              "seq": "$n=b1"
+            }
+          ],
+          "cursor": "$n=b1",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

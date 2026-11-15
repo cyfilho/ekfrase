@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: MPL-2.0
+# O instalador do Ekfrase Writer no computador (npm run casca:instalador; o CI do público gera os dois).
+# Sem certificado de assinatura (DEC-P064): o Windows mostra o aviso do SmartScreen na primeira vez
+# (a página de download, ekfrase.com/writer/#/computador, explica o passo a passo).
+appId: com.ekfrase.writer
+productName: Ekfrase Writer
+copyright: Ekfrase (MPL-2.0)
+directories:
+  output: instalador
+  buildResources: recursos
+files:
+  - package.json
+  - dist/main.cjs
+  - dist/preload.cjs
+  - dist/app/**/*
+  - "!dist/app/**/*.map"
+extraResources:
+  - from: dist/nativo
+    to: nativo
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+publish: null
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: dist/app/icones/icone-512.png
+  artifactName: Ekfrase-Writer-Setup.${ext}
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Ekfrase Writer
+  # desinstalar NÃO apaga os textos (eles ficam na pasta escolhida, não aqui)
+  deleteAppDataOnUninstall: false
+linux:
+  # o mesmo nome no AppImage e no Writer OS (/opt/ekfrase-writer/ekfrase-writer, que o ekfrase-sessao.sh abre)
+  executableName: ekfrase-writer
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: dist/app/icones/icone-512.png
+  category: Office
+  artifactName: Ekfrase-Writer.AppImage
+  synopsis: Escrita focada, sem internet e todo pelo teclado

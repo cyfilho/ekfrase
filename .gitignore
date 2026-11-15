@@ -22,3 +22,13 @@ __MACOSX/
 
 # Biblioteca: o acervo é gerado de biblioteca/ por scripts/biblioteca.ts
 /apps/biblioteca/public/acervo/
+
+# Feedbacks exportados do portal (prints de pessoas): ficam só no computador do Alcy
+feedbacks/
+
+# Casca do computador: os instaladores gerados
+sistema/writer-os/casca/instalador/
+sistema/writer-os/gravador/instalador/
+
+# o Writer OS: as imagens montadas (o CI d? como artefato)
+sistema/writer-os/imagem/saida/
