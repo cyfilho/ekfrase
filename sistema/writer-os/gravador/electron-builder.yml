@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Gravador do Writer OS (npm run gravador:pacote; o CI gera os dois): Windows = um .exe portátil (sem
+# instalar; pede a permissão de administrador só na hora de gravar), Linux = AppImage. Sem certificado de
+# assinatura (DEC-P064; PLANO §12, linha 13): a página ekfrase.com/writer/os/ explica o aviso do SmartScreen.
+appId: com.ekfrase.gravador
+productName: Ekfrase Gravador
+copyright: Ekfrase (MPL-2.0)
+directories:
+  output: instalador
+  buildResources: recursos
+files:
+  - package.json
+  - dist/main.cjs
+  - dist/preload.cjs
+  - dist/trabalhador.cjs
+  - dist/icone.png
+  - dist/pagina/**/*
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+publish: null
+win:
+  target:
+    - target: portable
+      arch: [x64]
+  icon: dist/icone.png
+  # a janela roda como a pessoa; só o processo que grava pede a permissão (elevar.ts)
+  requestedExecutionLevel: asInvoker
+  signAndEditExecutable: true
+portable:
+  artifactName: Ekfrase-Gravador.exe
+  requestExecutionLevel: user
+linux:
+  executableName: ekfrase-gravador
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: dist/icone.png
+  category: Utility
+  artifactName: Ekfrase-Gravador.AppImage
+  synopsis: Cria o pendrive do Ekfrase Writer OS

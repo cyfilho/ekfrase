@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MPL-2.0
+# Os pacotes do Writer OS (PLANO §6.2), Debian trixie, sem os "recomendados". Um por linha; # comenta.
+# NÃO entram: sudo, doas, openssh, navegador, gerenciador de arquivos, terminal. O último gancho
+# (ganchos/90-travas.sh) ainda tira su, login, getty, pkexec, apt e dpkg, e falha se algum sobrar.
+
+# o sistema
+linux-image-amd64
+live-boot
+initramfs-tools
+systemd
+systemd-sysv
+systemd-timesyncd
+dbus
+udev
+kmod
+util-linux
+mount
+procps
+
+# firmware (o Wi-Fi Intel AC 9560 do notebook de teste usa o iwlwifi: §10c)
+firmware-linux
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-misc-nonfree
+intel-microcode
+amd64-microcode
+wireless-regdb
+
+# a tela (Cage, Wayland) e o vídeo
+cage
+libgl1-mesa-dri
+libegl1
+libgles2
+libgbm1
+plymouth
+plymouth-themes
+fontconfig
+fonts-dejavu-core
+
+# rede, discos, energia, hora
+network-manager
+wpasupplicant
+udisks2
+polkitd
+exfatprogs
+dosfstools
+e2fsprogs
+gdisk
+upower
+ca-certificates
+
+# o que a casca (Electron) pede
+libnss3
+libgtk-3-0t64
+libasound2t64
+libxss1
+libxtst6
+libatspi2.0-0t64
+libatk1.0-0t64
+libatk-bridge2.0-0t64
+libcups2t64
+libdrm2
+libxkbcommon0
+libsecret-1-0
+libnotify4
+libuuid1

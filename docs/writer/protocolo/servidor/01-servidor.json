@@ -1,0 +1,20 @@
+{
+  "caso": "servidor",
+  "descricao": "Sem login, o servidor diz quem é e qual protocolo fala.",
+  "passos": [
+    {
+      "quem": "anonimo",
+      "metodo": "GET",
+      "rota": "escrita/servidor",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "nome": "$texto",
+          "versaoProtocolo": 1,
+          "aceitaCadastro": true
+        }
+      }
+    }
+  ]
+}

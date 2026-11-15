@@ -137,6 +137,48 @@ body {
   height: 100dvh;
 }
 
+/* FB-0001: o painel da direita se recolhe (o mapa ocupa a largura toda) */
+@media (min-width: 821px) {
+  .app.painel-recolhido {
+    grid-template-columns: minmax(0, 1fr) 0;
+  }
+}
+
+.app.painel-recolhido .panel {
+  display: none;
+}
+
+/* tela cheia: só o mapa e os controles dele */
+.app.tela-cheia {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'stage';
+  height: 100vh;
+  height: 100dvh;
+}
+
+.app.tela-cheia .topbar,
+.app.tela-cheia .panel,
+.app.tela-cheia .rodape-maker {
+  display: none;
+}
+
+/* o botão do painel, aceso quando o painel está recolhido (e o da tela cheia, quando ligada) */
+.icon-btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.app.painel-recolhido #toggle-panel svg,
+.app.tela-cheia #toggle-fullscreen svg {
+  transform: scaleX(-1);
+}
+
+/* na tela cheia o painel não existe: o botão dele sai */
+.app.tela-cheia #toggle-panel {
+  display: none;
+}
+
 /* O rodapé de todo app Ekfrase (a marca fica só aqui), numa linha. */
 .rodape-maker {
   grid-area: foot;

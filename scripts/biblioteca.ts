@@ -19,7 +19,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
-import { CATEGORIAS, FORMATOS, SIMBOLOS_CAPA } from '../packages/interface/src/acervo.ts';
+import { CDD_VALIDO, FORMATOS, SIMBOLOS_CAPA } from '../packages/interface/src/acervo.ts';
 import { RAIZ } from './raiz.ts';
 
 const ORIGEM = join(RAIZ, 'biblioteca');
@@ -41,7 +41,8 @@ export interface Ficha {
   ano_traducao?: number;
   idioma: string;
   idioma_original?: string;
-  categoria: (typeof CATEGORIAS)[number];
+  /** O número na Classificação Decimal de Dewey (DEC-P058), ex.: "808.2". */
+  cdd: string;
   generos: string[];
   licenca: string;
   descricao: string;
@@ -230,15 +231,20 @@ export function gerarPdf(docx: string, pdf: string): boolean {
     "$ErrorActionPreference = 'Stop'",
     '$w = New-Object -ComObject Word.Application',
     '$w.Visible = $false',
+    '$w.DisplayAlerts = 0',
     'try {',
     `  $d = $w.Documents.Open('${esc(docx)}', $false, $true)`,
     `  $d.SaveAs([ref] '${esc(pdf)}', [ref] 17)`,
     '  $d.Close([ref] 0)',
     '} finally { $w.Quit() }',
   ].join('\n');
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8' });
-  if (r.status !== 0) console.error(r.stderr || r.stdout);
-  return r.status === 0 && existsSync(pdf);
+  // O Word às vezes cai no meio (RPC indisponível) em livros grandes: tenta até 3 vezes.
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8' });
+    if (r.status === 0 && existsSync(pdf)) return true;
+    console.error(`PDF: tentativa ${tentativa} falhou${tentativa < 3 ? ', tentando de novo' : ''}`);
+  }
+  return false;
 }
 
 // ---------- montar ----------
@@ -248,7 +254,7 @@ export function problemasDaFicha(f: Partial<Ficha>): string[] {
   const p: string[] = [];
   if (!f.id || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(f.id)) p.push('id fora do formato (letras minúsculas, números e hífen)');
   if (!f.titulo || !f.autor || !f.traducao || !f.descricao || !f.licenca) p.push('faltam titulo, autor, traducao, descricao ou licenca');
-  if (!f.categoria || !CATEGORIAS.includes(f.categoria)) p.push(`categoria deve ser uma de: ${CATEGORIAS.join(', ')}`);
+  if (typeof f.cdd !== 'string' || !CDD_VALIDO.test(f.cdd)) p.push('cdd: o número da Classificação Decimal de Dewey (três algarismos e, se houver, o ponto: 808.2)');
   if (!Array.isArray(f.generos) || f.generos.some((g) => !/^[a-z0-9-]+$/.test(g))) p.push('generos: lista de ids (minúsculas e hífen)');
   if (!f.capa || !SIMBOLOS.includes(f.capa.simbolo) || !/^#[0-9a-f]{6}$/i.test(f.capa.fundo) || !/^#[0-9a-f]{6}$/i.test(f.capa.detalhe)) {
     p.push(`capa: fundo e detalhe em #rrggbb; simbolo: ${SIMBOLOS.join(', ')}`);

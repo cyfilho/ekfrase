@@ -1,0 +1,343 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+/* O Gravador: uma janela de ~520×620, as cores só dos tokens do Guia de Arte (e da paleta do Writer). */
+
+html,
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fonte-texto);
+}
+
+body::before,
+body::after {
+  display: none !important;
+}
+
+.gravador {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.topo-gravador {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topo-gravador > div {
+  flex: 1;
+}
+
+.topo-gravador .nome {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.topo-gravador .sub {
+  margin: 0;
+  color: var(--tinta-suave);
+  font-size: 0.9rem;
+}
+
+.botao-icone {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  background: var(--papel-forte);
+  color: var(--tinta);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.passos {
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--tinta-suave);
+}
+
+.passos li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.passos .numero {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: calc(var(--px) * 1) solid var(--tinta-suave);
+  border-radius: 50%;
+}
+
+.passos .atual {
+  color: var(--tinta);
+  font-weight: 700;
+}
+
+.passos .atual .numero {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  border-color: var(--destaque);
+}
+
+h1 {
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+h1:focus {
+  outline: none;
+}
+
+h1:focus-visible {
+  outline: calc(var(--px) * 2) solid var(--foco);
+}
+
+h2 {
+  font-family: var(--fonte-titulo);
+  font-size: 1.2rem;
+  margin: 1rem 0 0.4rem;
+}
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.lista-discos {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.disco,
+.modo label,
+.espaco label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  background: var(--papel-forte);
+  cursor: pointer;
+}
+
+.modo,
+.espaco {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.disco.escolhido {
+  outline: calc(var(--px) * 2) solid var(--destaque);
+}
+
+.disco.travado {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.disco input,
+.modo input,
+.espaco input {
+  margin-top: 0.25rem;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: calc(var(--px) * 2) solid var(--foco);
+  outline-offset: 2px;
+}
+
+.texto-disco {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.texto-disco span {
+  font-size: 0.9rem;
+  color: var(--tinta-suave);
+}
+
+.texto-disco .motivo {
+  color: var(--erro);
+}
+
+/* o ícone: pendrive (estreito, com o conector) ou disco externo (largo) — desenhado só com bordas */
+.icone-disco {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  position: relative;
+}
+
+.icone-disco::before {
+  content: '';
+  position: absolute;
+  border: calc(var(--px) * 1) solid var(--tinta);
+  background: var(--papel);
+}
+
+.icone-disco.pendrive::before {
+  left: 0.45rem;
+  top: 0.45rem;
+  width: 0.6rem;
+  height: 1rem;
+}
+
+.icone-disco.pendrive::after {
+  content: '';
+  position: absolute;
+  left: 0.6rem;
+  top: 0.15rem;
+  width: 0.3rem;
+  height: 0.3rem;
+  border: calc(var(--px) * 1) solid var(--tinta);
+  border-bottom: 0;
+}
+
+.icone-disco.externo::before {
+  left: 0.1rem;
+  top: 0.35rem;
+  width: 1.3rem;
+  height: 0.9rem;
+}
+
+.nota {
+  font-size: 0.88rem;
+  color: var(--tinta-suave);
+}
+
+.vazio,
+.aviso {
+  padding: 0.5rem 0.65rem;
+  border-left: calc(var(--px) * 3) solid var(--destaque);
+  background: var(--papel-forte);
+}
+
+.erro {
+  color: var(--erro);
+}
+
+.perigo {
+  font-weight: 700;
+  color: var(--erro);
+}
+
+.alerta-vermelho {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.75rem;
+  border: calc(var(--px) * 2) solid var(--erro);
+  background: var(--erro-fundo);
+}
+
+.alerta-vermelho label,
+.campo-confirmar,
+.campo-limite {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.campo-confirmar {
+  margin-top: 1rem;
+}
+
+input[type='text'],
+input[type='number'] {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  background: var(--papel);
+  color: var(--tinta);
+}
+
+.nome-disco {
+  user-select: all;
+}
+
+.lacre-ok {
+  color: var(--frio);
+  font-weight: 700;
+}
+
+.lacre-sem {
+  color: var(--erro);
+  font-weight: 700;
+}
+
+.cartao-disco {
+  padding: 0.6rem 0.75rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  background: var(--papel-forte);
+}
+
+.cartao-disco p {
+  margin: 0.3rem 0 0;
+}
+
+.acoes,
+.acoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.acoes {
+  justify-content: flex-end;
+}
+
+.botao.perigoso {
+  background: var(--erro);
+  border-color: var(--erro);
+  color: var(--papel);
+}
+
+.barra {
+  height: 0.9rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  background: var(--papel-forte);
+}
+
+.barra span {
+  display: block;
+  height: 100%;
+  background: var(--destaque);
+  transition: width 0.3s;
+}
+
+.fase {
+  font-size: 1.05rem;
+}
+
+.marcas {
+  padding-left: 1.1rem;
+  margin: 0.3rem 0;
+}
+
+.marcas li {
+  margin: 0.2rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra span {
+    transition: none;
+  }
+}

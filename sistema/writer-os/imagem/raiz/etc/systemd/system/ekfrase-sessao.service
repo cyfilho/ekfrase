@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MPL-2.0
+# A sessão do Writer OS (PLANO §6.3): o usuário writer no seat0, no tty1, com o Cage e a casca.
+# É a unidade de quiosque da wiki do Cage. Não há getty em lugar nenhum (§7).
+[Unit]
+Description=Ekfrase Writer OS: a sessão (Cage + o Writer)
+After=systemd-user-sessions.service plymouth-quit-wait.service ekfrase-dados.service dbus.service systemd-logind.service
+Wants=ekfrase-dados.service dbus.service systemd-logind.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=writer
+PAMName=ekfrase-sessao
+WorkingDirectory=~
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=XDG_SESSION_TYPE=wayland
+ExecStart=/usr/lib/ekfrase/ekfrase-sessao.sh
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=graphical.target

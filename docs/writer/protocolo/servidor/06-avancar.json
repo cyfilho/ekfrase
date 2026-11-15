@@ -1,0 +1,170 @@
+{
+  "caso": "avancar",
+  "descricao": "Com a base certa e versao maior, o registro é regravado e ganha seq novo, maior que o anterior.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Rascunho",
+              "texto": "— Rascunho.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000001-0000-aaaaaaaa",
+                "texto": "1731400000001-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Rascunho melhor",
+              "texto": "— Rascunho melhor.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000002-0000-aaaaaaaa",
+                "texto": "1731400000002-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "O registro aparece uma vez só, com a versão nova.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "historia": "0193a000-0000-7000-8000-000000000900",
+                "titulo": "Rascunho melhor",
+                "texto": "— Rascunho melhor.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                "palavras": 5,
+                "ordem": "a0",
+                "_v": {
+                  "titulo": "1731400000002-0000-aaaaaaaa",
+                  "texto": "1731400000002-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Quem já tinha o seq antigo recebe a regravação.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s1}",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "historia": "0193a000-0000-7000-8000-000000000900",
+                "titulo": "Rascunho melhor",
+                "texto": "— Rascunho melhor.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                "palavras": 5,
+                "ordem": "a0",
+                "_v": {
+                  "titulo": "1731400000002-0000-aaaaaaaa",
+                  "texto": "1731400000002-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s2}",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

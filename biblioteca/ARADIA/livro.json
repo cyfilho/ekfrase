@@ -1,5 +1,5 @@
 {
-  "comentario": "A ficha do livro na Biblioteca do Ekfrase. O texto do livro vem do .epub desta pasta; para baixar, também o .txt, o .docx e o .pdf (o PDF é gerado do .docx pelo Word: node scripts/biblioteca.ts --pdf). categoria: uma das estantes (literatura, poesia, filosofia, religiao, historia, ciencias). generos: livres (os nomes ficam em locales/<idioma>/biblioteca.json, chave genero.<id>). capa: cores e o símbolo do desenho (lua, sol, estrela, folha, pena, olho, chave, coroa).",
+  "comentario": "A ficha do livro na Biblioteca do Ekfrase. O texto do livro vem do .epub desta pasta; para baixar, também o .txt, o .docx e o .pdf (o PDF é gerado do .docx pelo Word: node scripts/biblioteca.ts --pdf). cdd: o número na Classificação Decimal de Dewey (ex.: 808.2; a classe, o primeiro algarismo, é a estante). generos: livres (os nomes ficam em locales/<idioma>/biblioteca.json, chave genero.<id>). capa: cores e o símbolo do desenho (lua, sol, estrela, folha, pena, olho, chave, coroa).",
   "id": "aradia",
   "titulo": "Aradia",
   "subtitulo": "O Evangelho das Bruxas da Itália",
@@ -11,7 +11,7 @@
   "ano_traducao": 2026,
   "idioma": "pt-BR",
   "idioma_original": "en + it",
-  "categoria": "religiao",
+  "cdd": "398.42",
   "generos": ["folclore", "bruxaria", "etnografia"],
   "licenca": "CC BY-SA 4.0",
   "descricao": "Edição crítica bilíngue do clássico de 1899 que reúne o evangelho das bruxas toscanas recolhido por Leland: dupla tradução direta do italiano (uma versão métrica e rimada, outra fiel ao sentido), a tradução integral do texto inglês e notas de tradução.",

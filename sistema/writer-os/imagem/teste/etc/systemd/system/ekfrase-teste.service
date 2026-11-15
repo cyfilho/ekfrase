@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# SÓ na imagem de teste: o relato na serial (tests/writer-os/qemu.py lê de lá). Confere, como root,
+# o que o writer não pode conferir (§8: a partição, nada de sudo, os grupos, o Secure Boot) e
+# repassa o que o agente de teste da casca escreve em /run/ekfrase/teste/relato.
+[Unit]
+Description=Ekfrase Writer OS: o relato do teste na serial
+After=ekfrase-dados.service
+Before=ekfrase-sessao.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'mkdir -p /run/ekfrase/teste && touch /run/ekfrase/teste/relato && chown -R 1000:1000 /run/ekfrase/teste'
+ExecStart=/usr/lib/ekfrase/teste/relato.sh
+
+[Install]
+WantedBy=multi-user.target

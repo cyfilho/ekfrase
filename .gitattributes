@@ -6,3 +6,6 @@
 *.epub binary
 *.pdf binary
 *.docx binary
+*.xz binary
+# o lacre dos testes do Gravador cobre os bytes exatos
+tests/gravador/fixtures/** binary

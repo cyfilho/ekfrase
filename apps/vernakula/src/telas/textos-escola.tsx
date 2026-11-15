@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { useState } from 'preact/hooks';
-import { api, type Conta, type TextosEscola } from '../api.ts';
+import { api, type Escola, type TextosEscola } from '../api.ts';
 import { marcadores } from '../avisos.ts';
 import { t, tr } from '../textos.ts';
 
 /** Quem troca os textos da escola (o mesmo que a ponte confere). */
 const PAPEIS = ['admin', 'coord_geral', 'coordenacao'];
-export const podeEditarTextos = (c: Conta) => !!c.organizacoes[0]?.papeis.some((p) => PAPEIS.includes(p));
+export const podeEditarTextos = (e: Escola | undefined) => !!e?.papeis.some((p) => PAPEIS.includes(p));
 
 /** Só os textos que este app mostra (o do Editor de Textos fica de fora). */
 const DESTE_APP = /^(vernakula|nucleo)\./;
@@ -20,15 +20,14 @@ type Situacao = { tipo: 'salvando' } | { tipo: 'salvo'; hora: string } | { tipo:
  * Edita no idioma que está escolhido no alto da página.
  */
 export function TextosDaEscola({
-  conta,
+  escola,
   trocas,
   aoMudar,
 }: {
-  conta: Conta;
+  escola: Escola;
   trocas: TextosEscola;
   aoMudar: (novas: TextosEscola) => void;
 }) {
-  const escola = conta.organizacoes[0]!;
   const idioma = tr.idioma();
   const nomeIdioma = tr.idiomas().find((i) => i.codigo === idioma)?.nome ?? idioma;
   const [busca, setBusca] = useState('');

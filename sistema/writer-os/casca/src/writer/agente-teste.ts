@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: MPL-2.0
+
+/**
+ * O AGENTE DE TESTE do Writer OS (PLANO §8). SÓ existe na imagem de teste: liga quando há
+ * `/etc/ekfrase/teste` (a imagem de entrega não tem esse arquivo) ou, fora do pendrive, com
+ * `EKFRASE_CASCA_OS_TESTE=1`. Ele não mexe na tela: só conta o que acontece, uma linha por evento, em
+ * `/run/ekfrase/teste/relato`, que um serviço root da imagem de teste repassa para a serial
+ * (`tests/writer-os/qemu.py` lê de lá):
+ *
+ *   tela <data-teste>       a tela que está aberta (a cada troca)
+ *   texto ok | texto falta  depois da senha: a cena de teste tem o texto da última vez?
+ *   ultimo <N>              o último número que ficou gravado
+ *   integridade <r>         `PRAGMA integrity_check` do banco (`ok`)
+ *   usb ok | usb negado     o 2º pendrive (rótulo OUTRO) monta e aceita um arquivo?
+ *   interno negado          o disco interno NÃO monta (§7)
+ *   gravado <N>             o laço de gravação (cada linha depois do COMMIT): é o teste de arrancar
+ */
+import { DONO_LOCAL, Escrita } from '@ekfrase/writer-nucleo';
+import type { BrowserWindow } from 'electron';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import type { Sistema } from '../motor/sistema.ts';
+import type { DadosDoWriter } from './dados.ts';
+
+export const HISTORIA_DE_TESTE = 'Teste do Writer OS';
+const MARCA = 'Escrito no Writer OS.';
+/** Quantas gravações o laço faz (uma a cada 250 ms: ~75 s). */
+const VOLTAS = 300;
+
+const QUAL_TELA = `(() => {
+  const m = document.querySelector('main[data-teste]') || document.querySelector('[data-teste^="tela-"]');
+  return m ? m.getAttribute('data-teste') : '';
+})()`;
+
+export function ligarAgente(o: { relato: string; janela: () => BrowserWindow | null; dados: DadosDoWriter; sistema: Sistema }): (linha: string) => void {
+  mkdirSync(dirname(o.relato), { recursive: true });
+  const dizer = (linha: string) => {
+    try {
+      appendFileSync(o.relato, `${linha}\n`);
+    } catch {
+      // o relato é só para o teste
+    }
+  };
+  dizer('agente ligado');
+  let tela = '';
+  let conferindo = false;
+
+  setInterval(() => {
+    const j = o.janela();
+    if (j && !j.isDestroyed()) {
+      j.webContents
+        .executeJavaScript(QUAL_TELA)
+        .then((t: unknown) => {
+          if (typeof t === 'string' && t && t !== tela) {
+            tela = t;
+            dizer(`tela ${t}`);
+          }
+        })
+        .catch(() => undefined);
+    }
+    if (o.dados.aberta && !conferindo) {
+      conferindo = true;
+      void conferir().catch((e: unknown) => dizer(`erro ${e instanceof Error ? e.message : String(e)}`));
+    }
+  }, 250);
+
+  async function conferir(): Promise<void> {
+    await o.dados.abrirArmazem(DONO_LOCAL);
+    const armazem = o.dados.armazemAberto(DONO_LOCAL);
+    if (!armazem) throw new Error('sem armazém');
+    const escrita = new Escrita(armazem);
+    dizer(`integridade ${armazem.integridade()}`);
+    let historia = (await escrita.historias()).find((h) => h.titulo === HISTORIA_DE_TESTE);
+    let cena = historia ? (await escrita.cenas(historia.id))[0] : undefined;
+    let n = 0;
+    if (cena && cena.texto.startsWith(MARCA)) {
+      n = Number(/gravado=(\d+)/.exec(cena.texto)?.[1] ?? 0);
+      dizer('texto ok');
+      dizer(`ultimo ${n}`);
+    } else dizer('texto falta');
+    if (!historia) historia = await escrita.criarHistoria({ titulo: HISTORIA_DE_TESTE });
+    if (!cena) cena = await escrita.criarCena(historia.id, { titulo: 'Cena' });
+
+    // o 2º pendrive e o disco interno (§7)
+    const outro = (await o.sistema.discos()).find((d) => d.rotulo === 'OUTRO');
+    if (outro) {
+      const onde = outro.montado ?? (await o.sistema.montar(outro.id));
+      try {
+        if (!onde) throw new Error('não montou');
+        writeFileSync(join(onde, 'ekfrase-teste.txt'), 'ok\n');
+        dizer('usb ok');
+      } catch {
+        dizer('usb negado');
+      }
+    } else dizer('usb sem-disco');
+    dizer(`interno ${await o.sistema.montarInterno()}`);
+
+    // o laço: cada linha "gravado N" só sai depois de o banco confirmar a gravação
+    for (let i = 0; i < VOLTAS && o.dados.aberta; i++) {
+      n += 1;
+      await escrita.gravarTexto(cena.id, `${MARCA}\ngravado=${n}\n`);
+      dizer(`gravado ${n}`);
+      await new Promise((ok) => setTimeout(ok, 250));
+    }
+    dizer('laco fim');
+  }
+
+  return dizer;
+}
