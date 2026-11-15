@@ -71,7 +71,7 @@ describe('o registro (quem abre o quê)', () => {
     for (const a of REGISTRO) {
       expect(ids.has(a.id), a.id).toBe(false);
       ids.add(a.id);
-      expect(existsSync(join(raiz, 'apps', a.id)), a.id).toBe(true);
+      expect(existsSync(join(raiz, 'apps', a.id, 'package.json')), a.id).toBe(true);
       expect(a.endereco).toBe(`/${a.id}/`);
       expect(a.abre.length).toBeGreaterThan(0);
     }
@@ -87,6 +87,10 @@ describe('o registro (quem abre o quê)', () => {
     expect(podeAbrir('maker', e({ app: 'futuro' }))).toEqual({ abre: false, motivo: 'app-desconhecido' });
     expect(quemAbre(e({}))).toMatchObject({ app: { id: 'maker' } });
     expect(quemAbre(e({ app: 'futuro' }))).toEqual({ app: null, motivo: 'app-desconhecido' });
+    // o Writer: histórias e ideias
+    expect(podeAbrir('writer', e({ app: 'writer', tipo: 'historia' }))).toEqual({ abre: true });
+    expect(podeAbrir('writer', e({ app: 'writer', tipo: 'ideias' }))).toEqual({ abre: true });
+    expect(podeAbrir('maker', e({ app: 'writer', tipo: 'historia' }))).toMatchObject({ abre: false, motivo: 'outro-app', app: { id: 'writer', endereco: '/writer/' } });
   });
 
   // o roteador fica no castelo (o site), que só existe no repositório da plataforma

@@ -15,17 +15,28 @@
     "maker": "npm run dev -w @ekfrase/maker",
     "biblioteca": "npm run dev -w @ekfrase/biblioteca",
     "vernakula": "npm run dev -w @ekfrase/vernakula",
+    "writer": "npm run dev -w @ekfrase/writer",
+    "teclado": "node scripts/teclado.ts",
+    "casca": "node sistema/writer-os/casca/scripts/montar.ts",
+    "casca:instalador": "node sistema/writer-os/casca/scripts/montar.ts --instalador --sem-abrir",
+    "gravador": "node sistema/writer-os/gravador/scripts/montar.ts",
+    "gravador:pacote": "node sistema/writer-os/gravador/scripts/montar.ts --pacote --sem-abrir",
+    "gravador:roteiro": "node sistema/writer-os/gravador/scripts/roteiro.ts",
     "chave": "node scripts/chave.ts",
     "arte": "node scripts/arte/gerar.mjs",
-    "typecheck": "tsc -p packages/nucleo --noEmit && tsc -p packages/interface --noEmit && tsc -p packages/arquivo --noEmit && tsc -p packages/maker-core --noEmit && tsc -p packages/maker-doc --noEmit && tsc -p packages/maker-gen --noEmit && tsc -p packages/maker-render --noEmit && tsc -p apps/maker --noEmit && tsc -p apps/biblioteca --noEmit && tsc -p apps/vernakula --noEmit && tsc -p tsconfig.tests.json --noEmit",
+    "typecheck": "tsc -p packages/nucleo --noEmit && tsc -p packages/interface --noEmit && tsc -p packages/arquivo --noEmit && tsc -p packages/maker-core --noEmit && tsc -p packages/maker-doc --noEmit && tsc -p packages/maker-gen --noEmit && tsc -p packages/maker-render --noEmit && tsc -p packages/writer-nucleo --noEmit && tsc -p apps/maker --noEmit && tsc -p apps/biblioteca --noEmit && tsc -p apps/vernakula --noEmit && tsc -p apps/writer --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
-    "build": "npm run build -w @ekfrase/maker && npm run build -w @ekfrase/biblioteca && npm run build -w @ekfrase/vernakula",
+    "build": "npm run build -w @ekfrase/maker && npm run build -w @ekfrase/biblioteca && npm run build -w @ekfrase/vernakula && npm run build -w @ekfrase/writer",
     "conferir": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
+    "@noble/hashes": "2.4.0",
     "@types/node": "^26.6.6",
+    "better-sqlite3-multiple-ciphers": "13.0.3",
+    "playwright": "1.64.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "xz-decompress": "0.2.3"
   }
 }

@@ -17,6 +17,8 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    // o pacote do SQLite cifrado da casca tem os tipos, mas o "exports" dele os esconde
+    "paths": { "better-sqlite3-multiple-ciphers": ["./node_modules/better-sqlite3-multiple-ciphers/index.d.ts"] }
   }
 }

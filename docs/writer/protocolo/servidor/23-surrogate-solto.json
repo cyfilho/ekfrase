@@ -1,0 +1,74 @@
+{
+  "caso": "surrogate-solto",
+  "descricao": "Metade de emoji solta (\ud83d sem par, de um corte por unidade UTF-16) num registro não derruba o pedido: cada metade solta vira U+FFFD, o par completo fica, e os dois registros são aceitos.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpoBruto": "{\"registros\":[{\"id\":\"0193a000-0000-7000-8000-000000000001\",\"colecao\":\"ideias\",\"versao\":\"1731400000001-0000-aaaaaaaa\",\"apagado\":false,\"dados\":{\"titulo\":\"Boa\",\"_v\":{\"titulo\":\"1731400000001-0000-aaaaaaaa\"}},\"base\":null},{\"id\":\"0193a000-0000-7000-8000-000000000002\",\"colecao\":\"ideias\",\"versao\":\"1731400000002-0000-aaaaaaaa\",\"apagado\":false,\"dados\":{\"titulo\":\"Um farol \\ud83d\",\"texto\":\"meio \\ud83d e \\udea2 soltos; par inteiro 🚢\",\"_v\":{\"titulo\":\"1731400000002-0000-aaaaaaaa\",\"texto\":\"1731400000002-0000-aaaaaaaa\"}},\"base\":null}]}",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "Boa",
+                "_v": {
+                  "titulo": "1731400000001-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "Um farol �",
+                "texto": "meio � e � soltos; par inteiro 🚢",
+                "_v": {
+                  "titulo": "1731400000002-0000-aaaaaaaa",
+                  "texto": "1731400000002-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

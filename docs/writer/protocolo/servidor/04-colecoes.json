@@ -1,0 +1,194 @@
+{
+  "caso": "colecoes",
+  "descricao": "As cinco coleções são aceitas num mesmo pedido; os resultados vêm na ordem do pedido e cada gravação ganha um seq maior.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000010",
+            "colecao": "historias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "historias",
+              "_v": {
+                "titulo": "1731400000001-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000011",
+            "colecao": "capitulos",
+            "versao": "1731400000001-0001-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "capitulos",
+              "_v": {
+                "titulo": "1731400000001-0001-aaaaaaaa"
+              }
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000012",
+            "colecao": "cenas",
+            "versao": "1731400000001-0002-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "cenas",
+              "_v": {
+                "titulo": "1731400000001-0002-aaaaaaaa"
+              }
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000013",
+            "colecao": "ideias",
+            "versao": "1731400000001-0003-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "ideias",
+              "_v": {
+                "titulo": "1731400000001-0003-aaaaaaaa"
+              }
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000014",
+            "colecao": "personagens",
+            "versao": "1731400000001-0004-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "titulo": "personagens",
+              "_v": {
+                "titulo": "1731400000001-0004-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000010",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000011",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000012",
+              "estado": "aceito",
+              "seq": "$n>s2=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000013",
+              "estado": "aceito",
+              "seq": "$n>s3=s4"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000014",
+              "estado": "aceito",
+              "seq": "$n>s4=s5"
+            }
+          ],
+          "cursor": "$n=s5"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000010",
+              "colecao": "historias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "historias",
+                "_v": {
+                  "titulo": "1731400000001-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000011",
+              "colecao": "capitulos",
+              "versao": "1731400000001-0001-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "capitulos",
+                "_v": {
+                  "titulo": "1731400000001-0001-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s2"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000012",
+              "colecao": "cenas",
+              "versao": "1731400000001-0002-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "cenas",
+                "_v": {
+                  "titulo": "1731400000001-0002-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000013",
+              "colecao": "ideias",
+              "versao": "1731400000001-0003-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "ideias",
+                "_v": {
+                  "titulo": "1731400000001-0003-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s4"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000014",
+              "colecao": "personagens",
+              "versao": "1731400000001-0004-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "titulo": "personagens",
+                "_v": {
+                  "titulo": "1731400000001-0004-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s5"
+            }
+          ],
+          "cursor": "$n=s5",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

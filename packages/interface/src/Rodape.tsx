@@ -19,6 +19,12 @@ export function RodapeEkfrase({ t, compacto = false, familia = true }: { t: T; c
           </span>
         </a>
       </p>}
+      <nav class="ekf-rodape-links" aria-label={t('nucleo.rodape.nav')}>
+        <a href="/#/sobre">{t('nucleo.rodape.sobre')}</a>
+        <a href="/#/contato">{t('nucleo.rodape.contato')}</a>
+        <a href="/#/privacidade">{t('nucleo.rodape.privacidade')}</a>
+        <a href="/#/termos">{t('nucleo.rodape.termos')}</a>
+      </nav>
       <p>{t('nucleo.rodape.livre')}</p>
       {LINKS.patreon && (
         <p>
