@@ -98,5 +98,20 @@
   "inventario.titulo": "Inventário",
   "app.maker": "Maker",
   "app.biblioteca": "Biblioteca",
-  "app.vernakula": "Vernákula"
+  "app.vernakula": "Vernákula",
+  "equipe.titulo": "Área da equipe",
+  "app.writer": "Writer",
+  "entrada.computador.baixar": "Baixar",
+  "rodape.sobre": "Sobre",
+  "rodape.contato": "Contato",
+  "rodape.privacidade": "Privacidade",
+  "rodape.termos": "Termos de Uso",
+  "rodape.nav": "Informações do Ekfrase",
+  "conta.aceite.antes": "Ao criar a conta, você concorda com os ",
+  "conta.aceite.e": " e a ",
+  "conta.aceite.privacidade": "Política de Privacidade",
+  "entrada.pendrive.titulo": "No pendrive",
+  "entrada.pendrive.texto": "Um pendrive que liga o computador direto no app, sem o resto do sistema: escreva em qualquer máquina e leve tudo com você.",
+  "entrada.pendrive.ver": "Conhecer",
+  "conta.aceite.fechado": " (publicados em ekfrase.com)."
 }

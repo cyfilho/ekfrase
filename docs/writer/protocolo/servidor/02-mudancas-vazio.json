@@ -1,0 +1,49 @@
+{
+  "caso": "mudancas-vazio",
+  "descricao": "Conta que nunca sincronizou: lista vazia, e o cursor devolvido é o próprio \"desde\".",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=0&limite=500",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Sem nada depois do cursor pedido, ele volta igual.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=7",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 7,
+          "mais": false
+        }
+      }
+    }
+  ]
+}

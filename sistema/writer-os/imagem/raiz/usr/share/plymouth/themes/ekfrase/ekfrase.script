@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MPL-2.0
+# A tela do boot do Ekfrase Writer OS (PLANO §6.3): fundo azul-noite, a logo do Writer no meio e,
+# embaixo, a pena escrevendo "Ekfrase Writer OS" (30 quadros, scripts/arte/writer-os.mjs). Sem outro texto e sem
+# senha (o Writer OS não cifra o disco do sistema). A logo vem do ganchos/40-plymouth.sh (logo.png).
+
+Window.SetBackgroundTopColor(0.114, 0.141, 0.200);
+Window.SetBackgroundBottomColor(0.114, 0.141, 0.200);
+
+# telas grandes (2K, 4K): a arte cresce por inteiro (pixel art não aceita meio pixel)
+escala = Math.Int(Window.GetHeight() / 900);
+if (escala < 1) escala = 1;
+
+logo_img = Image("logo.png");
+logo_img = logo_img.Scale(logo_img.GetWidth() * escala, logo_img.GetHeight() * escala);
+logo = Sprite(logo_img);
+meio_x = Window.GetX() + Window.GetWidth() / 2;
+meio_y = Window.GetY() + Window.GetHeight() / 2;
+logo.SetX(meio_x - logo_img.GetWidth() / 2);
+logo.SetY(meio_y - logo_img.GetHeight() / 2 - 40 * escala);
+
+for (i = 0; i < 30; i++) {
+  q = Image("tinta-" + i + ".png");
+  quadro[i] = q.Scale(q.GetWidth() * escala, q.GetHeight() * escala);
+}
+tinta = Sprite(quadro[0]);
+tinta.SetX(meio_x - quadro[0].GetWidth() / 2);
+tinta.SetY(meio_y + logo_img.GetHeight() / 2 - 20 * escala);
+
+passo = 0;
+fun a_cada_quadro() {
+  # 50 chamadas por segundo; um quadro novo a cada 6 (pouco mais de 8 por segundo; o nome inteiro em 3 s)
+  passo++;
+  tinta.SetImage(quadro[Math.Int(passo / 6) % 30]);
+}
+Plymouth.SetRefreshFunction(a_cada_quadro);

@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MPL-2.0
+# O diagnóstico do Writer OS (15/11/2026): grava o journal, o dmesg e um resumo da placa de vídeo e da
+# sessão na partição de dados ("Ekfrase Writer/.diagnostico/"), para ler no Windows. Cria também
+# /run/ekfrase/sessao/, onde a sessão conta as quedas do Cage.
+[Unit]
+Description=Ekfrase Writer OS: o diagnóstico no pendrive
+After=ekfrase-dados.service
+Before=ekfrase-sessao.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'mkdir -p /run/ekfrase/sessao && chown 1000:1000 /run/ekfrase/sessao && chmod 0755 /run/ekfrase/sessao'
+ExecStart=/usr/lib/ekfrase/ekfrase-diagnostico.sh
+Nice=10
+IOSchedulingClass=idle
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

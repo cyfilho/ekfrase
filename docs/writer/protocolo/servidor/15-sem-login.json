@@ -1,0 +1,42 @@
+{
+  "caso": "sem-login",
+  "descricao": "Sem sessão de conta: 401 com o erro \"login\" (ler e enviar). Só escrita/servidor responde sem login.",
+  "passos": [
+    {
+      "quem": "anonimo",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 401,
+        "corpo": {
+          "ok": false,
+          "erro": "login"
+        }
+      }
+    },
+    {
+      "quem": "anonimo",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {},
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 401,
+        "corpo": {
+          "ok": false,
+          "erro": "login"
+        }
+      }
+    }
+  ]
+}

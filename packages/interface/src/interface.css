@@ -393,21 +393,66 @@
   gap: 0.5rem;
 }
 
+/* FB-0005: a bolinha nativa sumia no `input { width: 100% }` do base.css e espremia o texto.
+   Agora o cartão inteiro é a escolha: a bolinha fica escondida (mas focável) e um quadradinho marca. */
+.ekf-janela input[type='radio'],
+.ekf-janela input[type='checkbox'] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  flex: none;
+}
+
 .ekf-tipo {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.4rem 0.7rem;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0.55rem 0.9rem;
   border: var(--px) solid var(--borda);
   background: var(--papel-forte);
   font-weight: 700;
+  line-height: 1.2;
   cursor: pointer;
+}
+
+.ekf-janela .ekf-tipo input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.ekf-tipo span {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ekf-tipo span::before {
+  content: '';
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: var(--px) solid currentColor;
+  background: transparent;
 }
 
 .ekf-tipo:has(input:checked) {
   background: var(--destaque);
   color: var(--destaque-texto);
+}
+
+.ekf-tipo:has(input:checked) span::before {
+  background: currentColor;
+  box-shadow: inset 0 0 0 2px var(--destaque);
+}
+
+.ekf-tipo:has(input:focus-visible) {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 .ekf-print {
@@ -460,6 +505,14 @@
 }
 
 .ekf-rodape p {
+  margin: 0.3rem 0;
+}
+
+.ekf-rodape-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2rem 1rem;
   margin: 0.3rem 0;
 }
 
@@ -570,6 +623,63 @@
   color: var(--destaque);
 }
 
+/* texto corrido de uma página do app (download, pendrive…) */
+.ekf-pagina {
+  max-width: 44rem;
+  padding: 1.1rem 1.1rem 1.4rem;
+  background: var(--papel);
+  border: var(--px) solid var(--borda);
+  box-shadow: 4px 4px 0 0 var(--sombra);
+}
+
+.ekf-pagina + .ekf-pagina {
+  margin-top: 1rem;
+}
+
+.ekf-pagina h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--fonte-titulo);
+  font-size: 1.5rem;
+}
+
+.ekf-pagina p,
+.ekf-pagina ol {
+  margin: 0 0 0.75rem;
+}
+
+.ekf-pagina ol {
+  padding-left: 1.25rem;
+}
+
+.ekf-pagina li + li {
+  margin-top: 0.4rem;
+}
+
+.ekf-pagina .ekf-linha {
+  margin-top: 0.5rem;
+}
+
+.ekf-pagina a.ekf-botao,
+.ekf-forma a.ekf-botao {
+  text-decoration: none;
+  text-align: center;
+}
+
+.ekf-pagina .ekf-nota {
+  color: var(--tinta-suave);
+  font-size: 0.9rem;
+}
+
+.ekf-pagina .ekf-aviso {
+  padding: 0.6rem 0.8rem;
+  background: var(--aviso-fundo, var(--papel));
+  border-left: var(--px) solid var(--aviso, var(--destaque));
+}
+
+.ekf-voltar {
+  margin-top: 1rem;
+}
+
 @media (max-width: 30rem) {
   .ekf-heroi {
     flex-direction: column;
@@ -581,4 +691,11 @@
     width: 72px;
     height: 72px;
   }
+}
+
+/* "Ao criar a conta, você concorda com…" */
+.ekf-aceite {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--tinta-suave);
 }

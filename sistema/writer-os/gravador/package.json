@@ -1,0 +1,16 @@
+{
+  "name": "ekfrase-gravador",
+  "productName": "Ekfrase Gravador",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gravador do Ekfrase Writer OS: cria o pendrive (ou SSD/HD externo) que liga direto no Writer",
+  "license": "MPL-2.0",
+  "author": "Ekfrase",
+  "homepage": "https://ekfrase.com/writer/os/",
+  "main": "dist/main.cjs",
+  "devDependencies": {
+    "electron": "45.3.1",
+    "electron-builder": "26.18.0"
+  }
+}

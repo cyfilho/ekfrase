@@ -1,0 +1,1408 @@
+{
+  "descricao": "Mesclar um registro local (com mudanças pendentes) com o do servidor. README.md §4. Entrada: `local`, `servidor`, `baseV` (o `dados._v` da versão do servidor que o aparelho conhecia; null = nenhuma). Saída: `dados` (com `_v`), `apagado`, `igualAoServidor`, `copia` (a cópia de conflito a criar, ou null). A comparação de `dados` é de valor JSON (a ordem das chaves não conta). A `versao` do registro mesclado NÃO está aqui: é uma versão nova do relógio do aparelho (ou a do servidor, se `igualAoServidor`).",
+  "casos": [
+    {
+      "nome": "campos diferentes mudaram dos dois lados: ficam os dois",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada de Ana",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "revisada",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480002000-0000-bbbbbbbb",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "revisada",
+          "texto": "Era noite.",
+          "titulo": "A chegada de Ana",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480002000-0000-bbbbbbbb",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480001000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "o mesmo campo mudou dos dois lados: vence a versão maior (servidor)",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Chegada (A)",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Chegada (B)",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480002000-0000-bbbbbbbb",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Chegada (B)",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480002000-0000-bbbbbbbb"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": true,
+        "copia": null
+      }
+    },
+    {
+      "nome": "o mesmo campo mudou dos dois lados: vence a versão maior (local)",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480003000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Chegada (A)",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480003000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Chegada (B)",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480002000-0000-bbbbbbbb",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Chegada (A)",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480003000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "mesmo tempo e contador: desempata o aparelho (o texto maior vence)",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "de A",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480001000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "de B",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480001000-0000-bbbbbbbb",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "de B",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "A chegada",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480001000-0000-bbbbbbbb",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": true,
+        "copia": null
+      }
+    },
+    {
+      "nome": "o servidor já tem tudo o que o local tem: igualAoServidor",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Novo",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Novo",
+            "resumo": "",
+            "status": "final",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480002000-0000-bbbbbbbb",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "final",
+          "texto": "Era noite.",
+          "titulo": "Novo",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480002000-0000-bbbbbbbb",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480001000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": true,
+        "copia": null
+      }
+    },
+    {
+      "nome": "mover dos dois lados (ordem e capitulo): cada campo pela sua versão",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001500-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a0V",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480001500-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001200-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": null,
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a3",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480001200-0000-bbbbbbbb",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480001200-0000-bbbbbbbb",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": null,
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a0V",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "A chegada",
+          "_v": {
+            "capitulo": "1794480001200-0000-bbbbbbbb",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480001500-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "ideia: a lista de etiquetas é um campo só (não se mescla por item)",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000004",
+          "colecao": "ideias",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": null,
+            "tipo": "premissa",
+            "titulo": "Um farol",
+            "texto": "E se o farol apagasse?",
+            "etiquetas": [
+              "mar",
+              "noite"
+            ],
+            "fixada": false,
+            "virou_tipo": null,
+            "virou_id": null,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "tipo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "etiquetas": "1794480001000-0000-aaaaaaaa",
+              "fixada": "1794480000000-0000-aaaaaaaa",
+              "virou_tipo": "1794480000000-0000-aaaaaaaa",
+              "virou_id": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000004",
+          "colecao": "ideias",
+          "versao": "1794480000900-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": null,
+            "tipo": "premissa",
+            "titulo": "Um farol",
+            "texto": "E se o farol apagasse?",
+            "etiquetas": [
+              "farol"
+            ],
+            "fixada": true,
+            "virou_tipo": null,
+            "virou_id": null,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "tipo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "etiquetas": "1794480000900-0000-bbbbbbbb",
+              "fixada": "1794480000900-0000-bbbbbbbb",
+              "virou_tipo": "1794480000000-0000-aaaaaaaa",
+              "virou_id": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "tipo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "etiquetas": "1794480000000-0000-aaaaaaaa",
+          "fixada": "1794480000000-0000-aaaaaaaa",
+          "virou_tipo": "1794480000000-0000-aaaaaaaa",
+          "virou_id": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "etiquetas": [
+            "mar",
+            "noite"
+          ],
+          "fixada": true,
+          "historia": null,
+          "texto": "E se o farol apagasse?",
+          "tipo": "premissa",
+          "titulo": "Um farol",
+          "virou_id": null,
+          "virou_tipo": null,
+          "_v": {
+            "etiquetas": "1794480001000-0000-aaaaaaaa",
+            "fixada": "1794480000900-0000-bbbbbbbb",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "tipo": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480000000-0000-aaaaaaaa",
+            "virou_id": "1794480000000-0000-aaaaaaaa",
+            "virou_tipo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "campo que só o local tem (o servidor veio de um app mais antigo)",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "cor": "azul",
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "cor": "1794480001000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Outro",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480002000-0000-bbbbbbbb",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "cor": "azul",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Outro",
+          "_v": {
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "cor": "1794480001000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480002000-0000-bbbbbbbb"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "lápide no servidor mais nova que a edição local: fica apagado",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Editei",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480002000-0000-bbbbbbbb"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Editei",
+          "_v": {
+            "apagado": "1794480002000-0000-bbbbbbbb",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480001000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": true,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "edição local mais nova que a lápide do servidor: o registro volta",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480003000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Editei depois",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480003000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480002000-0000-bbbbbbbb"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Editei depois",
+          "_v": {
+            "apagado": "1794480002000-0000-bbbbbbbb",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480003000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "lápide local mais nova que a edição do servidor: fica apagado",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480003000-0000-aaaaaaaa",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480003000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Editei",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480002000-0000-bbbbbbbb",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Editei",
+          "_v": {
+            "apagado": "1794480003000-0000-aaaaaaaa",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480002000-0000-bbbbbbbb"
+          }
+        },
+        "apagado": true,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "lápide local mais antiga que a edição do servidor: o registro volta",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480001000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "Editei depois",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480002000-0000-bbbbbbbb",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "Editei depois",
+          "_v": {
+            "apagado": "1794480001000-0000-aaaaaaaa",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480002000-0000-bbbbbbbb"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "apagado e trazido de volta: vale a versão maior de `apagado`",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480004000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480004000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480002000-0000-bbbbbbbb"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "A chegada",
+          "_v": {
+            "apagado": "1794480004000-0000-aaaaaaaa",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    },
+    {
+      "nome": "os dois apagaram: apagado",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480001000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000003",
+          "colecao": "cenas",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": true,
+          "dados": {
+            "historia": "0193a5c0-0000-7000-8000-000000000001",
+            "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+            "titulo": "A chegada",
+            "resumo": "",
+            "status": "rascunho",
+            "ordem": "a1",
+            "texto": "Era noite.",
+            "palavras": 2,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "capitulo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "resumo": "1794480000000-0000-aaaaaaaa",
+              "status": "1794480000000-0000-aaaaaaaa",
+              "ordem": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "palavras": "1794480000000-0000-aaaaaaaa",
+              "apagado": "1794480002000-0000-bbbbbbbb"
+            }
+          }
+        },
+        "baseV": {
+          "historia": "1794480000000-0000-aaaaaaaa",
+          "capitulo": "1794480000000-0000-aaaaaaaa",
+          "titulo": "1794480000000-0000-aaaaaaaa",
+          "resumo": "1794480000000-0000-aaaaaaaa",
+          "status": "1794480000000-0000-aaaaaaaa",
+          "ordem": "1794480000000-0000-aaaaaaaa",
+          "texto": "1794480000000-0000-aaaaaaaa",
+          "palavras": "1794480000000-0000-aaaaaaaa"
+        }
+      },
+      "saida": {
+        "dados": {
+          "capitulo": "0193a5c0-0000-7000-8000-000000000002",
+          "historia": "0193a5c0-0000-7000-8000-000000000001",
+          "ordem": "a1",
+          "palavras": 2,
+          "resumo": "",
+          "status": "rascunho",
+          "texto": "Era noite.",
+          "titulo": "A chegada",
+          "_v": {
+            "apagado": "1794480002000-0000-bbbbbbbb",
+            "capitulo": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "ordem": "1794480000000-0000-aaaaaaaa",
+            "palavras": "1794480000000-0000-aaaaaaaa",
+            "resumo": "1794480000000-0000-aaaaaaaa",
+            "status": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": true,
+        "igualAoServidor": true,
+        "copia": null
+      }
+    },
+    {
+      "nome": "sem base (o aparelho não conhecia o registro do servidor): campo a campo do mesmo jeito",
+      "entrada": {
+        "local": {
+          "id": "0193a5c0-0000-7000-8000-000000000004",
+          "colecao": "ideias",
+          "versao": "1794480001000-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {
+            "historia": null,
+            "tipo": "premissa",
+            "titulo": "Farol (A)",
+            "texto": "E se o farol apagasse?",
+            "etiquetas": [
+              "mar"
+            ],
+            "fixada": false,
+            "virou_tipo": null,
+            "virou_id": null,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "tipo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480001000-0000-aaaaaaaa",
+              "texto": "1794480000000-0000-aaaaaaaa",
+              "etiquetas": "1794480000000-0000-aaaaaaaa",
+              "fixada": "1794480000000-0000-aaaaaaaa",
+              "virou_tipo": "1794480000000-0000-aaaaaaaa",
+              "virou_id": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "servidor": {
+          "id": "0193a5c0-0000-7000-8000-000000000004",
+          "colecao": "ideias",
+          "versao": "1794480002000-0000-bbbbbbbb",
+          "apagado": false,
+          "dados": {
+            "historia": null,
+            "tipo": "premissa",
+            "titulo": "Um farol",
+            "texto": "Outro texto",
+            "etiquetas": [
+              "mar"
+            ],
+            "fixada": false,
+            "virou_tipo": null,
+            "virou_id": null,
+            "_v": {
+              "historia": "1794480000000-0000-aaaaaaaa",
+              "tipo": "1794480000000-0000-aaaaaaaa",
+              "titulo": "1794480000000-0000-aaaaaaaa",
+              "texto": "1794480002000-0000-bbbbbbbb",
+              "etiquetas": "1794480000000-0000-aaaaaaaa",
+              "fixada": "1794480000000-0000-aaaaaaaa",
+              "virou_tipo": "1794480000000-0000-aaaaaaaa",
+              "virou_id": "1794480000000-0000-aaaaaaaa"
+            }
+          }
+        },
+        "baseV": null
+      },
+      "saida": {
+        "dados": {
+          "etiquetas": [
+            "mar"
+          ],
+          "fixada": false,
+          "historia": null,
+          "texto": "Outro texto",
+          "tipo": "premissa",
+          "titulo": "Farol (A)",
+          "virou_id": null,
+          "virou_tipo": null,
+          "_v": {
+            "etiquetas": "1794480000000-0000-aaaaaaaa",
+            "fixada": "1794480000000-0000-aaaaaaaa",
+            "historia": "1794480000000-0000-aaaaaaaa",
+            "texto": "1794480002000-0000-bbbbbbbb",
+            "tipo": "1794480000000-0000-aaaaaaaa",
+            "titulo": "1794480001000-0000-aaaaaaaa",
+            "virou_id": "1794480000000-0000-aaaaaaaa",
+            "virou_tipo": "1794480000000-0000-aaaaaaaa"
+          }
+        },
+        "apagado": false,
+        "igualAoServidor": false,
+        "copia": null
+      }
+    }
+  ]
+}

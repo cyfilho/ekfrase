@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Writer OS só enxerga discos ligados por USB (PLANO §6.1b e §7): o disco interno do computador
+# (SATA, NVMe, o leitor de cartão interno) fica invisível para o udisks2, e nada o monta.
+SUBSYSTEM=="block", ENV{ID_BUS}!="usb", ENV{UDISKS_IGNORE}="1"

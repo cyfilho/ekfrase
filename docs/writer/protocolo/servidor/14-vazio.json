@@ -1,0 +1,115 @@
+{
+  "caso": "vazio",
+  "descricao": "Pedido sem a lista de registros, com a lista vazia ou com corpo que não é JSON: erro \"vazio\".",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": []
+      },
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {},
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": {
+          "id": "0193a000-0000-7000-8000-000000000001"
+        }
+      },
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      },
+      "nota": "\"registros\" tem de ser uma lista."
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": [
+        {
+          "id": "0193a000-0000-7000-8000-000000000001",
+          "colecao": "ideias",
+          "versao": "1731400000001-0000-aaaaaaaa",
+          "apagado": false,
+          "dados": {},
+          "base": null
+        }
+      ],
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      },
+      "nota": "A lista solta, sem o objeto em volta."
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpoBruto": "isto não é JSON",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpoBruto": "",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "vazio"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    }
+  ]
+}
