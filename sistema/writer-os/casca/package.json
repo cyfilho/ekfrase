@@ -1,0 +1,16 @@
+{
+  "name": "ekfrase-writer-casca",
+  "productName": "Ekfrase Writer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ekfrase Writer no computador: a casca Electron (SQLite cifrado, espelho .md, travas)",
+  "license": "MPL-2.0",
+  "author": "Ekfrase",
+  "homepage": "https://ekfrase.com/writer/",
+  "main": "dist/main.cjs",
+  "devDependencies": {
+    "electron": "45.3.1",
+    "electron-builder": "26.18.0"
+  }
+}

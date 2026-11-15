@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MPL-2.0
+# O GRUB do Ekfrase Writer OS @VERSAO@ (PLANO §6.3 e §7): sem menu, sem espera, sem edição.
+# A entrada é --unrestricted (liga sem senha); editar a linha do kernel ou abrir o console do GRUB
+# pede a senha do superusuário, que foi sorteada na montagem e jogada fora.
+set timeout=0
+set timeout_style=hidden
+set superusers="ekfrase"
+password_pbkdf2 ekfrase @HASH@
+
+if [ ! -e /live/vmlinuz ]; then
+  search --no-floppy --label --set=root EKFR-BOOT
+fi
+
+menuentry "Ekfrase Writer" --unrestricted {
+  linux /live/vmlinuz boot=live live-media-path=/live live-media-timeout=30 noprompt noeject nopersistence quiet splash loglevel=3 rd.udev.log_level=3 systemd.show_status=false systemd.debug-shell=0 rd.shell=0 rd.emergency=reboot panic=10 vt.global_cursor_default=0
+  initrd /live/initrd.img
+}

@@ -1,0 +1,83 @@
+{
+  "caso": "grande-demais",
+  "descricao": "Registro cujo \"dados\" passa de 5 MB (5 × 1024 × 1024 bytes de JSON) é recusado sozinho; o resto do pedido segue.",
+  "passos": [
+    {
+      "nota": "O texto tem exatamente 5 MB; com as aspas e a chave, o JSON de \"dados\" passa do limite.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 5242880
+              }
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": "cabe"
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "recusado",
+              "erro": "grande_demais"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "cenas",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "texto": "cabe"
+              },
+              "seq": "$n=s1"
+            }
+          ],
+          "cursor": "$n=s1",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,469 @@
+{
+  "caso": "paginas",
+  "descricao": "O cursor e o \"mais\": páginas pequenas com \"limite\", em ordem de seq, até acabar. Um registro regravado vai para o fim da fila.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 1
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "ideias",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 2
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000003",
+            "colecao": "ideias",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 3
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000004",
+            "colecao": "ideias",
+            "versao": "1731400000004-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 4
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000005",
+            "colecao": "ideias",
+            "versao": "1731400000005-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 5
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "estado": "aceito",
+              "seq": "$n>s2=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000004",
+              "estado": "aceito",
+              "seq": "$n>s3=s4"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000005",
+              "estado": "aceito",
+              "seq": "$n>s4=s5"
+            }
+          ],
+          "cursor": "$n=s5"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=2",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 1
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 2
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": true
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s2}&limite=2",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "colecao": "ideias",
+              "versao": "1731400000003-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 3
+              },
+              "seq": "$n=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000004",
+              "colecao": "ideias",
+              "versao": "1731400000004-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 4
+              },
+              "seq": "$n=s4"
+            }
+          ],
+          "cursor": "$n=s4",
+          "mais": true
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s4}&limite=2",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000005",
+              "colecao": "ideias",
+              "versao": "1731400000005-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 5
+              },
+              "seq": "$n=s5"
+            }
+          ],
+          "cursor": "$n=s5",
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s5}&limite=2",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": "$n=s5",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Coube certinho no limite: não há mais.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=5",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 1
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 2
+              },
+              "seq": "$n=s2"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "colecao": "ideias",
+              "versao": "1731400000003-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 3
+              },
+              "seq": "$n=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000004",
+              "colecao": "ideias",
+              "versao": "1731400000004-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 4
+              },
+              "seq": "$n=s4"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000005",
+              "colecao": "ideias",
+              "versao": "1731400000005-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 5
+              },
+              "seq": "$n=s5"
+            }
+          ],
+          "cursor": "$n=s5",
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=4",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 1
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 2
+              },
+              "seq": "$n=s2"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "colecao": "ideias",
+              "versao": "1731400000003-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 3
+              },
+              "seq": "$n=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000004",
+              "colecao": "ideias",
+              "versao": "1731400000004-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 4
+              },
+              "seq": "$n=s4"
+            }
+          ],
+          "cursor": "$n=s4",
+          "mais": true
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "ideias",
+            "versao": "1731400000009-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "n": 22
+            },
+            "base": "1731400000002-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s5=s6"
+            }
+          ],
+          "cursor": "$n=s6"
+        }
+      }
+    },
+    {
+      "nota": "Quem estava em dia recebe só a regravação.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s5}",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000009-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 22
+              },
+              "seq": "$n=s6"
+            }
+          ],
+          "cursor": "$n=s6",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Do zero: o registro 2 saiu do lugar antigo e vem no fim.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=3",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "ideias",
+              "versao": "1731400000001-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 1
+              },
+              "seq": "$n=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "colecao": "ideias",
+              "versao": "1731400000003-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 3
+              },
+              "seq": "$n=s3"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000004",
+              "colecao": "ideias",
+              "versao": "1731400000004-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 4
+              },
+              "seq": "$n=s4"
+            }
+          ],
+          "cursor": "$n=s4",
+          "mais": true
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde={s4}&limite=3",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000005",
+              "colecao": "ideias",
+              "versao": "1731400000005-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 5
+              },
+              "seq": "$n=s5"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "colecao": "ideias",
+              "versao": "1731400000009-0000-aaaaaaaa",
+              "apagado": false,
+              "dados": {
+                "n": 22
+              },
+              "seq": "$n=s6"
+            }
+          ],
+          "cursor": "$n=s6",
+          "mais": false
+        }
+      }
+    }
+  ]
+}

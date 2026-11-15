@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MPL-2.0
+[Plymouth Theme]
+Name=Ekfrase Writer
+Description=A tela do boot do Ekfrase Writer OS: a logo e a pena escrevendo (pixel art por código, scripts/arte/writer-os.mjs). MPL-2.0.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/ekfrase
+ScriptFile=/usr/share/plymouth/themes/ekfrase/ekfrase.script

@@ -1,0 +1,118 @@
+{
+  "caso": "parametros",
+  "descricao": "Parâmetros de mudancas fora do contrato (desde negativo ou não inteiro; limite fora de 1 a 500): erro \"dados\".",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=0",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=501",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?limite=dez",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=-1",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=1.5",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=abc",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde[]=1",
+      "espera": {
+        "status": 400,
+        "corpo": {
+          "ok": false,
+          "erro": "dados"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=0&limite=1",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas?desde=0&limite=500",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    }
+  ]
+}

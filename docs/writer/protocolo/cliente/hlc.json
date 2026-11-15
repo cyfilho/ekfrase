@@ -1,0 +1,347 @@
+{
+  "descricao": "Relógio híbrido (HLC). README.md §2. \"gerar\": cria o relógio com `aparelho` e `ultimo` e segue os passos; cada `agora` recebe o relógio físico (`fisico`, ms) e tem de devolver `espera`; no fim, o `ultimo` do relógio = `ultimoNoFim`. \"comparar\": comparação de TEXTO, -1/0/1. \"maior\": a maior da lista (\"\" se vazia). \"formato\": o que é e o que não é um HLC bem formado.",
+  "gerar": [
+    {
+      "nome": "o tempo anda: contador zero",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0000-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000001,
+          "espera": "1794480000001-0000-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000500,
+          "espera": "1794480000500-0000-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480000500-0000-aaaaaaaa"
+    },
+    {
+      "nome": "mesmo milissegundo: o contador sobe",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0000-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0001-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0002-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480000000-0002-aaaaaaaa"
+    },
+    {
+      "nome": "o relógio do aparelho anda para trás: a versão não",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480001000,
+          "espera": "1794480001000-0000-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480001000-0001-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794479995000,
+          "espera": "1794480001000-0002-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480001001,
+          "espera": "1794480001001-0000-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480001001-0000-aaaaaaaa"
+    },
+    {
+      "nome": "absorve uma versão do futuro (de outro aparelho)",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0000-aaaaaaaa"
+        },
+        {
+          "op": "absorver",
+          "versao": "1794480060000-0007-bbbbbbbb"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000001,
+          "espera": "1794480060000-0008-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000002,
+          "espera": "1794480060000-0009-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480060001,
+          "espera": "1794480060001-0000-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480060001-0000-aaaaaaaa"
+    },
+    {
+      "nome": "absorver uma versão antiga não muda nada",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000010,
+          "espera": "1794480000010-0000-aaaaaaaa"
+        },
+        {
+          "op": "absorver",
+          "versao": "1794480000000-0009-bbbbbbbb"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000010,
+          "espera": "1794480000010-0001-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480000010-0001-aaaaaaaa"
+    },
+    {
+      "nome": "absorve no mesmo milissegundo com contador maior",
+      "aparelho": "aaaaaaaa",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0000-aaaaaaaa"
+        },
+        {
+          "op": "absorver",
+          "versao": "1794480000000-0005-bbbbbbbb"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-0006-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480000000-0006-aaaaaaaa"
+    },
+    {
+      "nome": "retoma do último guardado (entre sessões)",
+      "aparelho": "bbbbbbbb",
+      "ultimo": "1794480000100-0003-bbbbbbbb",
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000100-0004-bbbbbbbb"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000100,
+          "espera": "1794480000100-0005-bbbbbbbb"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000101,
+          "espera": "1794480000101-0000-bbbbbbbb"
+        }
+      ],
+      "ultimoNoFim": "1794480000101-0000-bbbbbbbb"
+    },
+    {
+      "nome": "o contador estoura: o tempo avança 1 ms",
+      "aparelho": "aaaaaaaa",
+      "ultimo": "1794480000000-fffe-aaaaaaaa",
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000000-ffff-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000001-0000-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000000,
+          "espera": "1794480000001-0001-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000001,
+          "espera": "1794480000001-0002-aaaaaaaa"
+        },
+        {
+          "op": "agora",
+          "fisico": 1794480000002,
+          "espera": "1794480000002-0000-aaaaaaaa"
+        }
+      ],
+      "ultimoNoFim": "1794480000002-0000-aaaaaaaa"
+    },
+    {
+      "nome": "tempo com fração e tempo negativo: arredonda para baixo, mínimo zero",
+      "aparelho": "cccccccc",
+      "ultimo": null,
+      "passos": [
+        {
+          "op": "agora",
+          "fisico": -5,
+          "espera": "0000000000000-0000-cccccccc"
+        },
+        {
+          "op": "agora",
+          "fisico": 12.9,
+          "espera": "0000000000012-0000-cccccccc"
+        },
+        {
+          "op": "agora",
+          "fisico": 12.1,
+          "espera": "0000000000012-0001-cccccccc"
+        }
+      ],
+      "ultimoNoFim": "0000000000012-0001-cccccccc"
+    }
+  ],
+  "comparar": [
+    {
+      "a": "1794480000000-0000-aaaaaaaa",
+      "b": "1794480000000-0000-aaaaaaaa",
+      "espera": 0
+    },
+    {
+      "a": "1794480000000-0000-aaaaaaaa",
+      "b": "1794480000001-0000-aaaaaaaa",
+      "espera": -1
+    },
+    {
+      "a": "1794480000001-0000-aaaaaaaa",
+      "b": "1794480000000-ffff-bbbbbbbb",
+      "espera": 1
+    },
+    {
+      "a": "1794480000000-0001-aaaaaaaa",
+      "b": "1794480000000-0002-aaaaaaaa",
+      "espera": -1
+    },
+    {
+      "a": "1794480000000-000a-aaaaaaaa",
+      "b": "1794480000000-0009-bbbbbbbb",
+      "espera": 1
+    },
+    {
+      "a": "1794480000000-0000-aaaaaaaa",
+      "b": "1794480000000-0000-bbbbbbbb",
+      "espera": -1
+    },
+    {
+      "a": "1794480000000-0000-bbbbbbbb",
+      "b": "1794480000000-0000-aaaaaaaa",
+      "espera": 1
+    },
+    {
+      "a": "0000000000999-0000-aaaaaaaa",
+      "b": "0000000001000-0000-aaaaaaaa",
+      "espera": -1
+    },
+    {
+      "a": "1794480000000-00ff-cccccccc",
+      "b": "1794480000000-0100-aaaaaaaa",
+      "espera": -1
+    }
+  ],
+  "maior": [
+    {
+      "versoes": [
+        "1794480000000-0000-aaaaaaaa",
+        "1794480000005-0000-bbbbbbbb",
+        "1794480000005-0000-aaaaaaaa"
+      ],
+      "espera": "1794480000005-0000-bbbbbbbb"
+    },
+    {
+      "versoes": [
+        "1794480000000-0003-cccccccc"
+      ],
+      "espera": "1794480000000-0003-cccccccc"
+    },
+    {
+      "versoes": [],
+      "espera": ""
+    }
+  ],
+  "formato": [
+    {
+      "versao": "1794480000000-0000-aaaaaaaa",
+      "valido": true
+    },
+    {
+      "versao": "0000000000000-0000-00000000",
+      "valido": true
+    },
+    {
+      "versao": "9999999999999-ffff-ffffffff",
+      "valido": true
+    },
+    {
+      "versao": "1794480000000-0000-AAAAAAAA",
+      "valido": false
+    },
+    {
+      "versao": "1794480000000-000-aaaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": "179448000000-0000-aaaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": "1794480000000-0000-aaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": "1794480000000_0000_aaaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": "1794480000000-000g-aaaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": " 1794480000000-0000-aaaaaaaa",
+      "valido": false
+    },
+    {
+      "versao": "",
+      "valido": false
+    }
+  ]
+}

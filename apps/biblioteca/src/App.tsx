@@ -3,7 +3,7 @@
 /**
  * A Biblioteca do Ekfrase (DEC-P049). O hall é o próprio app: quem chega vê o acervo, sem conta.
  *
- * `#/` o acervo (busca, estantes por categoria, gêneros; com conta, os livros do inventário) ·
+ * `#/` o acervo (busca, estantes pelas classes da CDD, gêneros; com conta, os livros do inventário) ·
  * `#/livro/<id>` a ficha (ler, pôr no inventário, baixar em EPUB/TXT/DOCX/PDF, sumário) ·
  * `#/ler/<id>[/<capítulo>]` o leitor (Leitor.tsx).
  *
@@ -44,6 +44,9 @@ export const nomeGenero = (g: string) => {
   const v = t(k);
   return v === k ? g : v;
 };
+
+/** O nome de um código da CDD (classe ou subdivisão: `biblioteca.cdd.<código>`). */
+export const nomeCdd = (c: string) => t(`biblioteca.cdd.${c}`);
 
 // ---------- o acervo e o inventário, num lugar só ----------
 
@@ -92,7 +95,7 @@ export function App() {
           <img src={logo} width={48} height={48} alt="" />
           <span>{t('biblioteca.nome')}</span>
         </a>
-        <AcoesTopo t={t} tr={tr} app="biblioteca" passeio="/#/torre/biblioteca" entrar />
+        <AcoesTopo t={t} tr={tr} app="biblioteca" passeio="/#/torre/biblioteca/salas" entrar />
       </header>
       <main class="conteudo bib">{rota.tipo === 'livro' ? <Ficha id={rota.id} /> : <Acervo />}</main>
       <RodapeEkfrase t={t} />
@@ -118,19 +121,22 @@ function Acervo() {
   const livros = useCatalogo();
   const inventario = useInventario();
   const [termo, setTermo] = useState('');
-  const [categoria, setCategoria] = useState<string | null>(null);
+  // a estante = uma classe da CDD (DEC-P058): só aparecem as classes que têm livros
+  const [classe, setClasse] = useState<string | null>(null);
   const [genero, setGenero] = useState<string | null>(null);
+  const daClasse = (l: Livro) => !classe || acervo.classeDe(l.cdd) === classe;
 
   const achados = useMemo(() => {
-    let l = acervo.buscar(livros ?? [], termo, nomeGenero);
-    if (categoria) l = l.filter((x) => x.categoria === categoria);
+    let l = acervo.buscar(livros ?? [], termo, nomeGenero, nomeCdd);
+    l = l.filter(daClasse);
     if (genero) l = l.filter((x) => x.generos.includes(genero));
     return l;
-  }, [livros, termo, categoria, genero]);
+  }, [livros, termo, classe, genero]);
   const generos = useMemo(
-    () => [...new Set((livros ?? []).filter((l) => !categoria || l.categoria === categoria).flatMap((l) => l.generos))].sort((a, b) => nomeGenero(a).localeCompare(nomeGenero(b))),
-    [livros, categoria],
+    () => [...new Set((livros ?? []).filter(daClasse).flatMap((l) => l.generos))].sort((a, b) => nomeGenero(a).localeCompare(nomeGenero(b))),
+    [livros, classe],
   );
+  const classes = useMemo(() => acervo.classesComLivros(livros ?? []), [livros]);
   const meus = (livros ?? []).filter((l) => inventario?.has(l.id));
 
   return (
@@ -160,14 +166,14 @@ function Acervo() {
       <section class="bib-secao">
         <h2>{t('biblioteca.estantes')}</h2>
         <div class="bib-chips" role="group" aria-label={t('biblioteca.estantes')}>
-          <button type="button" class="chip" aria-pressed={categoria === null} onClick={() => (setCategoria(null), setGenero(null))}>
+          <button type="button" class="chip" aria-pressed={classe === null} onClick={() => (setClasse(null), setGenero(null))}>
             {t('biblioteca.todas')}
           </button>
-          {acervo.CATEGORIAS.map((c) => {
-            const n = (livros ?? []).filter((l) => l.categoria === c).length;
+          {classes.map((c) => {
+            const n = (livros ?? []).filter((l) => acervo.classeDe(l.cdd) === c).length;
             return (
-              <button key={c} type="button" class="chip" aria-pressed={categoria === c} onClick={() => (setCategoria(categoria === c ? null : c), setGenero(null))}>
-                {t(`biblioteca.categoria.${c}`)} <small>{n}</small>
+              <button key={c} type="button" class="chip" aria-pressed={classe === c} onClick={() => (setClasse(classe === c ? null : c), setGenero(null))}>
+                <span class="cdd-num">{c}</span> {t(`biblioteca.cdd.${c}`)} <small>{n}</small>
               </button>
             );
           })}
@@ -197,6 +203,7 @@ function Acervo() {
       <section class="bib-sobre painel">
         <h2>{t('biblioteca.sobre.titulo')}</h2>
         <p>{t('biblioteca.sobre.texto')}</p>
+        <p>{t('biblioteca.sobre.cdd')}</p>
       </section>
     </>
   );
@@ -306,15 +313,25 @@ function Ficha({ id }: { id: string }) {
           {l.subtitulo && <p class="subtitulo">{l.subtitulo}</p>}
           <p class="autor">
             {l.autor}
-            {l.ano ? ` (${l.ano < 0 ? t('biblioteca.ano.ac', { ano: -l.ano }) : l.ano})` : ''}
+            {l.ano ? ` (${l.ano < 0 ? t('biblioteca.ano.ac', { ano: String(-l.ano) }) : l.ano})` : ''}
           </p>
           <p class="dica">{t('biblioteca.traducao', { nome: l.traducao })}</p>
           <ul class="etiquetas">
-            <li>{t(`biblioteca.categoria.${l.categoria}`)}</li>
+            <li class="cdd">
+              {t('biblioteca.cdd', { numero: l.cdd })} · {nomeCdd(acervo.classeDe(l.cdd))}
+            </li>
             {l.generos.map((g) => (
               <li key={g}>{nomeGenero(g)}</li>
             ))}
           </ul>
+          <p class="dica">
+            {t('biblioteca.cdd.caminho', {
+              caminho: acervo
+                .caminhoCdd(l.cdd)
+                .map((c) => `${c} ${nomeCdd(c)}`)
+                .join(' › '),
+            })}
+          </p>
           <p>{l.descricao}</p>
           <p class="dica">
             {t('biblioteca.tamanho', { capitulos: l.capitulos, paginas: Math.max(1, Math.round(l.palavras / 250)) })}
@@ -335,7 +352,7 @@ function Ficha({ id }: { id: string }) {
               </a>
             ))}
           </div>
-          <p class="dica">{t('biblioteca.licenca', { licenca: l.licenca, editora: l.editora ?? 'Ekfrase', ano: l.ano_traducao ?? '' })}</p>
+          <p class="dica">{t('biblioteca.licenca', { licenca: l.licenca, editora: l.editora ?? 'Ekfrase', ano: l.ano_traducao != null ? String(l.ano_traducao) : '' })}</p>
         </div>
       </div>
       {sumario && sumario.length > 0 && (

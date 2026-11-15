@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MPL-2.0
+//
+// O polkit do Writer OS (PLANO §6.4 e §7): o usuário writer, só na sessão ATIVA e LOCAL, pode isto
+// e mais nada. Para os outros usuários (os serviços do sistema), valem as regras de sempre.
+//
+// - NetworkManager: o Wi-Fi (procurar, conectar, as conexões dele);
+// - udisks2: montar, ejetar e desligar SÓ disco ligado por USB (pendrive, SSD portátil, HD externo:
+//   §6.1b, pelo barramento e não por "removível"). O disco interno nem aparece para o udisks2
+//   (rules.d/90-ekfrase-so-usb.rules), e montar disco do sistema é negado;
+// - logind: desligar, reiniciar, o brilho; timedate: o fuso.
+polkit.addRule(function (action, subject) {
+  if (subject.user !== "writer") return polkit.Result.NOT_HANDLED;
+  if (!subject.local || !subject.active) return polkit.Result.NO;
+
+  var id = action.id;
+  var livres = [
+    "org.freedesktop.NetworkManager.network-control",
+    "org.freedesktop.NetworkManager.wifi.scan",
+    "org.freedesktop.NetworkManager.settings.modify.own",
+    "org.freedesktop.NetworkManager.enable-disable-wifi",
+    "org.freedesktop.login1.power-off",
+    "org.freedesktop.login1.reboot",
+    "org.freedesktop.login1.set-brightness",
+    "org.freedesktop.timedate1.set-timezone",
+  ];
+  if (livres.indexOf(id) >= 0) return polkit.Result.YES;
+
+  var discos = ["org.freedesktop.udisks2.filesystem-mount", "org.freedesktop.udisks2.eject-media", "org.freedesktop.udisks2.power-off-drive"];
+  if (discos.indexOf(id) >= 0) {
+    var bus = action.lookup("drive.removable.bus") || action.lookup("drive.connection_bus") || "";
+    return bus === "usb" ? polkit.Result.YES : polkit.Result.NO;
+  }
+
+  // todo o resto: não (inclusive filesystem-mount-system, modify.system, pkexec…)
+  return polkit.Result.NO;
+});

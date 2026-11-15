@@ -1,0 +1,73 @@
+{
+  "caso": "sem-csrf",
+  "descricao": "Enviar sem o token CSRF: 403 com o erro \"csrf\" (a resposta traz o token certo) e nada é gravado.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "csrf": false,
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {},
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 403,
+        "corpo": {
+          "ok": false,
+          "erro": "csrf",
+          "csrf": "$texto"
+        }
+      }
+    },
+    {
+      "quem": "anonimo",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "csrf": false,
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "ideias",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {},
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 403,
+        "corpo": {
+          "ok": false,
+          "erro": "csrf",
+          "csrf": "$texto"
+        }
+      },
+      "nota": "Sem login e sem token: o token é conferido primeiro."
+    },
+    {
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    }
+  ]
+}

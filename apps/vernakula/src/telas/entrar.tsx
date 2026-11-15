@@ -52,6 +52,9 @@ export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntr
       <p class="link-abaixo">
         <a href="#/esqueci">{t('vernakula.entrar.esqueci')}</a>
       </p>
+      <p class="link-abaixo">
+        <a href="#/criar">{t('vernakula.entrar.criar')}</a>
+      </p>
     </section>
   );
 }
