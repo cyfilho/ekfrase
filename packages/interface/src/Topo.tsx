@@ -10,6 +10,7 @@ import { IconePasseio, IconePessoa } from './icones.tsx';
 import { Menu } from './Menu.tsx';
 import { FormConta } from './Conta.tsx';
 import { Janela } from './Janela.tsx';
+import { ambienteFechado } from './ambiente.ts';
 import { aoMudarConta, aoMudarPerfil, contaAtual, eu, sair, verPerfil, type Conta } from './ponte.ts';
 import { SeletorIdioma } from './SeletorIdioma.tsx';
 import type { T } from './tipos.ts';
@@ -26,9 +27,19 @@ export function useConta(): { carregando: boolean; conta: Conta | null } {
   return e.carregando ? { carregando: true, conta: null } : { carregando: false, conta: e.conta };
 }
 
-/** O passeio deste app: a torre dele no castelo do Ekfrase (DEC-P040). */
-export function BotaoPasseio({ t, href }: { t: T; href: string }) {
+/**
+ * O passeio deste app: a torre dele no castelo do Ekfrase (DEC-P040). Com uma função no lugar do endereço
+ * (o Writer no computador, onde o castelo só existe com o Motor), o botão chama a função em vez de navegar.
+ */
+export function BotaoPasseio({ t, href }: { t: T; href: string | (() => void) }) {
   const rotulo = t('nucleo.passeio.titulo');
+  if (typeof href === 'function') {
+    return (
+      <button type="button" class="ekf-icone" title={rotulo} aria-label={rotulo} onClick={href} data-teste="botao-passeio">
+        <IconePasseio />
+      </button>
+    );
+  }
   return (
     <a class="ekf-icone" href={href} title={rotulo} aria-label={rotulo}>
       <IconePasseio />
@@ -49,7 +60,7 @@ export function useFoto(): string | null {
 
 /**
  * Quem entrou: a foto (ou o ícone), o nome, a conta Ekfrase (personagem, foto, inventário, apps),
- * o feedback recebido (só a equipe) e Sair. Sem conta: nada, ou, com `comEntrar`, o botão Entrar
+ * a área da equipe (feedback, pedidos de escola; só a equipe) e Sair. Sem conta: nada, ou, com `comEntrar`, o botão Entrar
  * (a conta Ekfrase é opcional: passear e baixar não pedem conta, DEC-P050).
  */
 export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void; comEntrar?: boolean }) {
@@ -82,16 +93,20 @@ export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void
             <strong>{conta.nome}</strong>
             <small>{conta.email}</small>
           </p>
-          <a role="menuitem" href="/#/conta">
-            {t('nucleo.conta.ekfrase.link')}
-          </a>
-          <a role="menuitem" href="/#/conta/inventario">
-            {t('nucleo.inventario.titulo')}
-          </a>
-          {conta.equipe && (
-            <a role="menuitem" href="/#/feedback">
-              {t('nucleo.feedback.recebido')}
-            </a>
+          {!ambienteFechado() && (
+            <>
+              <a role="menuitem" href="/#/conta">
+                {t('nucleo.conta.ekfrase.link')}
+              </a>
+              <a role="menuitem" href="/#/conta/inventario">
+                {t('nucleo.inventario.titulo')}
+              </a>
+              {conta.equipe && (
+                <a role="menuitem" href="/#/equipe">
+                  {t('nucleo.equipe.titulo')}
+                </a>
+              )}
+            </>
           )}
           <button
             type="button"
@@ -114,8 +129,8 @@ export interface AcoesTopoProps {
   tr: Tradutor;
   /** O app de onde vem o feedback ("castelo", "maker"…). */
   app: string;
-  /** Endereço do passeio deste app (sem = sem botão). */
-  passeio?: string;
+  /** Endereço do passeio deste app (sem = sem botão); uma função = o botão faz isso em vez de navegar. */
+  passeio?: string | (() => void);
   /** Botões a mais, antes dos de sempre (o "Lugares" do castelo). */
   antes?: ComponentChildren;
   aoTrocarIdioma?: (codigo: string) => void;
@@ -142,10 +157,17 @@ export function AcoesTopo(p: AcoesTopoProps) {
 export function TopoEkfrase(p: AcoesTopoProps) {
   return (
     <header class="ekf-topo">
-      <a class="ekf-marca" href="/">
-        <img src={logoEkfrase} width={48} height={36} alt="" />
-        <span>Ekfrase</span>
-      </a>
+      {ambienteFechado() ? (
+        <span class="ekf-marca">
+          <img src={logoEkfrase} width={48} height={36} alt="" />
+          <span>Ekfrase</span>
+        </span>
+      ) : (
+        <a class="ekf-marca" href="/">
+          <img src={logoEkfrase} width={48} height={36} alt="" />
+          <span>Ekfrase</span>
+        </a>
+      )}
       <AcoesTopo {...p} />
     </header>
   );

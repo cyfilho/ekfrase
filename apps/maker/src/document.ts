@@ -127,13 +127,21 @@ export class DocumentSession {
     this.emit();
   }
 
-  /** Exportar: baixa o arquivo .ekfr. */
-  save(preview?: Uint8Array): string {
+  /** Há mudanças a salvar (um mundo novo ou importado também: ele ainda não está na nuvem). */
+  markDirty(): void {
+    this.dirty = true;
+    this.emit();
+  }
+
+  /** Exportar: baixa o arquivo .ekfr. `marcarSalvo` = sem nuvem, o arquivo é o que salva o mundo. */
+  save(preview?: Uint8Array, marcarSalvo = true): string {
     const bytes = this.bytes(preview);
     const fileName = fileNameFor(this.store.getMeta().name, FILE_EXTENSION);
     download(bytes, fileName, MEDIA_TYPE);
-    this.dirty = false;
-    this.emit();
+    if (marcarSalvo) {
+      this.dirty = false;
+      this.emit();
+    }
     return fileName;
   }
 

@@ -422,7 +422,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
         />
       )}
 
-      {!foco && <RodapeEkfrase t={t} compacto />}
+      {!foco && <RodapeEkfrase t={t} />}
     </div>
   );
 }

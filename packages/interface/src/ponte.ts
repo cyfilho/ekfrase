@@ -105,6 +105,13 @@ export const criarConta = (d: { nome: string; email: string; senha: string; idio
 
 export const redefinirSenha = (codigo: string, nova: string) => comConta(pedir('POST', 'conta/redefinir', { codigo, nova }));
 
+/** Pede a exclusão da conta (7 dias para se arrepender). Já sai da conta neste aparelho. */
+export async function excluirConta(senhaAtual: string, confirmacao: string): Promise<Resposta<{ ate: string }>> {
+  const r = await pedir<{ ate: string }>('POST', 'conta/excluir', { senha_atual: senhaAtual, confirmacao });
+  if (r.ok) mudar({ carregando: false, conta: null });
+  return r;
+}
+
 export const esqueciSenha = (email: string, app: string, idioma: string) => pedir('POST', 'conta/esqueci', { email, app, idioma });
 
 export async function sair(): Promise<void> {

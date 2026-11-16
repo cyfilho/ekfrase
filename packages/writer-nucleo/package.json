@@ -1,0 +1,19 @@
+{
+  "name": "@ekfrase/writer-nucleo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "O núcleo do Ekfrase Writer: modelo (histórias, capítulos, cenas, ideias, personagens), armazém local, sincronização com a ponte, conflitos e exportar/importar",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ekfrase/arquivo": "0.1.0",
+    "fflate": "^0.8.3",
+    "idb": "^8.0.3"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.0.0"
+  }
+}

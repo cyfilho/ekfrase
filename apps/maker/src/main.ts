@@ -18,7 +18,19 @@ import { chaveNoEndereco, enderecoDaEntrega, entregar, identificar, podeAbrir, r
 import { DocError, type Command } from '@ekfrase/maker-doc';
 import { BIOMES, DEFAULT_GENERATOR, GenError, type BiomeId } from '@ekfrase/maker-gen';
 import { BRUSHES, brushAvailable, layersOf, type Brush } from './brushes';
-import { abrirMeusMundos, esquecerNuvem, iniciarCasca, iniciarIdiomaETema, salvarNaNuvem, tr } from './casca';
+import {
+  abrirMeusMundos,
+  esquecerNuvem,
+  guardarAntesDeTrocar,
+  guardarJa,
+  iniciarCasca,
+  iniciarIdiomaETema,
+  mudou,
+  salvarNaNuvem,
+  temNuvem,
+  temPendencia,
+  tr,
+} from './casca';
 import { DocumentSession, randomSeed } from './document';
 import { TerrainView } from './terrain';
 import { TileLayer } from './tiles';
@@ -454,12 +466,31 @@ function applyWorld(seed: string): void {
   if (before.ns !== ns || before.ew !== ew) fitWorld();
 }
 
-function setupWorld(): void {
-  $('world-apply').addEventListener('click', () => {
+/**
+ * "Gerar novo mundo" (e o globo do castelo). Um mundo com algo feito (pintura, nomes, nome próprio) não
+ * é trocado: o atual fica salvo em Meus mundos e abre um documento novo, com outra semente (FB-0001).
+ * Um mundo ainda intocado só troca de semente.
+ */
+async function gerarNovoMundo(): Promise<void> {
+  const meta = session.store.getMeta();
+  const temAlgo = session.store.editCount() > 0 || labels.length > 0 || meta.name !== t('doc.untitled');
+  if (!temAlgo) {
     const seed = randomSeed();
     worldSeed.value = seed;
     applyWorld(seed);
-  });
+    return;
+  }
+  if (!(await guardarAntesDeTrocar())) return;
+  esquecerNuvem();
+  session.newDocument(t('doc.untitled'));
+  session.markDirty();
+  select(null);
+  fitWorld();
+  showToast(t('world.newKept'));
+}
+
+function setupWorld(): void {
+  $('world-apply').addEventListener('click', () => void gerarNovoMundo());
   worldSeed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') applyWorld(worldSeed.value);
   });
@@ -536,7 +567,8 @@ function makePreview(): Promise<Uint8Array | undefined> {
 
 async function saveDocument(): Promise<void> {
   try {
-    const file = session.save(await makePreview());
+    // com a nuvem, exportar não marca como salvo: a nuvem ainda precisa receber as mudanças
+    const file = session.save(await makePreview(), !temNuvem());
     showToast(t('doc.savedAs', { file }));
   } catch (e) {
     showError(e);
@@ -569,9 +601,13 @@ async function abrirArquivo(bytes: Uint8Array, nome: string): Promise<void> {
       return;
     }
   }
+  // o mundo aberto vai para a nuvem antes de dar lugar ao do arquivo
+  if (!(await guardarAntesDeTrocar())) return;
   try {
     session.open(bytes);
     esquecerNuvem();
+    // o mundo importado ainda não está na nuvem: o salvamento automático o leva
+    session.markDirty();
     showToast(t('doc.opened', { name: session.store.getMeta().name }));
     select(null);
     fitWorld();
@@ -583,6 +619,8 @@ async function abrirArquivo(bytes: Uint8Array, nome: string): Promise<void> {
 function setupDocument(): void {
   session = new DocumentSession(t('doc.untitled'));
   session.onChange(() => {
+    // toda mudança vai para o rascunho e, depois, para a nuvem (FB-0001)
+    if (session.dirty) mudou();
     refreshLabels();
     renderLabelCard();
     syncTerrain();
@@ -598,17 +636,20 @@ function setupDocument(): void {
     if (name !== session.store.getMeta().name) runCommand(() => session.apply({ type: 'meta.rename', name }));
     docName.value = session.store.getMeta().name;
   });
-  $('doc-new').addEventListener('click', () => {
-    if (!confirmDiscard()) return;
+  $('doc-new').addEventListener('click', async () => {
+    if (!(await guardarAntesDeTrocar())) return;
     esquecerNuvem();
     session.newDocument(t('doc.untitled'));
+    // o mundo novo já é "o da última vez": vai para a nuvem e é ele que abre ao recarregar
+    session.markDirty();
     select(null);
     fitWorld();
   });
   // Abrir e Salvar são da nuvem (a conta Ekfrase); Importar e Exportar, do arquivo .ekfr
   $('doc-open').addEventListener('click', abrirMeusMundos);
+  // o seletor de arquivo precisa do clique direto (sem esperar a nuvem): o mundo atual é guardado depois
   $('doc-import').addEventListener('click', () => {
-    if (confirmDiscard()) docFile.click();
+    if (temNuvem() || confirmDiscard()) docFile.click();
   });
   docFile.addEventListener('change', async () => {
     const file = docFile.files?.[0];
@@ -636,9 +677,14 @@ function setupDocument(): void {
     e.preventDefault();
   });
 
-  // Alterações não salvas: o navegador pergunta antes de fechar ou recarregar a página.
+  // Algo ainda não chegou à nuvem: o navegador pergunta antes de fechar ou recarregar a página
+  // (o rascunho deste navegador já guardou tudo). Ao sair da aba, manda para a nuvem já.
   window.addEventListener('beforeunload', (e) => {
-    if (session.dirty) e.preventDefault();
+    guardarJa();
+    if (temPendencia()) e.preventDefault();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') guardarJa();
   });
 }
 
@@ -1295,29 +1341,100 @@ function init(): void {
       void receber(chave).then((e) => (e ? abrirArquivo(e.bytes, e.nome) : showToast(t('file.handoffExpired'))));
       return;
     }
-    if (p === 'novo') $('world-apply').click();
+    if (p === 'novo') void gerarNovoMundo();
     else if (p === 'mapa') chooseStyle('map');
     else if (p === 'satelite') chooseStyle('satellite');
     else if (p === 'editar') setMode(true);
   };
-  pedido();
-  addEventListener('hashchange', pedido);
 
-  // a casca do Ekfrase: topo, rodapé, a entrada (login) e a nuvem
+  setupPainelETelaCheia();
+
+  // a casca do Ekfrase: topo, rodapé, a entrada (login) e a nuvem. Os pedidos do endereço esperam o
+  // mundo da última vez abrir (senão o "mundo novo" do globo cairia por baixo dele).
   void iniciarCasca({
     nome: () => session.store.getMeta().name,
     bytes: async () => session.bytes(await makePreview()),
-    abrir: (bytes) => {
+    bytesRapido: () => session.bytes(),
+    abrir: (bytes, avisar = true) => {
       session.open(bytes);
-      showToast(t('doc.opened', { name: session.store.getMeta().name }));
+      if (avisar) showToast(t('doc.opened', { name: session.store.getMeta().name }));
       select(null);
-      fitWorld();
+      fitWorld(false);
     },
     marcarSalvo: () => session.markSaved(),
+    marcarSujo: () => session.markDirty(),
     sujo: () => session.dirty,
     aviso: showToast,
     erro: showError,
+    estadoNuvem: (texto) => ($('doc-cloud').textContent = texto),
+    pronto: () => {
+      pedido();
+      addEventListener('hashchange', pedido);
+    },
   });
+}
+
+// ---------- painel retrátil e tela cheia (FB-0001) ----------
+
+const PAINEL_KEY = 'ekfrase.maker.painel';
+
+/**
+ * O painel da direita se recolhe (mais espaço para o mapa; lembrado neste aparelho) e a tela cheia
+ * esconde topo, painel e rodapé: só o mapa e os controles dele (zoom, ferramentas, pincéis). F liga e
+ * desliga a tela cheia; Esc sai.
+ */
+function setupPainelETelaCheia(): void {
+  const app = document.querySelector<HTMLElement>('.app')!;
+  const botaoPainel = $<HTMLButtonElement>('toggle-panel');
+  const botaoTela = $<HTMLButtonElement>('toggle-fullscreen');
+  const rotular = (b: HTMLElement, chave: string): void => {
+    b.title = t(chave);
+    b.setAttribute('aria-label', t(chave));
+  };
+  const mostrar = (): void => {
+    const recolhido = app.classList.contains('painel-recolhido');
+    const cheia = app.classList.contains('tela-cheia');
+    botaoPainel.setAttribute('aria-pressed', String(recolhido));
+    botaoTela.setAttribute('aria-pressed', String(cheia));
+    rotular(botaoPainel, recolhido ? 'view.panelShow' : 'view.panelHide');
+    rotular(botaoTela, cheia ? 'view.fullscreenExit' : 'view.fullscreen');
+    dispatchEvent(new Event('resize'));
+  };
+  let recolhido = false;
+  try {
+    recolhido = localStorage.getItem(PAINEL_KEY) === 'recolhido';
+  } catch {
+    // sem armazenamento
+  }
+  app.classList.toggle('painel-recolhido', recolhido);
+  botaoPainel.addEventListener('click', () => {
+    const r = app.classList.toggle('painel-recolhido');
+    try {
+      localStorage.setItem(PAINEL_KEY, r ? 'recolhido' : 'aberto');
+    } catch {
+      // sem armazenamento
+    }
+    mostrar();
+  });
+  const telaCheia = (ligar: boolean): void => {
+    app.classList.toggle('tela-cheia', ligar);
+    if (ligar && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => undefined);
+    if (!ligar && document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+    mostrar();
+  };
+  botaoTela.addEventListener('click', () => telaCheia(!app.classList.contains('tela-cheia')));
+  // o Esc do navegador sai da tela cheia: o editor acompanha
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && app.classList.contains('tela-cheia')) telaCheia(false);
+  });
+  window.addEventListener('keydown', (e) => {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement;
+    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.toLowerCase() === 'f') telaCheia(!app.classList.contains('tela-cheia'));
+    else if (e.key === 'Escape' && app.classList.contains('tela-cheia')) telaCheia(false);
+  });
+  onLocaleChange(mostrar);
+  mostrar();
 }
 
 init();

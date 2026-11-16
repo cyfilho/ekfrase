@@ -1,0 +1,459 @@
+{
+  "descricao": "Índice fracionário do campo `ordem`. README.md §6. \"entre\": `entre(a, b)` (null = sem vizinho daquele lado) tem de devolver exatamente `espera`. \"erro\": pares que `entre` tem de recusar (ordem trocada, chaves iguais ou chave malformada). \"valida\": o que é uma chave bem formada. \"logoDepois\": a ordem da cópia de conflito. \"variasEntre\": `n` chaves crescentes entre `a` e `b` (cada uma = entre(anterior, b)). \"sequencias\": listas montadas inserindo sempre no fim, sempre no começo, ou sempre entre a 1ª e a 2ª; cada lista está em ordem crescente de TEXTO (comparação por código do caractere, ASCII).",
+  "alfabeto": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+  "entre": [
+    {
+      "a": null,
+      "b": null,
+      "espera": "a0"
+    },
+    {
+      "a": "a0",
+      "b": null,
+      "espera": "a1"
+    },
+    {
+      "a": "a1",
+      "b": null,
+      "espera": "a2"
+    },
+    {
+      "a": "az",
+      "b": null,
+      "espera": "b00"
+    },
+    {
+      "a": "b00",
+      "b": null,
+      "espera": "b01"
+    },
+    {
+      "a": "bzz",
+      "b": null,
+      "espera": "c000"
+    },
+    {
+      "a": null,
+      "b": "a0",
+      "espera": "Zz"
+    },
+    {
+      "a": null,
+      "b": "a1",
+      "espera": "a0"
+    },
+    {
+      "a": null,
+      "b": "Zz",
+      "espera": "Zy"
+    },
+    {
+      "a": null,
+      "b": "b00",
+      "espera": "az"
+    },
+    {
+      "a": null,
+      "b": "a0V",
+      "espera": "a0"
+    },
+    {
+      "a": "a0",
+      "b": "a1",
+      "espera": "a0V"
+    },
+    {
+      "a": "a0",
+      "b": "a2",
+      "espera": "a1"
+    },
+    {
+      "a": "a0",
+      "b": "a0V",
+      "espera": "a0G"
+    },
+    {
+      "a": "a0V",
+      "b": "a1",
+      "espera": "a0l"
+    },
+    {
+      "a": "a0",
+      "b": "a0G",
+      "espera": "a08"
+    },
+    {
+      "a": "a0",
+      "b": "a01",
+      "espera": "a00V"
+    },
+    {
+      "a": "a0",
+      "b": "a001",
+      "espera": "a000V"
+    },
+    {
+      "a": "a1",
+      "b": "a1V",
+      "espera": "a1G"
+    },
+    {
+      "a": "a1V",
+      "b": "a2",
+      "espera": "a1l"
+    },
+    {
+      "a": "a1V",
+      "b": "a1X",
+      "espera": "a1W"
+    },
+    {
+      "a": "a1V",
+      "b": "a1W",
+      "espera": "a1VV"
+    },
+    {
+      "a": "Zz",
+      "b": "a0",
+      "espera": "ZzV"
+    },
+    {
+      "a": "Zy",
+      "b": "a1",
+      "espera": "Zz"
+    },
+    {
+      "a": "a0",
+      "b": "b00",
+      "espera": "a1"
+    },
+    {
+      "a": "az",
+      "b": "b00",
+      "espera": "azV"
+    },
+    {
+      "a": "a0",
+      "b": "a0VV",
+      "espera": "a0G"
+    },
+    {
+      "a": "a0VV",
+      "b": "a0W",
+      "espera": "a0Vl"
+    },
+    {
+      "a": "zzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "b": null,
+      "espera": "zzzzzzzzzzzzzzzzzzzzzzzzzzzV"
+    },
+    {
+      "a": null,
+      "b": "A00000000000000000000000001",
+      "espera": "A00000000000000000000000000V"
+    }
+  ],
+  "erro": [
+    {
+      "a": "a1",
+      "b": "a0"
+    },
+    {
+      "a": "a0",
+      "b": "a0"
+    },
+    {
+      "a": "a00",
+      "b": null
+    },
+    {
+      "a": "",
+      "b": null
+    },
+    {
+      "a": "a",
+      "b": null
+    },
+    {
+      "a": "a0 ",
+      "b": "a1"
+    },
+    {
+      "a": "a0-",
+      "b": "a1"
+    },
+    {
+      "a": "b0",
+      "b": null
+    },
+    {
+      "a": null,
+      "b": "A00000000000000000000000000"
+    },
+    {
+      "a": "0",
+      "b": null
+    }
+  ],
+  "valida": [
+    {
+      "chave": "a0",
+      "valida": true
+    },
+    {
+      "chave": "a0V",
+      "valida": true
+    },
+    {
+      "chave": "Zz",
+      "valida": true
+    },
+    {
+      "chave": "b00",
+      "valida": true
+    },
+    {
+      "chave": "b0V",
+      "valida": true
+    },
+    {
+      "chave": "A00000000000000000000000001",
+      "valida": true
+    },
+    {
+      "chave": "a00",
+      "valida": false
+    },
+    {
+      "chave": "a",
+      "valida": false
+    },
+    {
+      "chave": "",
+      "valida": false
+    },
+    {
+      "chave": "b0",
+      "valida": false
+    },
+    {
+      "chave": "a0!",
+      "valida": false
+    },
+    {
+      "chave": "A00000000000000000000000000",
+      "valida": false
+    },
+    {
+      "chave": "á0",
+      "valida": false
+    },
+    {
+      "chave": "a0v0",
+      "valida": false
+    }
+  ],
+  "logoDepois": [
+    {
+      "ordem": "a0",
+      "espera": "a0V"
+    },
+    {
+      "ordem": "a1",
+      "espera": "a1V"
+    },
+    {
+      "ordem": "a0V",
+      "espera": "a0VV"
+    },
+    {
+      "ordem": "Zz",
+      "espera": "ZzV"
+    }
+  ],
+  "variasEntre": [
+    {
+      "a": null,
+      "b": null,
+      "n": 5,
+      "espera": [
+        "a0",
+        "a1",
+        "a2",
+        "a3",
+        "a4"
+      ]
+    },
+    {
+      "a": "a0",
+      "b": "a1",
+      "n": 4,
+      "espera": [
+        "a0V",
+        "a0l",
+        "a0t",
+        "a0x"
+      ]
+    }
+  ],
+  "sequencias": {
+    "fim": [
+      "a0",
+      "a1",
+      "a2",
+      "a3",
+      "a4",
+      "a5",
+      "a6",
+      "a7",
+      "a8",
+      "a9",
+      "aA",
+      "aB",
+      "aC",
+      "aD",
+      "aE",
+      "aF",
+      "aG",
+      "aH",
+      "aI",
+      "aJ",
+      "aK",
+      "aL",
+      "aM",
+      "aN",
+      "aO",
+      "aP",
+      "aQ",
+      "aR",
+      "aS",
+      "aT",
+      "aU",
+      "aV",
+      "aW",
+      "aX",
+      "aY",
+      "aZ",
+      "aa",
+      "ab",
+      "ac",
+      "ad",
+      "ae",
+      "af",
+      "ag",
+      "ah",
+      "ai",
+      "aj",
+      "ak",
+      "al",
+      "am",
+      "an",
+      "ao",
+      "ap",
+      "aq",
+      "ar",
+      "as",
+      "at",
+      "au",
+      "av",
+      "aw",
+      "ax",
+      "ay",
+      "az",
+      "b00",
+      "b01",
+      "b02",
+      "b03",
+      "b04",
+      "b05",
+      "b06",
+      "b07"
+    ],
+    "comeco": [
+      "Yzt",
+      "Yzu",
+      "Yzv",
+      "Yzw",
+      "Yzx",
+      "Yzy",
+      "Yzz",
+      "Z0",
+      "Z1",
+      "Z2",
+      "Z3",
+      "Z4",
+      "Z5",
+      "Z6",
+      "Z7",
+      "Z8",
+      "Z9",
+      "ZA",
+      "ZB",
+      "ZC",
+      "ZD",
+      "ZE",
+      "ZF",
+      "ZG",
+      "ZH",
+      "ZI",
+      "ZJ",
+      "ZK",
+      "ZL",
+      "ZM",
+      "ZN",
+      "ZO",
+      "ZP",
+      "ZQ",
+      "ZR",
+      "ZS",
+      "ZT",
+      "ZU",
+      "ZV",
+      "ZW",
+      "ZX",
+      "ZY",
+      "ZZ",
+      "Za",
+      "Zb",
+      "Zc",
+      "Zd",
+      "Ze",
+      "Zf",
+      "Zg",
+      "Zh",
+      "Zi",
+      "Zj",
+      "Zk",
+      "Zl",
+      "Zm",
+      "Zn",
+      "Zo",
+      "Zp",
+      "Zq",
+      "Zr",
+      "Zs",
+      "Zt",
+      "Zu",
+      "Zv",
+      "Zw",
+      "Zx",
+      "Zy",
+      "Zz",
+      "a0"
+    ],
+    "meio": [
+      "a0",
+      "a004",
+      "a008",
+      "a00G",
+      "a00V",
+      "a01",
+      "a02",
+      "a04",
+      "a08",
+      "a0G",
+      "a0V",
+      "a1"
+    ]
+  }
+}

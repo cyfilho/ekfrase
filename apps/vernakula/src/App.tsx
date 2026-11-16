@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { EntradaApp, voltarAoModoDoApp } from '@ekfrase/interface';
+import { EntradaApp, FormConta, entradaPedida, limparEntradaPedida } from '@ekfrase/interface';
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Conta, type TextosEscola } from './api.ts';
+import { api, type Conta, type Escola, type TextosEscola } from './api.ts';
 import { Cabecalho, Rodape } from './casca.tsx';
 import logoVernakula from './img/logo-vernakula.png';
-import { irPara, useEndereco } from './rotas.ts';
+import { irPara, useEndereco, type Rota } from './rotas.ts';
+import { Administracao, podeAdministrar } from './telas/admin.tsx';
+import { TelaConvite } from './telas/convite.tsx';
 import { Entrar, PrimeiroAcesso } from './telas/entrar.tsx';
+import { escolaAtual, escolaGuardada, guardarEscola, MinhasEscolas, PedirEscola } from './telas/escolas.tsx';
 import { Esqueci, Redefinir } from './telas/esqueci.tsx';
 import { Inicio } from './telas/inicio.tsx';
 import { MinhaConta } from './telas/minha-conta.tsx';
@@ -35,8 +38,12 @@ export function App() {
     });
   }, []);
 
+  // A escola em que a pessoa está agora (DEC-P059): a única, ou a escolhida em "Minhas escolas".
+  const [escolhida, setEscolhida] = useState<number | null>(escolaGuardada());
+  const escola = estado.fase === 'dentro' ? escolaAtual(estado.conta, escolhida) : undefined;
+
   // Dentro: os textos da escola passam a valer por cima do padrão. Fora: só o padrão.
-  const escolaId = estado.fase === 'dentro' ? estado.conta.organizacoes[0]?.id : undefined;
+  const escolaId = escola?.id;
   useEffect(() => {
     if (escolaId === undefined) {
       setTrocas({});
@@ -55,18 +62,36 @@ export function App() {
     tr.sobrepor(novas);
   }
 
+  const [entradaVista, setEntradaVista] = useState(() => entradaPedida());
+
   function entrou(conta: Conta) {
     setEstado({ fase: 'dentro', conta });
   }
 
+  function escolher(id: number) {
+    guardarEscola(id);
+    setEscolhida(id);
+    irPara('inicio');
+  }
+
+  /** Entrou pelo formulário comum (criar conta, convite): relê a conta e o token pela ponte deste app. */
+  function sincronizar() {
+    void api.eu().then((r) => {
+      if (r.ok && r.conta) setEstado({ fase: 'dentro', conta: r.conta });
+    });
+  }
+
+  const sair = () => {
+    void api.sair().finally(() => {
+      irPara('inicio');
+      setEstado({ fase: 'fora' });
+    });
+  };
+
   // Quem não entrou e chega no começo do app vê a tela inicial (o hall do modo normal: computador,
   // online), com o topo do Ekfrase — também quando desliga o modo jogo no hall ou nas salas.
-  // Quem entrou e chegou por um link direto aparece no modo da última vez (DEC-P048).
-  const telaInicial = estado.fase === 'fora' && rota === 'inicio' && !estado.aviso;
-  const dentroNoComeco = estado.fase === 'dentro' && rota === 'inicio';
-  useEffect(() => {
-    if (dentroNoComeco) voltarAoModoDoApp('vernakula');
-  }, [dentroNoComeco]);
+  // Quem entrou e chega por link direto (ou pelo botão do modo jogo, `?inicio`) também a vê, com o "Abrir o Vernákula".
+  const telaInicial = (estado.fase === 'fora' && rota === 'inicio' && !estado.aviso) || (estado.fase === 'dentro' && rota === 'inicio' && entradaVista);
   if (telaInicial) {
     return (
       <EntradaApp
@@ -76,40 +101,68 @@ export function App() {
         logo={logoVernakula}
         nome={t('vernakula.nome_curto')}
         descricao={t('vernakula.descricao')}
-        podeCriar={false}
+        podeCriar
         arquivos={false}
-        aoEntrar={entrou}
-        entrarProprio={() => irPara('entrar')}
+        aoEntrar={sincronizar}
+        entrarProprio={(modo) => irPara(modo === 'criar' ? 'criar' : 'entrar')}
+        {...(estado.fase === 'dentro' ? { aoAbrir: () => (limparEntradaPedida(), setEntradaVista(false)) } : {})}
       />
     );
   }
 
+  const dentro = estado.fase === 'dentro' ? estado.conta : null;
   return (
     <div class="casca">
-      <Cabecalho />
+      <Cabecalho escola={escola?.nome} />
       <main class="conteudo">
         {estado.fase === 'carregando' && <p class="carregando">{t('nucleo.carregando')}</p>}
         {estado.fase === 'instalacao' && <PrimeiroAcesso aoCriar={entrou} />}
         {estado.fase === 'fora' && rota === 'esqueci' && <Esqueci />}
         {(estado.fase === 'fora' || estado.fase === 'dentro') && rota === 'redefinir' && <Redefinir codigo={parametro} aoEntrar={entrou} />}
-        {estado.fase === 'fora' && rota !== 'esqueci' && rota !== 'redefinir' && <Entrar aviso={estado.aviso} aoEntrar={entrou} />}
-        {estado.fase === 'dentro' && rota === 'conta' && <MinhaConta conta={estado.conta} aoMudar={entrou} />}
-        {estado.fase === 'dentro' && rota === 'textos' && podeEditarTextos(estado.conta) && (
-          <TextosDaEscola conta={estado.conta} trocas={trocas} aoMudar={mudarTrocas} />
-        )}
-        {estado.fase === 'dentro' && (rota === 'inicio' || rota === 'entrar' || rota === 'esqueci' || (rota === 'textos' && !podeEditarTextos(estado.conta))) && (
-          <Inicio
-            conta={estado.conta}
-            aoSair={() => {
-              void api.sair().finally(() => {
-                irPara('inicio');
-                setEstado({ fase: 'fora' });
-              });
+        {(estado.fase === 'fora' || estado.fase === 'dentro') && rota === 'convite' && (
+          <TelaConvite
+            codigo={parametro}
+            conta={dentro}
+            aoEntrar={sincronizar}
+            aoAceitar={(c, id) => {
+              entrou(c);
+              escolher(id);
             }}
           />
+        )}
+        {estado.fase === 'fora' && rota === 'criar' && (
+          <section class="painel entrar" aria-labelledby="titulo-criar">
+            <h1 id="titulo-criar">{t('vernakula.criar.titulo')}</h1>
+            <p>{t('vernakula.criar.explicacao')}</p>
+            <FormConta t={t} app="vernakula" idioma={tr.idioma()} inicial="criar" podeCriar aoEntrar={sincronizar} />
+          </section>
+        )}
+        {estado.fase === 'fora' && !['esqueci', 'redefinir', 'convite', 'criar'].includes(rota) && <Entrar aviso={estado.aviso} aoEntrar={entrou} />}
+        {dentro && rota !== 'redefinir' && rota !== 'convite' && (
+          <Dentro conta={dentro} escola={escola} rota={rota} trocas={trocas} mudarTrocas={mudarTrocas} entrou={entrou} escolher={escolher} sair={sair} />
         )}
       </main>
       <Rodape />
     </div>
   );
+}
+
+/** Quem entrou: sem escola (ou sem escolher), "Minhas escolas"; com escola, as telas dela. */
+function Dentro(p: {
+  conta: Conta;
+  escola: Escola | undefined;
+  rota: Rota;
+  trocas: TextosEscola;
+  mudarTrocas: (t: TextosEscola) => void;
+  entrou: (c: Conta) => void;
+  escolher: (id: number) => void;
+  sair: () => void;
+}) {
+  const { conta, escola, rota } = p;
+  if (rota === 'conta') return <MinhaConta conta={conta} escola={escola} aoMudar={p.entrou} />;
+  if (rota === 'pedir') return <PedirEscola temEscola={conta.organizacoes.length > 0} />;
+  if (rota === 'escolas' || !escola) return <MinhasEscolas conta={conta} aoEscolher={p.escolher} aoMudarConta={p.entrou} />;
+  if (rota === 'textos' && podeEditarTextos(escola)) return <TextosDaEscola escola={escola} trocas={p.trocas} aoMudar={p.mudarTrocas} />;
+  if (rota === 'admin' && podeAdministrar(escola)) return <Administracao key={escola.id} escola={escola} />;
+  return <Inicio conta={conta} escola={escola} aoSair={p.sair} />;
 }

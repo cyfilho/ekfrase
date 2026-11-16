@@ -72,6 +72,13 @@
         </div>
 
         <div class="hud hud-zoom">
+          <!-- painel retrátil e tela cheia (FB-0001): os rótulos vêm de src/main.ts -->
+          <button class="icon-btn" id="toggle-panel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM15 5v14M10 9l-3 3 3 3" /></svg>
+          </button>
+          <button class="icon-btn" id="toggle-fullscreen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
+          </button>
           <button class="icon-btn" id="zoom-in" data-i18n-title="action.zoomIn" data-i18n-aria-label="action.zoomIn">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
@@ -126,6 +133,7 @@
             <span class="muted small grow" id="doc-edits"></span>
             <button class="link-btn" id="doc-json" data-i18n="doc.exportJson"></button>
           </div>
+          <p class="muted small" id="doc-cloud" aria-live="polite"></p>
           <p class="muted small" data-i18n="doc.hint"></p>
           <input id="doc-file" type="file" accept=".ekfr,.ekfrase,application/vnd.ekfrase.ekfr+zip" hidden />
         </section>

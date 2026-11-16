@@ -9,12 +9,13 @@
  *   versão pixel art do logo do Vernákula.
  * - Maker: o mapa em pergaminho, enrolado dos dois lados, com a ilha (mata,
  *   serra nevada, rio), a rota tracejada até o X e a rosa dos ventos.
+ * - Writer: a folha de papel marfim com o canto dobrado e a pena azul-noite.
  * - Cantoneiras de metal da "folha de papel" e o horizonte do fundo (máscaras).
  *
  * Luz vinda do alto à esquerda; contorno automático; fundo transparente.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Arte, mistura, ruido } from './pixel.mjs';
 
@@ -343,6 +344,44 @@ function logoBiblioteca() {
   return a;
 }
 
+// ---------------------------------------------------------------- Writer
+export const W = {
+  papel: '#f6efdc',
+  papelS: '#e2d4b0',
+  papelE: '#c9b78a',
+  linha: '#8a7a5c',
+  noite: '#1b2440',
+  noiteC: '#33406b',
+  pena: '#fbf6e9',
+  penaS: '#cdbd95',
+  sepia: '#a4703a',
+  sepiaE: '#7a4a21',
+  tinta: '#11162a',
+};
+
+/** A folha de papel marfim com o canto dobrado, as linhas já escritas e a pena azul-noite por cima. */
+export function logoWriter() {
+  const a = new Arte(64, 64);
+  // a folha (luz do alto à esquerda: sombra na direita e embaixo)
+  a.ret(7, 9, 45, 60, (x, y) => (y > 57 ? W.papelE : x > 42 ? W.papelS : W.papel));
+  // o canto dobrado
+  a.poligono([[36, 8], [47, 8], [47, 20]], null);
+  a.poligono([[36, 9], [36, 20], [46, 20]], W.papelE);
+  // as linhas escritas (a última ainda pela metade)
+  for (let y = 17; y <= 47; y += 5) a.ret(12, y, y === 17 ? 30 : y % 2 ? 38 : 34, y, W.linha);
+  a.ret(12, 52, 20, 52, W.noite);
+  // a pena: as barbas azul-noite, a haste clara e o bico sépia com a gota de tinta
+  a.poligono([[31, 45], [37, 26], [47, 11], [58, 3], [61, 6], [56, 19], [46, 33], [36, 47]], (x, y) => (x + y > 62 ? W.noite : W.noiteC));
+  for (const [x, y] of [[41, 27], [46, 21], [51, 15], [45, 30], [50, 24], [55, 17]]) a.pinta(x, y, W.tinta);
+  a.linha(25, 52, 58, 6, W.pena);
+  a.linha(26, 52, 59, 6, W.penaS);
+  a.poligono([[22, 57], [26, 49], [30, 53]], W.sepia);
+  a.linha(23, 56, 28, 52, W.sepiaE);
+  a.ret(21, 58, 22, 59, W.noite);
+  a.contorno(W.tinta);
+  return a;
+}
+
 // ---------------------------------------------------------------- cantoneiras e horizonte
 function cantoneira() {
   const c = { lat: '#b8954f', latC: '#ecd08f', latE: '#6e5426', rebite: '#3d2f17' };
@@ -388,6 +427,8 @@ function silhuetaCastelo() {
   return a;
 }
 
+// rodado direto (node scripts/arte/gerar.mjs) grava tudo; importado (scripts/arte/writer-os.mjs), só empresta os desenhos
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
 console.log('Gravando a arte:');
 gravar(NUCLEO, 'ekfrase-logo.png', logoEkfrase.png(4));
 gravar(NUCLEO, 'ekfrase-icone.png', iconeEkfrase.png(4));
@@ -406,7 +447,13 @@ const biblioteca = logoBiblioteca();
 const BI = join(RAIZ, 'apps', 'biblioteca');
 gravar(join(BI, 'src', 'img'), 'logo-biblioteca.png', biblioteca.png(4));
 gravar(join(BI, 'public'), 'icone-64.png', biblioteca.png(1, { margem: 0 }));
+const writer = logoWriter();
+const WR = join(RAIZ, 'apps', 'writer');
+gravar(join(WR, 'src', 'img'), 'logo-writer.png', writer.png(4));
+gravar(join(WR, 'public'), 'icone-64.png', writer.png(1, { margem: 0 }));
 for (const t of [192, 512]) {
   // Ícone de instalar no celular: precisa de fundo (o Android recorta as bordas), com folga.
   gravar(join(VK, 'public', 'icones'), `icone-${t}.png`, vernakula.png(t / 96, { fundo: V.petroleoE, lado: 96 }));
+  gravar(join(WR, 'public', 'icones'), `icone-${t}.png`, writer.png(t / 96, { fundo: W.noite, lado: 96 }));
+}
 }

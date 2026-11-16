@@ -7,8 +7,49 @@
  * livro, desenhada por código (DEC-P007): tecido, moldura dourada, o símbolo e o título.
  */
 
-export const CATEGORIAS = ['literatura', 'poesia', 'filosofia', 'religiao', 'historia', 'ciencias'] as const;
-export type Categoria = (typeof CATEGORIAS)[number];
+// ---------- a Classificação Decimal de Dewey (DEC-P058) ----------
+
+/**
+ * As 10 classes da CDD (a das bibliotecas públicas e escolares do Brasil). Cada livro tem o número
+ * CDD dele (`cdd`: "808.2", "133.43"); a classe é o primeiro algarismo (o "8" de 808.2 → 800). O nome
+ * de cada classe fica nos idiomas: `biblioteca.cdd.<classe>` (inteiro) e `.curto` (a placa da estante).
+ */
+export const CLASSES_CDD = ['000', '100', '200', '300', '400', '500', '600', '700', '800', '900'] as const;
+export type ClasseCdd = (typeof CLASSES_CDD)[number];
+
+/**
+ * As subdivisões da CDD que o acervo usa (divisões, como 390, e seções, como 398.42), cada uma com nome
+ * nos idiomas (`biblioteca.cdd.<código>`). Livro numa subdivisão nova: pôr o código aqui e o nome com
+ * `npm run chave` (sem isso, o livro aparece só com a classe).
+ */
+export const SUBDIVISOES_CDD = ['290', '299.16', '390', '398.42', '808'] as const;
+
+/** Um número CDD: três algarismos e, se houver, o ponto e até seis algarismos ("808.2"). */
+export const CDD_VALIDO = /^\d{3}(\.\d{1,6})?$/;
+
+/** A classe de um número CDD ("398.42" → "300"). */
+export function classeDe(cdd: string): ClasseCdd {
+  return `${cdd[0] ?? '0'}00` as ClasseCdd;
+}
+
+/**
+ * Do geral ao particular, os códigos que têm nome: a classe e, das subdivisões que o acervo usa, a
+ * divisão, a seção e as mais finas que forem começo do número ("398.42" → ["300", "390", "398.42"];
+ * "808.2" → ["800", "808"]).
+ */
+export function caminhoCdd(cdd: string): string[] {
+  const out: string[] = [classeDe(cdd)];
+  const candidatos = [`${cdd.slice(0, 2)}0`, cdd.slice(0, 3)];
+  for (let k = 5; k <= cdd.length; k++) candidatos.push(cdd.slice(0, k));
+  for (const c of candidatos) if ((SUBDIVISOES_CDD as readonly string[]).includes(c) && !out.includes(c)) out.push(c);
+  return out;
+}
+
+/** As classes que têm livros, na ordem da CDD (as estantes do castelo e os botões da Biblioteca). */
+export function classesComLivros(livros: readonly Pick<Livro, 'cdd'>[]): ClasseCdd[] {
+  const tem = new Set(livros.map((l) => classeDe(l.cdd)));
+  return CLASSES_CDD.filter((c) => tem.has(c));
+}
 
 export interface Livro {
   id: string;
@@ -22,7 +63,8 @@ export interface Livro {
   ano_traducao?: number;
   idioma: string;
   idioma_original?: string;
-  categoria: Categoria;
+  /** O número na Classificação Decimal de Dewey ("808.2"). */
+  cdd: string;
   generos: string[];
   licenca: string;
   descricao: string;
@@ -60,15 +102,24 @@ export function normalizar(s: string): string {
 }
 
 /**
- * Busca no acervo por título, autor, título original, gêneros e descrição (`nomeGenero` dá o nome
- * do gênero no idioma de quem busca). Todas as palavras precisam aparecer; o título pesa mais.
+ * Busca no acervo por título, autor, título original, gêneros, número da CDD (o do livro e os códigos
+ * da classe e das subdivisões: "800", "130"), nome da classe e descrição (`nomeGenero` e `nomeCdd`
+ * dão os nomes no idioma de quem busca). Todas as palavras precisam
+ * aparecer; o título pesa mais.
  */
-export function buscar(livros: readonly Livro[], termo: string, nomeGenero: (id: string) => string = (g) => g): Livro[] {
+export function buscar(
+  livros: readonly Livro[],
+  termo: string,
+  nomeGenero: (id: string) => string = (g) => g,
+  nomeCdd: (codigo: string) => string = () => '',
+): Livro[] {
   const palavras = normalizar(termo).split(' ').filter(Boolean);
   if (!palavras.length) return [...livros];
   const pontos = (l: Livro) => {
     const titulo = normalizar(`${l.titulo} ${l.subtitulo ?? ''} ${l.titulo_original ?? ''}`);
-    const resto = normalizar(`${l.autor} ${l.generos.map(nomeGenero).join(' ')} ${l.generos.join(' ')} ${l.descricao}`);
+    const caminho = caminhoCdd(l.cdd);
+    const cdd = `${l.cdd} ${caminho.join(' ')} ${caminho.map(nomeCdd).join(' ')}`;
+    const resto = normalizar(`${l.autor} ${l.generos.map(nomeGenero).join(' ')} ${l.generos.join(' ')} ${cdd} ${l.descricao}`);
     let p = 0;
     for (const w of palavras) {
       if (titulo.includes(w)) p += 3;

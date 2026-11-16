@@ -55,3 +55,34 @@ export function voltarAoModoDoApp(app: string): boolean {
   location.replace(`/#/torre/${app}/salas`);
   return true;
 }
+
+/**
+ * Quem acessa `ekfrase.com/<app>/` cai na tela de entrada do app (a página das formas de usar), com ou sem
+ * conta: ao chegar por link direto (primeira página desta aba, sem `#`) ou pelo `?inicio` (o botão do modo jogo
+ * no hall da torre e o balcão). **O endereço fica sempre `ekfrase.com/<app>/`** (padrão de todo app, 16/11): o
+ * `?inicio` é só um sinal, apagado do endereço já na primeira leitura. A resposta vale até `limparEntradaPedida`
+ * (o botão "Abrir" entra no app).
+ */
+let pedida: boolean | null = null;
+
+export function entradaPedida(): boolean {
+  if (pedida !== null) return pedida;
+  let sinal = false;
+  try {
+    const u = new URL(location.href);
+    sinal = u.searchParams.has('inicio');
+    if (sinal) {
+      u.searchParams.delete('inicio');
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    }
+  } catch {
+    /* sem endereço: nada */
+  }
+  pedida = sinal || (chegouAgora() && !location.hash.replace(/^#\/?/, ''));
+  return pedida;
+}
+
+/** A pessoa entrou no app: a tela de entrada não volta nesta página. */
+export function limparEntradaPedida(): void {
+  pedida = false;
+}

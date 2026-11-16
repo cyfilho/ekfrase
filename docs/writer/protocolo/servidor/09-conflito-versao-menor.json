@@ -1,0 +1,266 @@
+{
+  "caso": "conflito-versao-menor",
+  "descricao": "Versao recebida menor que a gravada, mesmo com a base certa: conflito. A comparação é de texto (tempo, depois contador, depois aparelho).",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000005-0002-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Versão cinco",
+              "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000005-0002-aaaaaaaa",
+                "texto": "1731400000005-0002-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "nota": "Tempo menor.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Relógio atrasado",
+              "texto": "— Relógio atrasado.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000003-0000-aaaaaaaa",
+                "texto": "1731400000003-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000005-0002-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000005-0002-aaaaaaaa",
+                "apagado": false,
+                "dados": {
+                  "historia": "0193a000-0000-7000-8000-000000000900",
+                  "titulo": "Versão cinco",
+                  "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                  "palavras": 5,
+                  "ordem": "a0",
+                  "_v": {
+                    "titulo": "1731400000005-0002-aaaaaaaa",
+                    "texto": "1731400000005-0002-aaaaaaaa"
+                  }
+                },
+                "seq": "$n=s1"
+              }
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "nota": "Mesmo tempo, contador menor.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000005-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Mesmo instante, contador menor",
+              "texto": "— Mesmo instante, contador menor.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000005-0000-aaaaaaaa",
+                "texto": "1731400000005-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000005-0002-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000005-0002-aaaaaaaa",
+                "apagado": false,
+                "dados": {
+                  "historia": "0193a000-0000-7000-8000-000000000900",
+                  "titulo": "Versão cinco",
+                  "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                  "palavras": 5,
+                  "ordem": "a0",
+                  "_v": {
+                    "titulo": "1731400000005-0002-aaaaaaaa",
+                    "texto": "1731400000005-0002-aaaaaaaa"
+                  }
+                },
+                "seq": "$n=s1"
+              }
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "nota": "Mesmo tempo e contador, aparelho menor (\"99999999\" < \"aaaaaaaa\").",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000005-0002-99999999",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Versão cinco",
+              "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000005-0000-aaaaaaaa",
+                "texto": "1731400000005-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000005-0002-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000005-0002-aaaaaaaa",
+                "apagado": false,
+                "dados": {
+                  "historia": "0193a000-0000-7000-8000-000000000900",
+                  "titulo": "Versão cinco",
+                  "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+                  "palavras": 5,
+                  "ordem": "a0",
+                  "_v": {
+                    "titulo": "1731400000005-0002-aaaaaaaa",
+                    "texto": "1731400000005-0002-aaaaaaaa"
+                  }
+                },
+                "seq": "$n=s1"
+              }
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "nota": "Mesmo tempo e contador, aparelho maior: aceito.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000005-0002-bbbbbbbb",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Versão cinco",
+              "texto": "— Versão cinco.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000005-0000-aaaaaaaa",
+                "texto": "1731400000005-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000005-0002-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    }
+  ]
+}

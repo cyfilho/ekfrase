@@ -1,0 +1,405 @@
+{
+  "caso": "cota",
+  "descricao": "Cota por conta (soma do JSON de \"dados\" de todos os registros, lápides inclusive). Se o pedido faria a conta passar da cota, ele é recusado INTEIRO com \"cota\" e nada é gravado. O que não cresce (reenvio igual, encolher, apagar) passa sempre. Este caso pede um servidor com cota de 1 MB.",
+  "exige": {
+    "cota_mb": 1
+  },
+  "passos": [
+    {
+      "nota": "Três registros de 400 mil bytes não cabem em 1 MB.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 1
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 2
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000003",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 3
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 413,
+        "corpo": {
+          "ok": false,
+          "erro": "cota",
+          "cota_mb": 1
+        }
+      }
+    },
+    {
+      "nota": "Nada foi gravado, nem os dois primeiros.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [],
+          "cursor": 0,
+          "mais": false
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 1
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 2
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000003",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 3
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 413,
+        "corpo": {
+          "ok": false,
+          "erro": "cota",
+          "cota_mb": 1
+        }
+      }
+    },
+    {
+      "nota": "Reenviar o que já está lá não cresce: passa.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 1
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n=s1"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "Encolher passa.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": "curto"
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s2=s3"
+            }
+          ],
+          "cursor": "$n=s3"
+        }
+      }
+    },
+    {
+      "nota": "Agora o terceiro cabe.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000003",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 3
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000003",
+              "estado": "aceito",
+              "seq": "$n>s3=s4"
+            }
+          ],
+          "cursor": "$n=s4"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000004",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 4
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 413,
+        "corpo": {
+          "ok": false,
+          "erro": "cota",
+          "cota_mb": 1
+        }
+      }
+    },
+    {
+      "nota": "Com a conta cheia, apagar (lápide pequena) continua possível.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "cenas",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": true,
+            "dados": {
+              "_v": {
+                "apagado": "1731400000003-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s4=s5"
+            }
+          ],
+          "cursor": "$n=s5"
+        }
+      }
+    },
+    {
+      "nota": "A cota é de cada conta: a da Bia está vazia.",
+      "quem": "bia",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 1
+            },
+            "base": null
+          },
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "texto": {
+                "$repete": "a",
+                "vezes": 400000
+              },
+              "n": 2
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=b1"
+            },
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>b1=b2"
+            }
+          ],
+          "cursor": "$n=b2"
+        }
+      }
+    }
+  ]
+}
