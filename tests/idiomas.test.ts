@@ -78,6 +78,42 @@ describe('idiomas', () => {
     expect(faltando).toEqual([]);
   });
 
+  // o Writer monta algumas chaves no código (`writer.status.${s}`…): todas têm de existir
+  // (no repositório público, só quando o Writer já estiver lá)
+  it.skipIf(!existsSync(join(raiz, 'packages', 'writer-nucleo')))('o Writer tem texto para todo status, tipo de ideia, situação da nuvem e código de erro', async () => {
+    const { STATUS_CENA, TIPOS_IDEIA, VIROU } = await import('../packages/writer-nucleo/src/modelo.ts');
+    const { TECLADOS } = await import('../sistema/writer-os/casca/src/motor/sistema.ts');
+    const w = pt['writer'];
+    expect(w, 'locales/pt-BR/writer.json').toBeTruthy();
+    const tem = (k: string) => k in w! || `${k}.other` in w!;
+    const faltando: string[] = [];
+    const montadas = [
+      ...STATUS_CENA.map((s) => `status.${s}`),
+      ...TIPOS_IDEIA.map((x) => `tipo.${x}`),
+      ...VIROU.flatMap((v) => [`virou.${v}`, `transformar.${v}`, `transformar.feito-${v}`]),
+      ...['em-dia', 'enviando', 'sem-rede', 'sem-conta', 'pendentes', 'memoria'].map((s) => `nuvem.${s}`),
+      ...['salvo', 'gravando', 'erro'].map((g) => `gravacao.${g}`),
+      // da ponte (/api/v1/escrita/*), do transporte e do núcleo
+      ...['login', 'csrf', 'dados', 'vazio', 'muitos', 'cota', 'grande', 'servidor', 'rede', 'recusado', 'invalido', 'grande_demais', 'nao-existe', 'sem-historia'].map((c) => `erro.${c}`),
+      // do importar (ErroImportar + ErroEkfr)
+      ...['nao-e-ekfr', 'sem-envelope', 'envelope-invalido', 'envelope-novo', 'grande', 'outro-app', 'versao-nova', 'tipo-desconhecido', 'app-desconhecido', 'conteudo-invalido', 'vazio'].map((c) => `importar.erro.${c}`),
+      ...['titulo', 'subtitulo', 'logline', 'sinopse', 'genero', 'formato', 'ponto_vista', 'tempo_verbal', 'tema', 'publico'].map((c) => `ficha.${c}`),
+      // o Writer OS (apps/writer/src/computador/SistemaOS.tsx): os teclados do sistema, os motivos do
+      // ekfrase-dados.sh, o Secure Boot e os códigos de erro do sistema e da casca
+      ...TECLADOS.map((id) => `os.teclado.${id}`),
+      ...['sem-espaco', 'nao-usb', 'sem-medio', 'nao-monta', 'protegido', 'sem-servico', 'sem-dados', 'nao-grava', 'outras-particoes', 'nao-cria', 'nao-formata'].map((m) => `os.onde.motivo.${m}`),
+      ...['ligado', 'desligado', 'desconhecido'].map((s) => `os.sobre.secure-boot.${s}`),
+      ...['senha', 'falhou', 'negado'].flatMap((e) => [`os.wifi.erro.${e}`, `os.discos.erro.${e}`]),
+      ...['senha', 'senha-curta', 'pasta', 'nao-abre', 'fechada', 'ja-tem', 'diferentes'].map((e) => `computador.erro.${e}`),
+    ];
+    for (const k of montadas) if (!tem(k)) faltando.push(k);
+    // os atalhos fixos da lista de atalhos (apps/writer/src/Paleta.tsx) são chaves inteiras no código
+    const paleta = readFileSync(join(raiz, 'apps', 'writer', 'src', 'Paleta.tsx'), 'utf8');
+    for (const m of paleta.matchAll(/'writer\.(atalho\.[a-z-]+)'/g)) if (!tem(m[1]!)) faltando.push(m[1]!);
+    expect(faltando).toEqual([]);
+    expect(pt['nucleo']?.['app.writer']).toBeTruthy();
+  });
+
   // o servidor (ponte/) só existe no repositório da plataforma
   it.skipIf(!existsSync(join(raiz, 'ponte', 'sql', 'esquema.sql')))('todo papel do banco tem nome nos idiomas (a chave é montada no código)', () => {
     const esquema = readFileSync(join(raiz, 'ponte', 'sql', 'esquema.sql'), 'utf8');

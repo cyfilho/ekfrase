@@ -134,6 +134,39 @@ export class Arte {
       }
     return codificarPng(lg, al, rgba);
   }
+
+  /** BMP de 24 bits (a tela de abertura do .exe portátil do electron-builder só aceita BMP); sem transparência: `fundo` obrigatório. */
+  bmp(escala, fundo) {
+    const lg = this.l * escala;
+    const al = this.a * escala;
+    const linha = Math.ceil((lg * 3) / 4) * 4;
+    const dados = Buffer.alloc(54 + linha * al);
+    dados.write('BM', 0, 'ascii');
+    dados.writeUInt32LE(dados.length, 2);
+    dados.writeUInt32LE(54, 10);
+    dados.writeUInt32LE(40, 14);
+    dados.writeInt32LE(lg, 18);
+    dados.writeInt32LE(al, 22);
+    dados.writeUInt16LE(1, 26);
+    dados.writeUInt16LE(24, 28);
+    dados.writeUInt32LE(linha * al, 34);
+    dados.writeInt32LE(2835, 38);
+    dados.writeInt32LE(2835, 42);
+    for (let py = 0; py < al; py++)
+      for (let px = 0; px < lg; px++) {
+        const c = this.ler(Math.floor(px / escala), Math.floor(py / escala)) ?? fundo;
+        const i = 54 + (al - 1 - py) * linha + px * 3;
+        dados[i] = parseInt(c.slice(5, 7), 16);
+        dados[i + 1] = parseInt(c.slice(3, 5), 16);
+        dados[i + 2] = parseInt(c.slice(1, 3), 16);
+      }
+    return dados;
+  }
+
+  /** Cola `outra` com o canto em (x, y), sem os transparentes. */
+  colar(outra, x, y) {
+    for (let j = 0; j < outra.a; j++) for (let i = 0; i < outra.l; i++) if (outra.ler(i, j) !== null) this.pinta(x + i, y + j, outra.ler(i, j));
+  }
 }
 
 /** Mistura duas cores "#rrggbb" (t = 0 → a, 1 → b). */

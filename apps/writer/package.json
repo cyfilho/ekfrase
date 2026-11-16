@@ -1,0 +1,28 @@
+{
+  "name": "@ekfrase/writer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ekfrase Writer: escrita focada (histórias, capítulos e cenas, banco de ideias), no navegador e sem internet",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@ekfrase/arquivo": "0.1.0",
+    "@ekfrase/interface": "0.1.0",
+    "@ekfrase/nucleo": "0.1.0",
+    "@ekfrase/writer-nucleo": "0.1.0",
+    "@fontsource/atkinson-hyperlegible-next": "5.3.0",
+    "@fontsource/cinzel": "5.3.0",
+    "@fontsource/cormorant-garamond": "5.3.0",
+    "preact": "11.1.0"
+  }
+}

@@ -1,0 +1,237 @@
+{
+  "caso": "lapide",
+  "descricao": "Apagar é gravar uma versão com apagado: true (lápide). A linha continua no servidor e segue as mesmas regras.",
+  "passos": [
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000001-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Vai sumir",
+              "texto": "— Vai sumir.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000001-0000-aaaaaaaa",
+                "texto": "1731400000001-0000-aaaaaaaa"
+              }
+            },
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>0=s1"
+            }
+          ],
+          "cursor": "$n=s1"
+        }
+      }
+    },
+    {
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000002-0000-aaaaaaaa",
+            "apagado": true,
+            "dados": {
+              "_v": {
+                "apagado": "1731400000002-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s1=s2"
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "A lápide vai para os outros aparelhos.",
+      "quem": "ana",
+      "metodo": "GET",
+      "rota": "escrita/mudancas",
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "registros": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "colecao": "cenas",
+              "versao": "1731400000002-0000-aaaaaaaa",
+              "apagado": true,
+              "dados": {
+                "_v": {
+                  "apagado": "1731400000002-0000-aaaaaaaa"
+                }
+              },
+              "seq": "$n=s2"
+            }
+          ],
+          "cursor": "$n=s2",
+          "mais": false
+        }
+      }
+    },
+    {
+      "nota": "Quem editou sem saber da lápide recebe conflito com ela.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Voltou",
+              "texto": "— Voltou.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000003-0000-aaaaaaaa",
+                "texto": "1731400000003-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000001-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "conflito",
+              "servidor": {
+                "id": "0193a000-0000-7000-8000-000000000001",
+                "colecao": "cenas",
+                "versao": "1731400000002-0000-aaaaaaaa",
+                "apagado": true,
+                "dados": {
+                  "_v": {
+                    "apagado": "1731400000002-0000-aaaaaaaa"
+                  }
+                },
+                "seq": "$n=s2"
+              }
+            }
+          ],
+          "cursor": "$n=s2"
+        }
+      }
+    },
+    {
+      "nota": "Desfazer o apagar é outra versão, com a base na lápide.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000001",
+            "colecao": "cenas",
+            "versao": "1731400000003-0000-aaaaaaaa",
+            "apagado": false,
+            "dados": {
+              "historia": "0193a000-0000-7000-8000-000000000900",
+              "titulo": "Voltou",
+              "texto": "— Voltou.\nEla sorriu: “enfim”. 日本語 / \\ </script>",
+              "palavras": 5,
+              "ordem": "a0",
+              "_v": {
+                "titulo": "1731400000003-0000-aaaaaaaa",
+                "texto": "1731400000003-0000-aaaaaaaa"
+              }
+            },
+            "base": "1731400000002-0000-aaaaaaaa"
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000001",
+              "estado": "aceito",
+              "seq": "$n>s2=s3"
+            }
+          ],
+          "cursor": "$n=s3"
+        }
+      }
+    },
+    {
+      "nota": "Lápide de um registro que o servidor nunca viu também é gravada.",
+      "quem": "ana",
+      "metodo": "POST",
+      "rota": "escrita/enviar",
+      "corpo": {
+        "registros": [
+          {
+            "id": "0193a000-0000-7000-8000-000000000002",
+            "colecao": "ideias",
+            "versao": "1731400000004-0000-aaaaaaaa",
+            "apagado": true,
+            "dados": {},
+            "base": null
+          }
+        ]
+      },
+      "espera": {
+        "status": 200,
+        "corpo": {
+          "ok": true,
+          "resultados": [
+            {
+              "id": "0193a000-0000-7000-8000-000000000002",
+              "estado": "aceito",
+              "seq": "$n>s3=s4"
+            }
+          ],
+          "cursor": "$n=s4"
+        }
+      }
+    }
+  ]
+}

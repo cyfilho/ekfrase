@@ -2,7 +2,7 @@
 
 import { aplicarTema, temaAtual, type Tema } from '@ekfrase/nucleo';
 import { useState } from 'preact/hooks';
-import { api, type Conta } from '../api.ts';
+import { api, type Conta, type Escola } from '../api.ts';
 import { avisoDoErro, type Aviso } from '../avisos.ts';
 import { t } from '../textos.ts';
 import { MostrarAviso } from './entrar.tsx';
@@ -10,8 +10,7 @@ import { MostrarAviso } from './entrar.tsx';
 const ERROS = ['senha_atual', 'email_em_uso', 'email', 'senha_curta', 'vazio', 'proibido'] as const;
 
 /** Minha conta: nome, e-mail, senha e, para a administração, o nome da escola. */
-export function MinhaConta({ conta, aoMudar }: { conta: Conta; aoMudar: (c: Conta) => void }) {
-  const escola = conta.organizacoes[0];
+export function MinhaConta({ conta, escola, aoMudar }: { conta: Conta; escola: Escola | undefined; aoMudar: (c: Conta) => void }) {
   const ehAdmin = !!escola?.papeis.includes('admin');
   return (
     <div class="pilha">
