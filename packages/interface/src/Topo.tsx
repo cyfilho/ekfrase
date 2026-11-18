@@ -134,6 +134,8 @@ export interface AcoesTopoProps {
   passeio?: string | (() => void);
   /** Botões a mais, antes dos de sempre (o "Lugares" do castelo). */
   antes?: ComponentChildren;
+  /** Botões a mais, depois de todos (na ponta direita): a engrenagem do menu do sistema no Writer OS (pedido do Alcy, 18/11). */
+  depois?: ComponentChildren;
   aoTrocarIdioma?: (codigo: string) => void;
   aoSair?: () => void;
   /** Sem conta, mostrar o botão Entrar (conta Ekfrase). */
@@ -142,7 +144,7 @@ export interface AcoesTopoProps {
   semConta?: boolean;
 }
 
-/** Os botões do topo, iguais em todo app: [antes] passeio · idioma · tema · feedback · conta. */
+/** Os botões do topo, iguais em todo app: [antes] passeio · idioma · tema · feedback · conta [depois]. */
 export function AcoesTopo(p: AcoesTopoProps) {
   return (
     <div class="ekf-acoes">
@@ -152,6 +154,7 @@ export function AcoesTopo(p: AcoesTopoProps) {
       <BotaoTema t={p.t} />
       <BotaoFeedback t={p.t} app={p.app} />
       {!p.semConta && <BotaoConta t={p.t} {...(p.aoSair ? { aoSair: p.aoSair } : {})} {...(p.entrar ? { comEntrar: true } : {})} />}
+      {p.depois}
     </div>
   );
 }

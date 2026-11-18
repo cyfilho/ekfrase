@@ -9,7 +9,9 @@ live-boot
 initramfs-tools
 systemd
 systemd-sysv
-systemd-timesyncd
+# a hora pela rede: o chrony SEM gravar o relógio da placa (raiz/etc/chrony/chrony.conf; o timesyncd gravava em UTC
+# e o Windows ligava com a hora errada, 18/11)
+chrony
 dbus
 udev
 kmod

@@ -49,8 +49,12 @@ Da segunda vez em diante: liga → a senha → a estante.
 
 ## 5. Usar e desligar
 - **Ctrl+Alt+S** (ou a engrenagem, no alto à direita) abre o **menu do sistema**: em cima **Desligar** e
-  **Reiniciar**; depois a conta (Entrar ou Sair); depois Wi-Fi, bateria e brilho, teclado, fuso, servidor,
-  pendrives (ejetar), "Sobre" (as versões e se o Secure Boot está ligado) e os Ajustes do Writer. Setas, Enter e Esc.
+  **Reiniciar**; depois a conta (Entrar ou Sair); depois Wi-Fi, bateria e brilho, teclado, fuso, "Servidor e conta"
+  (o servidor e, ali mesmo, entrar ou sair da conta), pendrives (ejetar), "Sobre" (as versões e se o Secure Boot está
+  ligado) e os Ajustes do Writer. Setas, Enter e Esc.
+- **A hora:** o Writer OS lê o relógio do computador na hora local, como o Windows, e nunca o altera (desde a 0.1.2).
+  Se o seu Windows ficou com a hora errada depois de usar uma versão anterior, acerte uma vez no Windows: Configurações
+  → Hora e idioma → Data e hora → **Sincronizar agora**.
 - A tela começa sempre em 50% de brilho; as teclas de brilho do notebook funcionam. O Num Lock começa ligado.
 - Desligue sempre pelo painel. (Tirar o pendrive com o Writer ligado não estraga o texto já gravado,
   mas o que você digitou nos últimos instantes pode ficar de fora.)

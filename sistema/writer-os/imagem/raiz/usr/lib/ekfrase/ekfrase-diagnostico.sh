@@ -62,7 +62,9 @@ fotografar() {
     echo "maquina: $(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name /sys/class/dmi/id/product_version 2>/dev/null | tr '\n' ' ')"
     echo "bios: $(cat /sys/class/dmi/id/bios_version /sys/class/dmi/id/bios_date 2>/dev/null | tr '\n' ' ')"
     echo "secureboot: $(od -An -t u1 -j4 -N1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c 2>/dev/null | tr -d ' ')"
-    echo "memoria: $(grep -E '^(MemTotal|MemAvailable)' /proc/meminfo | tr -s ' ' | tr '\n' ' ')"
+    # o relógio da placa: LOCAL (como o Windows) e nunca gravado (18/11); o kernel diz a hora que leu dele
+    echo "relogio: placa=$(sed -n 3p /etc/adjtime 2>/dev/null) fuso=$(readlink /etc/localtime | sed 's|.*/zoneinfo/||') agora=$(date '+%F %T %z')"
+    echo "memoria:$(grep -E '^(MemTotal|MemAvailable)' /proc/meminfo | tr -s ' ' | tr '\n' ' ')"
     echo
     echo "== placas de vídeo"
     placas
