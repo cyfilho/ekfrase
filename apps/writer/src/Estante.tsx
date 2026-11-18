@@ -9,6 +9,7 @@ import { partesHlc, type Cena, type Historia, type Ideia } from '@ekfrase/writer
 import type { TargetedKeyboardEvent } from 'preact';
 import { useState } from 'preact/hooks';
 import { Capa } from './Capa.tsx';
+import { noOS } from './computador/casca.ts';
 import { useComandos } from './comandos.ts';
 import { useSessao, useVivo } from './estado.ts';
 import { IconeAviso, IconeLampada, IconeMais } from './icones.tsx';
@@ -16,6 +17,7 @@ import { pedir } from './pedidos.ts';
 import { ir } from './rotas.ts';
 import { diaEHora, haQuanto, palavras, t, textoDoErro } from './textos.ts';
 import { avisar } from './ui.tsx';
+import { noApp } from '@ekfrase/interface';
 
 interface DadosEstante {
   historias: Historia[];
@@ -85,7 +87,7 @@ export function Estante() {
 
         {!s.conta && !s.soMemoria && (
           <p class="aviso-caixa suave" data-teste="aviso-sem-conta">
-            {t('writer.estante.sem-conta')}
+            {t(noOS ? 'writer.estante.sem-conta.os' : 'writer.estante.sem-conta')}
           </p>
         )}
         {s.soMemoria && (
@@ -103,7 +105,7 @@ export function Estante() {
             <ul>
               {dados.conflitos.map((c) => (
                 <li key={c.id}>
-                  <a href={`#/escrever/${c.id}`}>{t('writer.conflito.copia', { titulo: c.titulo || t('writer.cena.sem-titulo'), quando: c.conflito_em ? diaEHora(c.conflito_em) : '' })}</a>
+                  <a href={noApp('writer', `escrever/${c.id}`)}>{t('writer.conflito.copia', { titulo: c.titulo || t('writer.cena.sem-titulo'), quando: c.conflito_em ? diaEHora(c.conflito_em) : '' })}</a>
                 </li>
               ))}
             </ul>
@@ -120,7 +122,7 @@ export function Estante() {
           <ul class="livros" data-teste="livros">
             {dados.historias.map((h) => (
               <li key={h.id}>
-                <a class="livro" href={`#/historia/${h.id}`} data-teste="livro">
+                <a class="livro" href={noApp('writer', `historia/${h.id}`)} data-teste="livro">
                   <Capa historia={h} largura={72} />
                   <span class="livro-texto">
                     <strong class="livro-titulo">{h.titulo || t('writer.historia.sem-titulo')}</strong>
@@ -155,7 +157,7 @@ export function Estante() {
             ))}
           </ul>
         )}
-        <a class="botao" href="#/ideias" data-teste="ir-ideias">
+        <a class="botao" href={noApp('writer', 'ideias')} data-teste="ir-ideias">
           {t('writer.ideias.abrir-banco')}
         </a>
       </aside>

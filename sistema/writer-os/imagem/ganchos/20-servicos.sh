@@ -5,10 +5,12 @@
 # depuração, modo de recuperação e de emergência, tudo mascarado).
 set -euo pipefail
 
-systemctl enable ekfrase-dados.service ekfrase-diagnostico.service ekfrase-sessao.service NetworkManager.service systemd-timesyncd.service
+systemctl enable ekfrase-dados.service ekfrase-diagnostico.service ekfrase-sessao.service ekfrase-numlock.path NetworkManager.service systemd-timesyncd.service
 systemctl set-default graphical.target
 systemctl mask getty@.service autovt@.service serial-getty@.service console-getty.service container-getty@.service \
   ctrl-alt-del.target debug-shell.service rescue.service emergency.service
+# o brilho começa sempre em 50% (91-ekfrase-brilho.rules, 18/11): nada de voltar o do último desligamento
+systemctl mask systemd-backlight@.service
 
 # os módulos que o initrd precisa para achar o pendrive (FAT32, USB 2/3, UAS) e montar o squashfs
 cat >> /etc/initramfs-tools/modules <<'FIM'

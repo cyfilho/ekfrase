@@ -40,7 +40,7 @@ export function pwa(): Plugin {
       config = c;
     },
     transformIndexHtml() {
-      return [{ tag: 'link', attrs: { rel: 'manifest', href: './manifest.webmanifest' }, injectTo: 'head' }];
+      return [{ tag: 'link', attrs: { rel: 'manifest', href: `${config.base}manifest.webmanifest` }, injectTo: 'head' }];
     },
     writeBundle() {
       const saida = resolve(config.root, config.build.outDir);

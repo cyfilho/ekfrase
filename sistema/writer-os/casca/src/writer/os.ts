@@ -26,19 +26,12 @@ import {
   type RespostaSistema,
   type SobreOS,
 } from '@ekfrase/writer-nucleo';
-import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs';
+import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { extname, join, sep } from 'node:path';
 import { gravarInteiro } from '../motor/pastas.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
 import { NOME_DA_PASTA, type DadosDoWriter } from './dados.ts';
-
-/**
- * O pedaço da janela do Electron que este arquivo usa. Sem importar o tipo do `electron`: o teste de
- * `tests/casca.test.ts` importa este arquivo, e a cópia pública do repositório não tem o Electron.
- */
-interface JanelaDaPagina {
-  webContents: { executeJavaScript(codigo: string): Promise<unknown>; reload(): void };
-}
+import type { Pagina } from './pagina.ts';
 
 interface ArquivoSistema {
   idioma: string | null;
@@ -82,7 +75,7 @@ export class WriterOS {
   destino: DestinoOS | null = null;
   private motivo: string | null = null;
   private dados: DadosDoWriter | null = null;
-  private janela: () => JanelaDaPagina | null = () => null;
+  private pagina: Pagina | null = null;
   private sair: () => Promise<void> = async () => undefined;
   private paginaVoltou = false;
   private versaoApp = '';
@@ -154,9 +147,9 @@ export class WriterOS {
   }
 
   /** Liga às peças (depois de criar os dados) e abre a partição de dados, se há. */
-  async ligar(o: { dados: DadosDoWriter; janela: () => JanelaDaPagina | null; sair: () => Promise<void>; versaoApp: string }): Promise<void> {
+  async ligar(o: { dados: DadosDoWriter; pagina: Pagina; sair: () => Promise<void>; versaoApp: string }): Promise<void> {
     this.dados = o.dados;
-    this.janela = o.janela;
+    this.pagina = o.pagina;
     this.sair = o.sair;
     this.versaoApp = o.versaoApp;
     if (this.motivo === null) {
@@ -379,13 +372,11 @@ export class WriterOS {
 
   /** Grava no cofre as chaves `ekfrase*` do `localStorage` da página (nada de texto: o rascunho já vai ao cofre). */
   async salvarPagina(): Promise<void> {
-    const j = this.janela();
+    const j = this.pagina;
     const cofre = this.dados?.cofreAberto;
-    if (!j || !cofre) return;
+    if (!j?.aberta() || !cofre) return;
     try {
-      const copia = (await j.webContents.executeJavaScript(
-        'JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith("ekfrase")).map((k) => [k, localStorage.getItem(k)])))',
-      )) as string;
+      const copia = await j.copiarGuardado();
       if (typeof copia === 'string') cofre.porSegredo('pagina', copia);
       this.depurar?.(`pagina salva ${copia.length}`);
     } catch (e) {
@@ -400,14 +391,12 @@ export class WriterOS {
     if (this.paginaVoltou) return;
     this.paginaVoltou = true;
     const guardado = this.dados?.cofreAberto?.segredo('pagina');
-    const j = this.janela();
-    if (!guardado || !j) return;
+    const j = this.pagina;
+    if (!guardado || !j?.aberta()) return;
     try {
-      const mudou = (await j.webContents.executeJavaScript(
-        `(() => { const o = JSON.parse(${JSON.stringify(guardado)}); let mudou = false; for (const [k, v] of Object.entries(o)) { if (typeof v === 'string' && k.startsWith('ekfrase') && localStorage.getItem(k) !== v) { localStorage.setItem(k, v); mudou = true; } } return mudou; })()`,
-      )) as boolean;
+      const mudou = await j.porGuardado(guardado);
       // a página leu o localStorage ao abrir: recarrega para valer (os textos continuam abertos)
-      if (mudou) setTimeout(() => j.webContents.reload(), 50);
+      if (mudou) setTimeout(() => j.recarregar(), 50);
     } catch {
       // segue sem
     }
@@ -424,4 +413,54 @@ export class WriterOS {
   sobre(): SobreOS {
     return { sistema: this.sistema.versao(), app: this.versaoApp, kernel: this.sistema.kernel(), secureBoot: this.sistema.secureBoot() };
   }
+
+  // ---------- as teclas de brilho e o Num Lock (pedidos do Alcy em 18/11) ----------
+
+  private mudandoBrilho = false;
+
+  /**
+   * Uma tecla de brilho do notebook: 10% a mais ou a menos. Em alguns notebooks o firmware (ou o kernel) já muda
+   * o brilho sozinho com a mesma tecla; então, se o brilho mudou logo depois da tecla, só conta o novo (nunca
+   * muda duas vezes). Uma tecla por vez (segurar a tecla não empilha pedidos). `null` = nada a contar.
+   */
+  async teclaDeBrilho(passo: number, esperar = 150): Promise<number | null> {
+    if (this.mudandoBrilho || !passo) return null;
+    this.mudandoBrilho = true;
+    try {
+      const antes = await this.sistema.brilho();
+      if (antes === null) return null;
+      await new Promise((ok) => setTimeout(ok, esperar));
+      const depois = await this.sistema.brilho();
+      if (depois !== null && depois !== antes) return depois;
+      return await this.sistema.brilho(passo);
+    } finally {
+      this.mudandoBrilho = false;
+    }
+  }
+
+  /**
+   * A janela do Writer apareceu (o Cage já abriu e já tem os teclados): o aviso que liga o Num Lock. O
+   * `ekfrase-numlock.path` da imagem vê o arquivo mudar e o `ekfrase-numlock` (root) aperta o Num Lock numa
+   * tecla virtual, que o Cage junta ao grupo dos teclados. Uma vez por sessão do Cage (a casca é o único app dele).
+   */
+  sessaoPronta(): void {
+    const pasta = join(this.sistema.caminhos.run, 'sessao');
+    try {
+      if (this.sistema.simulado) mkdirSync(pasta, { recursive: true });
+      writeFileSync(join(pasta, 'pronta'), `${process.pid} ${Date.now()}\n`);
+    } catch {
+      // sem a pasta da sessão (o serviço do diagnóstico a cria): fica sem o Num Lock, nada mais
+    }
+  }
+}
+
+/**
+ * As teclas de brilho do notebook. No Cage, a tecla chega ao Writer como qualquer outra (o XKB a chama de
+ * XF86MonBrightnessUp/Down; o Chromium, de "BrightnessUp"/"BrightnessDown"): +10, −10 ou 0 (não é de brilho).
+ */
+export function passoDaTecla(i: { type: string; key: string; code: string }): number {
+  if (i.type !== 'keyDown') return 0;
+  if (i.key === 'BrightnessUp' || i.code === 'BrightnessUp') return 10;
+  if (i.key === 'BrightnessDown' || i.code === 'BrightnessDown') return -10;
+  return 0;
 }
