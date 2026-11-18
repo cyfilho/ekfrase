@@ -3,13 +3,14 @@
 /**
  * A Biblioteca do Ekfrase (DEC-P049). O hall é o próprio app: quem chega vê o acervo, sem conta.
  *
- * `#/` o acervo (busca, estantes pelas classes da CDD, gêneros; com conta, os livros do inventário) ·
- * `#/livro/<id>` a ficha (ler, pôr no inventário, baixar em EPUB/TXT/DOCX/PDF, sumário) ·
- * `#/ler/<id>[/<capítulo>]` o leitor (Leitor.tsx).
+ * `/biblioteca/` a entrada (as formas de usar) · `/biblioteca/app` o acervo (busca, estantes pelas classes da CDD,
+ * gêneros; com conta, os livros do inventário) · `/biblioteca/app/livro/<id>` a ficha (ler, pôr no inventário,
+ * baixar em EPUB/TXT/DOCX/PDF, sumário) · `/biblioteca/app/ler/<id>[/<capítulo>]` o leitor (Leitor.tsx).
+ * Padrão dos endereços: docs/ENDERECOS.md.
  *
  * Ler não pede conta; anotar e guardar onde parou pedem o livro no INVENTÁRIO (conta Ekfrase).
  */
-import { AcoesTopo, EntradaApp, FormConta, Janela, RodapeEkfrase, acervo, entradaPedida, limparEntradaPedida, ponte, useConta, type Livro } from '@ekfrase/interface';
+import { AcoesTopo, EntradaApp, FormConta, Janela, RodapeEkfrase, acervo, aoMudarEndereco, entradaPedida, jogo, limparEntradaPedida, noApp, ponte, telaNoApp, useConta, type Livro } from '@ekfrase/interface';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import logo from './img/logo-biblioteca.png';
 import { Leitor } from './Leitor.tsx';
@@ -18,7 +19,7 @@ import { t, tr } from './textos.ts';
 type Rota = { tipo: 'acervo' } | { tipo: 'livro'; id: string } | { tipo: 'ler'; id: string; capitulo: number | null };
 
 function rotaDoEndereco(): Rota {
-  const h = location.hash.replace(/^#\/?/, '');
+  const h = (telaNoApp('biblioteca') ?? []).join('/');
   const livro = /^livro\/([a-z0-9-]+)$/.exec(h);
   if (livro) return { tipo: 'livro', id: livro[1]! };
   const ler = /^ler\/([a-z0-9-]+)(?:\/(\d+))?$/.exec(h);
@@ -33,8 +34,7 @@ function useRota(): Rota {
       setR(rotaDoEndereco());
       scrollTo(0, 0);
     };
-    addEventListener('hashchange', mudou);
-    return () => removeEventListener('hashchange', mudou);
+    return aoMudarEndereco(mudou);
   }, []);
   return r;
 }
@@ -104,11 +104,11 @@ export function App() {
   return (
     <div class="casca">
       <header class="topo">
-        <a class="marca" href="#/">
+        <a class="marca" href={noApp('biblioteca')}>
           <img src={logo} width={48} height={48} alt="" />
           <span>{t('biblioteca.nome')}</span>
         </a>
-        <AcoesTopo t={t} tr={tr} app="biblioteca" passeio="/#/torre/biblioteca/salas" entrar />
+        <AcoesTopo t={t} tr={tr} app="biblioteca" passeio={jogo.sala('biblioteca')} entrar />
       </header>
       <main class="conteudo bib">{rota.tipo === 'livro' ? <Ficha id={rota.id} /> : <Acervo />}</main>
       <RodapeEkfrase t={t} />
@@ -225,7 +225,7 @@ function Acervo() {
 function CartaoLivro({ livro, continuar }: { livro: Livro; continuar?: boolean }) {
   return (
     <li class="bib-cartao">
-      <a href={continuar ? `#/ler/${livro.id}` : `#/livro/${livro.id}`}>
+      <a href={continuar ? noApp('biblioteca', `ler/${livro.id}`) : noApp('biblioteca', `livro/${livro.id}`)}>
         <Capa livro={livro} largura={120} />
         <strong>{livro.titulo}</strong>
         <small>{livro.autor}</small>
@@ -310,13 +310,13 @@ function Ficha({ id }: { id: string }) {
     return (
       <section class="pilha">
         <p class="erro">{t('biblioteca.nao_achado')}</p>
-        <a href="#/">{t('biblioteca.voltar')}</a>
+        <a href={noApp('biblioteca')}>{t('biblioteca.voltar')}</a>
       </section>
     );
   const tem = Boolean(inventario?.has(l.id));
   return (
     <article class="bib-ficha">
-      <a class="voltar" href="#/">
+      <a class="voltar" href={noApp('biblioteca')}>
         {t('biblioteca.voltar')}
       </a>
       <div class="bib-ficha-topo">
@@ -351,7 +351,7 @@ function Ficha({ id }: { id: string }) {
             {leitores !== null && leitores > 0 && ` · ${t('biblioteca.leitores', { count: leitores })}`}
           </p>
           <div class="acoes">
-            <a class="botao principal" href={`#/ler/${l.id}`}>
+            <a class="botao principal" href={noApp('biblioteca', `ler/${l.id}`)}>
               {t(tem ? 'biblioteca.continuar' : 'biblioteca.ler')}
             </a>
             <BotaoInventario livro={l} tem={tem} />
@@ -374,7 +374,7 @@ function Ficha({ id }: { id: string }) {
           <ol>
             {sumario.map((s, i) => (
               <li key={i}>
-                <a href={`#/ler/${l.id}/${i + 1}`}>{s}</a>
+                <a href={noApp('biblioteca', `ler/${l.id}/${i + 1}`)}>{s}</a>
               </li>
             ))}
           </ol>

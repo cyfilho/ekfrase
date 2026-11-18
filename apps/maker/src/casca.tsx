@@ -20,7 +20,7 @@ import '@fontsource/atkinson-hyperlegible-next/latin-400.css';
 import '@fontsource/atkinson-hyperlegible-next/latin-700.css';
 import '@ekfrase/nucleo/estilo/tokens.css';
 import { aplicarTema, criarTradutor, iniciarIdioma, montarCatalogo, temaAtual } from '@ekfrase/nucleo';
-import { AcoesTopo, EntradaApp, Janela, RodapeEkfrase, entradaPedida, limparEntradaPedida, ponte, type Documento } from '@ekfrase/interface';
+import { AcoesTopo, EntradaApp, Janela, RodapeEkfrase, jogo, entradaPedida, limparEntradaPedida, ponte, type Documento } from '@ekfrase/interface';
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import logoMaker from './img/logo-maker.png';
@@ -83,7 +83,7 @@ export function iniciarIdiomaETema(): void {
 function Topo() {
   const [, setV] = useState(0);
   useEffect(() => tr.aoTrocar(() => setV((n) => n + 1)), []);
-  return <AcoesTopo t={tn} tr={tr} app="maker" passeio="/#/torre/maker/salas" aoSair={() => location.reload()} />;
+  return <AcoesTopo t={tn} tr={tr} app="maker" passeio={jogo.sala('maker')} aoSair={() => location.reload()} />;
 }
 
 function Rodape() {

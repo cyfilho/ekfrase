@@ -13,11 +13,12 @@
  * Quando a página vai sumir, o que falta gravar vai na hora para o rascunho de emergência
  * (`rascunho.ts`); quando a sessão fecha, a folha grava antes de o armazém fechar.
  */
-import { AcoesTopo } from '@ekfrase/interface';
-import { STATUS_CENA, contarPalavras, type Cena, type StatusCena } from '@ekfrase/writer-nucleo';
+import { AcoesTopo, noApp } from '@ekfrase/interface';
+import { contarPalavras, type Cena } from '@ekfrase/writer-nucleo';
 import type { EditorView } from '@codemirror/view';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useComandos } from './comandos.ts';
+import { SeletorStatus } from './SeletorStatus.tsx';
 import { alternar, alternarTitulo, criarEditor, type Editor } from './editor.ts';
 import { pulsar, useSessao, useVivo } from './estado.ts';
 import { IconeEngrenagem, IconeLampada, IconeLupa, IconeNotas, IconeRelogio, IconeVoltar } from './icones.tsx';
@@ -44,7 +45,7 @@ export function Escrever({ id }: { id: string }) {
     return (
       <main class="conteudo">
         <p class="aviso-caixa">{t('writer.cena.nao-existe')}</p>
-        <a class="botao" href="#/">
+        <a class="botao" href={noApp('writer')}>
           {t('writer.estante.ir')}
         </a>
       </main>
@@ -338,7 +339,7 @@ function Folha({ cena, palavrasDoDia, metaDoDia, maquina, foco, semMenus, letra,
     <div class={`folha-fundo${digitando ? ' digitando' : ''}${semMenus ? ' sem-menus' : ''}${semMenus && mostraTopo ? ' menus-vistos' : ''}`} data-teste="tela-escrever" style={{ '--letra-folha': `${letra}px`, '--altura-topo': `${alturaTopo}px` }}>
       <header ref={topoRef} class={`folha-topo${mostraTopo ? '' : ' escondido'}`} onFocusIn={() => setTopo(true)} data-teste="folha-topo">
         <div class="folha-topo-esq">
-          <a class="ekf-icone" href={`#/historia/${cena.historia}`} title={t('writer.cmd.voltar-historia')} aria-label={t('writer.cmd.voltar-historia')} data-teste="voltar-historia">
+          <a class="ekf-icone" href={noApp('writer', `historia/${cena.historia}`)} title={t('writer.cmd.voltar-historia')} aria-label={t('writer.cmd.voltar-historia')} data-teste="voltar-historia">
             <IconeVoltar tamanho={16} />
           </a>
           <TituloDaCena cena={cena} />
@@ -347,7 +348,7 @@ function Folha({ cena, palavrasDoDia, metaDoDia, maquina, foco, semMenus, letra,
           <button type="button" class="ekf-icone" title={t('writer.cmd.notas')} aria-label={t('writer.cmd.notas')} onClick={() => setNotas(true)} data-teste="abrir-notas">
             <IconeNotas tamanho={16} />
           </button>
-          <a class="ekf-icone" href={`#/historico/${id}`} title={t('writer.cmd.historico')} aria-label={t('writer.cmd.historico')} data-teste="abrir-historico">
+          <a class="ekf-icone" href={noApp('writer', `historico/${id}`)} title={t('writer.cmd.historico')} aria-label={t('writer.cmd.historico')} data-teste="abrir-historico">
             <IconeRelogio tamanho={16} />
           </a>
           <button type="button" class="ekf-icone" title={t('writer.cmd.ideia')} aria-label={t('writer.cmd.ideia')} onClick={() => pedir('ideia')}>
@@ -365,10 +366,13 @@ function Folha({ cena, palavrasDoDia, metaDoDia, maquina, foco, semMenus, letra,
           <button type="button" class="ekf-icone" title={t('writer.cmd.paleta')} aria-label={t('writer.cmd.paleta')} onClick={() => pedir('paleta')}>
             <IconeLupa tamanho={16} />
           </button>
-          <button type="button" class="ekf-icone" title={t('writer.cmd.ajustes')} aria-label={t('writer.cmd.ajustes')} onClick={() => pedir('ajustes')}>
-            <IconeEngrenagem tamanho={16} />
-          </button>
-          <AcoesTopo t={t} tr={tr} app="writer" entrar />
+          {/* no Writer OS os Ajustes moram no menu do sistema, e a conta também (a engrenagem é dele) */}
+          {!noOS && (
+            <button type="button" class="ekf-icone" title={t('writer.cmd.ajustes')} aria-label={t('writer.cmd.ajustes')} onClick={() => pedir('ajustes')}>
+              <IconeEngrenagem tamanho={16} />
+            </button>
+          )}
+          <AcoesTopo t={t} tr={tr} app="writer" entrar={!noOS} semConta={noOS} />
           {noOS && <BotaoSistema tamanho={16} />}
         </div>
       </header>
@@ -454,25 +458,6 @@ function TituloDaCena({ cena }: { cena: Cena }) {
       }}
       data-teste="titulo-cena"
     />
-  );
-}
-
-export function SeletorStatus({ cena, teste }: { cena: Cena; teste?: string }) {
-  const s = useSessao();
-  return (
-    <select
-      class="seletor-status"
-      value={cena.status}
-      aria-label={t('writer.cena.status')}
-      onChange={(e) => void s.escrita.editarCena(cena.id, { status: e.currentTarget.value as StatusCena })}
-      data-teste={teste}
-    >
-      {STATUS_CENA.map((st) => (
-        <option key={st} value={st}>
-          {t(`writer.status.${st}`)}
-        </option>
-      ))}
-    </select>
   );
 }
 

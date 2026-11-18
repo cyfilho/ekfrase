@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, type Conta, type Convite, type Escola, type PedidoEscola } from '../api.ts';
 import { avisoDoErro, type Aviso } from '../avisos.ts';
-import { irPara } from '../rotas.ts';
+import { enderecoDe, irPara } from '../rotas.ts';
 import { t, tr } from '../textos.ts';
 import { MostrarAviso } from './entrar.tsx';
 
@@ -166,7 +166,7 @@ export function MinhasEscolas({
         )}
         {!aberto && (
           <div class="acoes">
-            <a class="botao" href="#/pedir">
+            <a class="botao" href={enderecoDe('pedir')}>
               {t('vernakula.escolas.pedir.botao')}
             </a>
           </div>
@@ -201,7 +201,7 @@ export function PedirEscola({ temEscola }: { temEscola: boolean }) {
   return (
     <div class="pilha">
       <p>
-        <a href="#/escolas">← {t(temEscola ? 'vernakula.escolas.voltar' : 'vernakula.menu.voltar')}</a>
+        <a href={enderecoDe('escolas')}>← {t(temEscola ? 'vernakula.escolas.voltar' : 'vernakula.menu.voltar')}</a>
       </p>
       <h1>{t('vernakula.escolas.pedir.titulo')}</h1>
       {feito ? (

@@ -11,7 +11,16 @@ if [ ! -e /live/vmlinuz ]; then
   search --no-floppy --label --set=root EKFR-BOOT
 fi
 
+# O live-boot vai direto à partição de onde o GRUB ligou (P3b, 18/11/2026). Sem isto ele sondava os discos, e o
+# `live-media-timeout=30` de antes não era "espere até 30 s": era "NÃO procure antes de 30 s" (9990-misc-helpers.sh,
+# find_livefs), 31 s parados no notebook. Se o PARTUUID não aparecer, o live-boot cai na busca de sempre, tentando
+# a cada segundo por até 60 s (o HD externo lento continua tendo tempo de acordar). Dentro da entrada, porque a
+# entrada do menu só herda as variáveis exportadas (o $root é).
 menuentry "Ekfrase Writer" --unrestricted {
-  linux /live/vmlinuz boot=live live-media-path=/live live-media-timeout=30 noprompt noeject nopersistence quiet splash loglevel=3 rd.udev.log_level=3 systemd.show_status=false systemd.debug-shell=0 rd.shell=0 rd.emergency=reboot panic=10 vt.global_cursor_default=0
+  set ekfrase_midia=/dev/disk/by-partlabel/EKFRASE-BOOT
+  if probe --set=ekfrase_pu --part-uuid "$root"; then
+    set ekfrase_midia="/dev/disk/by-partuuid/$ekfrase_pu"
+  fi
+  linux /live/vmlinuz boot=live live-media-path=/live live-media=$ekfrase_midia noprompt noeject nopersistence quiet splash loglevel=3 rd.udev.log_level=3 systemd.show_status=false systemd.debug-shell=0 rd.shell=0 rd.emergency=reboot panic=10 vt.global_cursor_default=0
   initrd /live/initrd.img
 }

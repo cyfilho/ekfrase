@@ -83,7 +83,7 @@ export function App() {
 
   const sair = () => {
     void api.sair().finally(() => {
-      irPara('inicio');
+      irPara('entrada');
       setEstado({ fase: 'fora' });
     });
   };
@@ -91,7 +91,7 @@ export function App() {
   // Quem não entrou e chega no começo do app vê a tela inicial (o hall do modo normal: computador,
   // online), com o topo do Ekfrase — também quando desliga o modo jogo no hall ou nas salas.
   // Quem entrou e chega por link direto (ou pelo botão do modo jogo, `?inicio`) também a vê, com o "Abrir o Vernákula".
-  const telaInicial = (estado.fase === 'fora' && rota === 'inicio' && !estado.aviso) || (estado.fase === 'dentro' && rota === 'inicio' && entradaVista);
+  const telaInicial = (estado.fase === 'fora' && rota === 'entrada' && !estado.aviso) || (estado.fase === 'dentro' && rota === 'entrada' && entradaVista);
   if (telaInicial) {
     return (
       <EntradaApp
@@ -113,7 +113,7 @@ export function App() {
   const dentro = estado.fase === 'dentro' ? estado.conta : null;
   return (
     <div class="casca">
-      <Cabecalho escola={escola?.nome} />
+      <Cabecalho escola={escola?.nome} entrou={estado.fase === 'dentro'} />
       <main class="conteudo">
         {estado.fase === 'carregando' && <p class="carregando">{t('nucleo.carregando')}</p>}
         {estado.fase === 'instalacao' && <PrimeiroAcesso aoCriar={entrou} />}

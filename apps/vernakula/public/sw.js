@@ -5,7 +5,7 @@
  * dado de aluno não fica guardado aqui (a guarda offline dos dados é outra
  * camada, com regras próprias).
  *
- * Estratégia: rede primeiro para a página (pega a versão nova logo), cache
+ * Estratégia: rede primeiro para a página, em qualquer caminho de /vernakula/ (pega a versão nova logo), cache
  * primeiro para arquivos com hash no nome (nunca mudam).
  */
 const CACHE = 'vernakula-casca-v1';
@@ -32,8 +32,11 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(e.request)
         .then((r) => {
-          const copia = r.clone();
-          void caches.open(CACHE).then((c) => c.put('./', copia));
+          // qualquer endereço dentro de /vernakula/ (/app/conta, /convite/<código>…) é o mesmo index.html
+          if (r.ok) {
+            const copia = r.clone();
+            void caches.open(CACHE).then((c) => c.put('./', copia));
+          }
           return r;
         })
         .catch(() => caches.match('./')),

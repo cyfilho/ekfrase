@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * A PÁGINA DO WRITER OS (`ekfrase.com/writer/os/` ou `#/os`; PLANO §8b): "Baixar o Gravador" (o .exe
+ * A PÁGINA DO WRITER OS (`ekfrase.com/writer/os`; PLANO §8b): "Baixar o Gravador" (o .exe
  * portátil e o AppImage do Release mais novo do Writer OS, no repositório público), o que ele faz em
  * três passos, o aviso do SmartScreen (sem certificado: DEC-P064) e, para quem prefere o Rufus ou o
  * Etcher, o GRAVAR.md. Abre também sem conta. No mesmo visual da tela inicial (`PaginaApp`) e ligada a
- * partir do hall (`#/inicio`).
+ * partir do hall (`/writer/`).
  */
-import { LINKS, PaginaApp } from '@ekfrase/interface';
+import { LINKS, PaginaApp, entradaDoApp } from '@ekfrase/interface';
 import { useEffect, useRef } from 'preact/hooks';
 import logo from '../img/logo-writer.png';
 import { t, tr } from '../textos.ts';
 import { enderecoDe, LISTA_DE_RELEASES, useRelease } from './releases.ts';
 
 const GRAVAR_MD = `${LINKS.codigo}/blob/main/sistema/writer-os/imagem/GRAVAR.md`;
-
-/** O hall: de ekfrase.com/writer/os/ vai para ekfrase.com/writer/#/inicio; de #/os, só a rota. */
-const VOLTAR = /\/os\/?$/.test(location.pathname) ? `${location.pathname.replace(/os\/?$/, '')}#/inicio` : '#/inicio';
 
 export function BaixarOS() {
   const rel = useRelease('writer-os-v', ['Ekfrase-Gravador.exe', 'Ekfrase-Gravador.AppImage']);
@@ -78,7 +75,7 @@ export function BaixarOS() {
           </p>
         </section>
         <p class="ekf-voltar">
-          <a class="ekf-botao" href={VOLTAR} data-teste="baixar-os-voltar">
+          <a class="ekf-botao" href={entradaDoApp('writer')} data-teste="baixar-os-voltar">
             {t('writer.inicio.voltar')}
           </a>
         </p>

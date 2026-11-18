@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import type { Parametros } from '@ekfrase/nucleo';
+import { jogo } from './enderecos.ts';
 
 /** O tradutor que cada app passa às peças (as chaves daqui são do núcleo: `nucleo.*`). */
 export type T = (chave: string, p?: Parametros) => string;
@@ -52,18 +53,21 @@ export function chegouAgora(): boolean {
  */
 export function voltarAoModoDoApp(app: string): boolean {
   if (!chegouAgora() || passeioEscolhido() !== 'sim') return false;
-  location.replace(`/#/torre/${app}/salas`);
+  location.replace(jogo.sala(app));
   return true;
 }
 
 /**
  * Quem acessa `ekfrase.com/<app>/` cai na tela de entrada do app (a página das formas de usar), com ou sem
- * conta: ao chegar por link direto (primeira página desta aba, sem `#`) ou pelo `?inicio` (o botão do modo jogo
- * no hall da torre e o balcão). **O endereço fica sempre `ekfrase.com/<app>/`** (padrão de todo app, 16/11): o
+ * conta: sempre que o endereço é a própria pasta do app (nada depois de `/<app>/`) ou tem o `?inicio` (o botão do
+ * modo jogo no hall da torre e o balcão). **O endereço fica sempre `ekfrase.com/<app>/`** (padrão de todo app): o
  * `?inicio` é só um sinal, apagado do endereço já na primeira leitura. A resposta vale até `limparEntradaPedida`
- * (o botão "Abrir" entra no app).
+ * (o botão "Abrir" entra no app: `ekfrase.com/<app>/app`). Padrão dos endereços: `enderecos.ts`.
  */
 let pedida: boolean | null = null;
+
+/** O endereço é a pasta do app, sem nada depois (`/<app>` ou `/<app>/`)? */
+const naPastaDoApp = (): boolean => location.pathname.split('/').filter(Boolean).length <= 1;
 
 export function entradaPedida(): boolean {
   if (pedida !== null) return pedida;
@@ -78,11 +82,12 @@ export function entradaPedida(): boolean {
   } catch {
     /* sem endereço: nada */
   }
-  pedida = sinal || (chegouAgora() && !location.hash.replace(/^#\/?/, ''));
+  pedida = sinal || naPastaDoApp();
   return pedida;
 }
 
-/** A pessoa entrou no app: a tela de entrada não volta nesta página. */
+/** A pessoa entrou no app: a tela de entrada não volta nesta página, e o endereço passa a `/<app>/app`. */
 export function limparEntradaPedida(): void {
   pedida = false;
+  if (naPastaDoApp()) history.replaceState(history.state, '', `${location.pathname.replace(/\/?$/, '/')}app${location.search}`);
 }
