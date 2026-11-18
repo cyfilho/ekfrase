@@ -3,7 +3,8 @@
 #
 # A SESSÃO do Writer OS (PLANO §6.3), como o usuário writer (ekfrase-sessao.service): o Cage (um
 # compositor Wayland de quiosque: uma janela só, sem trocar de terminal) com a casca do Writer em
-# modo OS. É um laço: trocar o teclado é a casca gravar o sistema.json e sair; o Cage abre de novo,
+# modo OS (desde o P3, 18/11/2026: o serviço do Writer no Node, que abre o Cog; o pixman leva junto o
+# LIBGL_ALWAYS_SOFTWARE, porque o Cog desenha pelo EGL e, sem placa de vídeo, o Mesa desenha na CPU). É um laço: trocar o teclado é a casca gravar o sistema.json e sair; o Cage abre de novo,
 # com o teclado novo (ele só lê o teclado ao abrir).
 #
 # Em /run/ekfrase/sessao/ (do writer; o ekfrase-diagnostico.service cria): `renderer` (auto | pixman,
@@ -13,7 +14,7 @@ set -u
 export LANG=C.UTF-8 XDG_SESSION_TYPE=wayland
 SESSAO=/run/ekfrase/sessao
 # a máquina virtual do teste não tem GPU; o teste da placa de vídeo (qemu.py --gpu) tem
-if [ -e /etc/ekfrase/teste ] && [ ! -e /run/ekfrase/teste/gpu ]; then export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1; fi
+if [ -e /etc/ekfrase/teste ] && [ ! -e /run/ekfrase/teste/gpu ]; then export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 LIBGL_ALWAYS_SOFTWARE=1; fi
 
 registrar() { [ -d "$SESSAO" ] && [ -w "$SESSAO" ] && printf '%s\n' "$2" > "$SESSAO/$1.tmp" && mv -f "$SESSAO/$1.tmp" "$SESSAO/$1"; }
 
@@ -24,7 +25,7 @@ QUEDAS=0
 while true; do
   if [ "$QUEDAS" -ge 2 ] && [ "${WLR_RENDERER:-}" != pixman ]; then
     echo "ekfrase-sessao: o Cage caiu $QUEDAS vezes; sigo sem a placa de vídeo (pixman)" >&2
-    export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1
+    export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 LIBGL_ALWAYS_SOFTWARE=1
   fi
   registrar renderer "${WLR_RENDERER:-auto}"
   INICIO=$(date +%s)
@@ -37,7 +38,7 @@ while true; do
     us-intl) LAYOUT=us VARIANTE=intl ;;
     *) LAYOUT=br ;;
   esac
-  XKB_DEFAULT_LAYOUT=$LAYOUT XKB_DEFAULT_VARIANT=$VARIANTE cage -d -- /opt/ekfrase-writer/ekfrase-writer --modo-os --ozone-platform=wayland
+  XKB_DEFAULT_LAYOUT=$LAYOUT XKB_DEFAULT_VARIANT=$VARIANTE cage -d -- /opt/ekfrase-writer/ekfrase-writer --modo-os
   CODIGO=$?
   DURACAO=$(($(date +%s) - INICIO))
   echo "ekfrase-sessao: o Cage saiu (código $CODIGO, depois de ${DURACAO} s, renderer ${WLR_RENDERER:-auto})" >&2

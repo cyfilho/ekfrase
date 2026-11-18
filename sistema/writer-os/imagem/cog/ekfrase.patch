@@ -1,0 +1,152 @@
+--- a/launcher/cog-launcher.c	2026-11-18 13:43:57.738795400 -0300
++++ b/launcher/cog-launcher.c	2026-11-18 13:44:23.316634600 -0300
+@@ -259,10 +259,122 @@
+ static void *
+ on_web_view_create(WebKitWebView *web_view, WebKitNavigationAction *action)
+ {
++    /* Ekfrase: no Writer OS uma janela nova nunca abre (nem no lugar desta) */
++    if (g_getenv("EKFRASE_COG_ORIGEM"))
++        return NULL;
+     webkit_web_view_load_request(web_view, webkit_navigation_action_get_request(action));
+     return NULL;
+ }
+ 
++/*
++ * Ekfrase Writer OS (docs/writer/PLANO.md §7): as travas que a casca Electron tinha, agora no Cog. Valem só com
++ * EKFRASE_COG_ORIGEM (a origem do app, "http://127.0.0.1:47800"), que o serviço do Writer passa ao abrir o Cog:
++ * a página nunca navega para fora da origem, nenhuma janela nova, nenhum download, nenhuma caixa do sistema
++ * (alert, confirm, "sair desta página?"), e a ponte (EKFRASE_COG_SCRIPT, o arquivo que o serviço escreveu) entra
++ * na página antes de tudo, como o preload do Electron.
++ */
++static gboolean
++ekfrase_eh_do_app(const char *uri)
++{
++    const char *origem = g_getenv("EKFRASE_COG_ORIGEM");
++    if (!origem || !*origem || !uri)
++        return FALSE;
++    const size_t n = strlen(origem);
++    return strncmp(uri, origem, n) == 0 && (uri[n] == '/' || uri[n] == '\0');
++}
++
++static gboolean
++ekfrase_on_decide_policy(G_GNUC_UNUSED WebKitWebView *web_view,
++                         WebKitPolicyDecision         *decision,
++                         WebKitPolicyDecisionType      type,
++                         G_GNUC_UNUSED gpointer        data)
++{
++    switch (type) {
++    case WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION: {
++        WebKitNavigationAction *acao =
++            webkit_navigation_policy_decision_get_navigation_action(WEBKIT_NAVIGATION_POLICY_DECISION(decision));
++        const char *uri = webkit_uri_request_get_uri(webkit_navigation_action_get_request(acao));
++        if (ekfrase_eh_do_app(uri)) {
++            webkit_policy_decision_use(decision);
++        } else {
++            g_message("ekfrase: navegação barrada: %s", uri ? uri : "(nada)");
++            webkit_policy_decision_ignore(decision);
++        }
++        return TRUE;
++    }
++    case WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION:
++        g_message("ekfrase: janela nova barrada");
++        webkit_policy_decision_ignore(decision);
++        return TRUE;
++    case WEBKIT_POLICY_DECISION_TYPE_RESPONSE:
++        /* o que a página não sabe mostrar viraria um download: nunca */
++        if (!webkit_response_policy_decision_is_mime_type_supported(WEBKIT_RESPONSE_POLICY_DECISION(decision))) {
++            g_message("ekfrase: resposta sem tela barrada (seria um download)");
++            webkit_policy_decision_ignore(decision);
++            return TRUE;
++        }
++        return FALSE;
++    default:
++        return FALSE;
++    }
++}
++
++static void
++ekfrase_on_download_started(G_GNUC_UNUSED WebKitNetworkSession *session,
++                            WebKitDownload                     *download,
++                            G_GNUC_UNUSED gpointer              data)
++{
++    g_message("ekfrase: download barrado");
++    webkit_download_cancel(download);
++}
++
++static gboolean
++ekfrase_on_script_dialog(G_GNUC_UNUSED WebKitWebView *web_view, WebKitScriptDialog *dialog, G_GNUC_UNUSED gpointer data)
++{
++    /* nenhuma caixa do sistema: confirm() = não; o "sair desta página?" = sair (quem decide é o app) */
++    switch (webkit_script_dialog_get_dialog_type(dialog)) {
++    case WEBKIT_SCRIPT_DIALOG_CONFIRM:
++        webkit_script_dialog_confirm_set_confirmed(dialog, FALSE);
++        break;
++    case WEBKIT_SCRIPT_DIALOG_BEFORE_UNLOAD_CONFIRM:
++        webkit_script_dialog_confirm_set_confirmed(dialog, TRUE);
++        break;
++    default:
++        break;
++    }
++    return TRUE;
++}
++
++static void
++ekfrase_travar(WebKitWebView *web_view, WebKitNetworkSession *session)
++{
++    const char *origem = g_getenv("EKFRASE_COG_ORIGEM");
++    if (!origem || !*origem)
++        return;
++    if (!ekfrase_eh_do_app(s_options.home_uri))
++        g_error("ekfrase: o endereço inicial (%s) não é da origem do app (%s)", s_options.home_uri, origem);
++
++    g_signal_connect(web_view, "decide-policy", G_CALLBACK(ekfrase_on_decide_policy), NULL);
++    g_signal_connect(web_view, "script-dialog", G_CALLBACK(ekfrase_on_script_dialog), NULL);
++    if (session)
++        g_signal_connect(session, "download-started", G_CALLBACK(ekfrase_on_download_started), NULL);
++
++    const char *arquivo = g_getenv("EKFRASE_COG_SCRIPT");
++    if (arquivo && *arquivo) {
++        g_autofree char  *codigo = NULL;
++        g_autoptr(GError) erro = NULL;
++        if (!g_file_get_contents(arquivo, &codigo, NULL, &erro))
++            g_error("ekfrase: sem a ponte da página (%s): %s", arquivo, erro->message);
++        g_autofree char *padrao = g_strdup_printf("%s/*", origem);
++        const char      *lista[] = {padrao, NULL};
++        WebKitUserScript *script = webkit_user_script_new(codigo, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
++                                                          WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, lista, NULL);
++        webkit_user_content_manager_add_script(webkit_web_view_get_user_content_manager(web_view), script);
++        webkit_user_script_unref(script);
++    }
++    g_message("ekfrase: travas ligadas (origem %s)", origem);
++}
++
+ static WebKitWebView *
+ cog_launcher_create_view(CogLauncher *self, CogShell *shell)
+ {
+@@ -357,6 +469,12 @@
+     cog_web_view_connect_default_progress_handlers(web_view);
+     cog_web_view_connect_default_error_handlers(web_view);
+ 
++#if COG_USE_WPE2
++    ekfrase_travar(web_view, self->network_session);
++#else
++    ekfrase_travar(web_view, NULL);
++#endif
++
+     webkit_web_view_load_uri(web_view, s_options.home_uri);
+     g_clear_pointer(&s_options.home_uri, g_free);
+ 
+--- a/platform/wayland/cog-platform-wl.c	2026-11-18 13:43:57.825683500 -0300
++++ b/platform/wayland/cog-platform-wl.c	2026-11-18 13:44:33.745998700 -0300
+@@ -1098,6 +1098,11 @@
+ static bool
+ capture_app_key_bindings(CogWlPlatform *self, uint32_t keysym, uint32_t unicode, uint32_t state, uint8_t modifiers)
+ {
++    /* Ekfrase: no Writer OS toda tecla vai para a página (Ctrl+W não fecha, F5 e Ctrl+R não recarregam, Alt+setas
++       não voltam, nada de zoom nem tela cheia): quem decide as teclas é o app (docs/writer/PLANO.md §7) */
++    if (g_getenv("EKFRASE_COG_ORIGEM"))
++        return false;
++
+     GApplication *app = g_application_get_default();
+     if (!app || !self->web_view)
+         return false;

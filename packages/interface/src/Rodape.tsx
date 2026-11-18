@@ -2,6 +2,7 @@
 
 import logoEkfrase from '@ekfrase/nucleo/estilo/img/ekfrase-logo.png';
 import { ambienteFechado } from './ambiente.ts';
+import { site } from './enderecos.ts';
 import { LINKS } from './config.ts';
 import type { T } from './tipos.ts';
 
@@ -41,10 +42,10 @@ export function RodapeEkfrase({ t, familia = true, completo = false }: { t: T; f
       )}
       {completo && !fechado && (
         <nav class="ekf-rodape-links" aria-label={t('nucleo.rodape.nav')}>
-          <a href="/#/sobre">{t('nucleo.rodape.sobre')}</a>
-          <a href="/#/contato">{t('nucleo.rodape.contato')}</a>
-          <a href="/#/privacidade">{t('nucleo.rodape.privacidade')}</a>
-          <a href="/#/termos">{t('nucleo.rodape.termos')}</a>
+          <a href={site.pagina('sobre')}>{t('nucleo.rodape.sobre')}</a>
+          <a href={site.pagina('contato')}>{t('nucleo.rodape.contato')}</a>
+          <a href={site.pagina('privacidade')}>{t('nucleo.rodape.privacidade')}</a>
+          <a href={site.pagina('termos')}>{t('nucleo.rodape.termos')}</a>
         </nav>
       )}
       {completo && <p>{t('nucleo.rodape.livre')}</p>}

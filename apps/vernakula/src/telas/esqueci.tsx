@@ -3,7 +3,7 @@
 import { useState } from 'preact/hooks';
 import { api, type Conta } from '../api.ts';
 import { avisoDoErro, type Aviso } from '../avisos.ts';
-import { irPara } from '../rotas.ts';
+import { enderecoDe, irPara } from '../rotas.ts';
 import { t, tr } from '../textos.ts';
 import { MostrarAviso } from './entrar.tsx';
 
@@ -44,7 +44,7 @@ export function Esqueci() {
   );
 }
 
-/** Chega pelo link do e-mail (#/redefinir/<código>): grava a senha nova e já entra. */
+/** Chega pelo link do e-mail (/vernakula/redefinir/<código>): grava a senha nova e já entra. */
 export function Redefinir({ codigo, aoEntrar }: { codigo: string; aoEntrar: (c: Conta) => void }) {
   const [nova, setNova] = useState('');
   const [repetir, setRepetir] = useState('');
@@ -82,7 +82,7 @@ export function Redefinir({ codigo, aoEntrar }: { codigo: string; aoEntrar: (c: 
         </label>
         <MostrarAviso aviso={aviso} />
         {vencido ? (
-          <a class="botao principal" href="#/esqueci">
+          <a class="botao principal" href={enderecoDe('esqueci')}>
             {t('vernakula.redefinir.pedir_outro')}
           </a>
         ) : (

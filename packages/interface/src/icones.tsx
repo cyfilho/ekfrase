@@ -121,3 +121,11 @@ export const IconeBolsa = (p: P) => <Pixels px={BOLSA} {...p} />;
 export const IconeLivro = (p: P) => <Pixels px={LIVRO} {...p} />;
 export const IconeCasa = (p: P) => <Pixels px={CASA} {...p} />;
 export const IconeSair = (p: P) => <Pixels px={SAIR} {...p} />;
+
+// A engrenagem (ajustes; no Writer OS, o menu do sistema): o aro e os oito dentes.
+// prettier-ignore
+const ENGRENAGEM: readonly Px[] = [
+  [5, 0, 2, 3], [5, 9, 2, 3], [0, 5, 3, 2], [9, 5, 3, 2], [2, 2, 2, 2], [8, 2, 2, 2], [2, 8, 2, 2], [8, 8, 2, 2],
+  [4, 3, 4, 1], [3, 4, 1, 4], [8, 4, 1, 4], [4, 8, 4, 1],
+];
+export const IconeEngrenagem = (p: P) => <Pixels px={ENGRENAGEM} {...p} />;
