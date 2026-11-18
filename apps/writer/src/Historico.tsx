@@ -12,6 +12,7 @@ import { useHistoriaDeAgora } from './pedidos.ts';
 import { ir } from './rotas.ts';
 import { diaEHora, haQuanto, palavras, t, textoDoErro } from './textos.ts';
 import { avisar, confirmar } from './ui.tsx';
+import { noApp } from '@ekfrase/interface';
 
 export function Historico({ cena: id }: { cena: string }) {
   const s = useSessao();
@@ -49,7 +50,7 @@ export function Historico({ cena: id }: { cena: string }) {
     <div class="tela-historico" data-teste="tela-historico">
       <header class="cabeca-tela">
         <h1>{t('writer.historico.titulo', { titulo: cena.titulo || t('writer.cena.sem-titulo') })}</h1>
-        <a class="botao" href={`#/escrever/${id}`}>
+        <a class="botao" href={noApp('writer', `escrever/${id}`)}>
           {t('writer.historico.voltar-escrever')}
         </a>
       </header>

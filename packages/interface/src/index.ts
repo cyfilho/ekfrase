@@ -15,6 +15,7 @@ export { EntradaApp, type EntradaAppProps } from './EntradaApp.tsx';
 export { AcoesTopo, BotaoConta, BotaoPasseio, TopoEkfrase, useConta, useFoto, type AcoesTopoProps } from './Topo.tsx';
 export { LINKS } from './config.ts';
 export { chegouAgora, entradaPedida, limparEntradaPedida, gravarPasseio, passeioEscolhido, voltarAoModoDoApp, type T } from './tipos.ts';
+export * from './enderecos.ts';
 export * as ponte from './ponte.ts';
 export * as acervo from './acervo.ts';
 export type { ClasseCdd, Livro } from './acervo.ts';

@@ -9,9 +9,13 @@ R=$1
 
 cp -a "$AQUI/raiz/." "$R/"
 chmod 0755 "$R"/usr/lib/ekfrase/*.sh
+# o ekfrase-numlock, compilado pelo montar.sh (fonte/ekfrase-numlock.c)
+install -m 0755 "$NUMLOCK" "$R/usr/lib/ekfrase/ekfrase-numlock"
 mkdir -p "$R/opt" "$R/usr/share/ekfrase" "$R/etc/ekfrase"
 rm -rf "$R/opt/ekfrase-writer"
 cp -a "$CASCA" "$R/opt/ekfrase-writer"
+# o Cog com as travas do Ekfrase (montar.sh): /usr/bin/cog, a libcogcore e o módulo do Wayland
+cp -a "$COG/." "$R/"
 cp "$LOGO" "$R/usr/share/ekfrase/logo.png"
 echo "$VERSAO" > "$R/etc/ekfrase/versao"
 

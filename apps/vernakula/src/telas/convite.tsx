@@ -4,12 +4,13 @@ import { FormConta } from '@ekfrase/interface';
 import { useEffect, useState } from 'preact/hooks';
 import { api, type Conta, type Convite } from '../api.ts';
 import type { Aviso } from '../avisos.ts';
+import { enderecoDe } from '../rotas.ts';
 import { t, tr } from '../textos.ts';
 import { MostrarAviso } from './entrar.tsx';
 import { avisoEscola, dataCurta, nomeTurma } from './escolas.tsx';
 
 /**
- * O link do e-mail de convite (#/convite/<código>): mostra a escola, a turma e
+ * O link do e-mail de convite (/vernakula/convite/<código>): mostra a escola, a turma e
  * o papel. Quem não entrou entra ou cria a conta Ekfrase ali mesmo (com o
  * e-mail do convite preenchido); quem entrou aceita ou recusa.
  */
@@ -44,7 +45,7 @@ export function TelaConvite({
         <h1>{t(recusado ? 'vernakula.convite.recusado.titulo' : 'vernakula.convite.invalido.titulo')}</h1>
         <p>{t(recusado ? 'vernakula.convite.recusado.texto' : 'vernakula.convite.invalido.texto')}</p>
         <div class="acoes">
-          <a class="botao" href="#">
+          <a class="botao" href={enderecoDe('entrada')}>
             {t('vernakula.menu.voltar')}
           </a>
         </div>

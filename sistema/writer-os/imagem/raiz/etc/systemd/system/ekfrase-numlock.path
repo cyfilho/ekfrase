@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Num Lock ligado em toda sessão (pedido do Alcy em 18/11/2026): a casca grava /run/ekfrase/sessao/pronta
+# quando a janela do Writer aparece (o Cage já abriu); isto chama o ekfrase-numlock.service.
+[Unit]
+Description=Ekfrase Writer OS: o Num Lock a cada sessão (o aviso da casca)
+
+[Path]
+PathModified=/run/ekfrase/sessao/pronta
+Unit=ekfrase-numlock.service
+
+[Install]
+WantedBy=multi-user.target

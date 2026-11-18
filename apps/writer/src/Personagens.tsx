@@ -12,6 +12,7 @@ import { IconeMais } from './icones.tsx';
 import { useHistoriaDeAgora } from './pedidos.ts';
 import { t, textoDoErro } from './textos.ts';
 import { Campo, avisar, confirmar } from './ui.tsx';
+import { noApp } from '@ekfrase/interface';
 
 const falhou = (e: unknown) => avisar(textoDoErro((e as { codigo?: string }).codigo), 'erro');
 
@@ -57,7 +58,7 @@ export function Personagens({ historia }: { historia: string }) {
         </button>
       </header>
       <p>
-        <a href={`#/historia/${historia}`}>{t('writer.voltar-para', { titulo: dados.historia.titulo || t('writer.historia.sem-titulo') })}</a>
+        <a href={noApp('writer', `historia/${historia}`)}>{t('writer.voltar-para', { titulo: dados.historia.titulo || t('writer.historia.sem-titulo') })}</a>
       </p>
       {dados.personagens.length === 0 && (
         <div class="vazio">

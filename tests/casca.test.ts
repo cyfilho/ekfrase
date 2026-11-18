@@ -15,10 +15,10 @@ import { Cofre } from '../sistema/writer-os/casca/src/motor/cofre.ts';
 import { caminhoSeguro, EspelhoDePasta, LISTA } from '../sistema/writer-os/casca/src/motor/espelho.ts';
 import { lerMarcador, pastaDoApp } from '../sistema/writer-os/casca/src/motor/pastas.ts';
 import { destinoDaApi } from '../sistema/writer-os/casca/src/motor/destino.ts';
-import { SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
+import { escolherLuz, SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
 import { teclaProibida } from '../sistema/writer-os/casca/src/motor/teclas.ts';
 import { DadosDoWriter, NOME_DA_PASTA } from '../sistema/writer-os/casca/src/writer/dados.ts';
-import { WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
+import { passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
 
 const pastas: string[] = [];
 const temp = (): string => {
@@ -286,5 +286,46 @@ describe('Writer OS: importar e salvar só dentro dos pendrives (os.ts, PLANO §
       return; // sem permissão para criar link (Windows sem modo desenvolvedor): o caso é do Linux do CI
     }
     expect(await os.listar(join(pendrive, 'atalho'))).toEqual({ ok: false, erro: 'negado' });
+  });
+});
+
+describe('Writer OS: o brilho e o Num Lock (pedidos de 18/11)', () => {
+  it('as teclas de brilho do notebook: +10 e -10, só ao apertar', () => {
+    expect(passoDaTecla({ type: 'keyDown', key: 'BrightnessUp', code: 'BrightnessUp' })).toBe(10);
+    expect(passoDaTecla({ type: 'keyDown', key: 'Unidentified', code: 'BrightnessDown' })).toBe(-10);
+    expect(passoDaTecla({ type: 'keyUp', key: 'BrightnessUp', code: 'BrightnessUp' })).toBe(0);
+    expect(passoDaTecla({ type: 'keyDown', key: 'a', code: 'KeyA' })).toBe(0);
+  });
+
+  it('a luz da tela: a do firmware antes da da plataforma e da "raw" do driver', () => {
+    expect(escolherLuz([{ nome: 'intel_backlight', tipo: 'raw' }, { nome: 'acpi_video0', tipo: 'firmware' }])).toBe('acpi_video0');
+    expect(escolherLuz([{ nome: 'amdgpu_bl1', tipo: 'raw' }, { nome: 'ideapad', tipo: 'platform' }])).toBe('ideapad');
+    expect(escolherLuz([{ nome: 'b', tipo: '' }, { nome: 'a', tipo: 'raw' }])).toBe('a');
+    expect(escolherLuz([])).toBeUndefined();
+  });
+
+  it('a tecla muda 10% (começa em 50%), e não muda de novo se o firmware já mudou sozinho', async () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-brilho-'));
+    const sistema = new SistemaSimulado(raiz, false);
+    const os = new WriterOS(sistema);
+    expect(await sistema.brilho()).toBe(50);
+    expect(await os.teclaDeBrilho(10, 1)).toBe(60);
+    expect(await os.teclaDeBrilho(-10, 1)).toBe(50);
+    // o firmware mudou o brilho logo depois da tecla: só conta o novo
+    const mudar = setTimeout(() => void sistema.brilho(-20), 5);
+    expect(await os.teclaDeBrilho(10, 60)).toBe(30);
+    clearTimeout(mudar);
+    // segurar a tecla: um pedido por vez
+    const [a, b] = await Promise.all([os.teclaDeBrilho(10, 20), os.teclaDeBrilho(10, 20)]);
+    expect([a, b].filter((x) => x !== null)).toEqual([40]);
+    rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it('a janela apareceu: o aviso que liga o Num Lock (run/sessao/pronta)', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-numlock-'));
+    const os = new WriterOS(new SistemaSimulado(raiz, false));
+    os.sessaoPronta();
+    expect(readFileSync(join(raiz, 'run', 'sessao', 'pronta'), 'utf8')).toMatch(/^\d+ \d+\n$/);
+    rmSync(raiz, { recursive: true, force: true });
   });
 });
