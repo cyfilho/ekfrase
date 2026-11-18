@@ -28,7 +28,7 @@ import { origemDe, Rede } from '../motor/rede.ts';
 import { FUSOS, SistemaLinux, SistemaSimulado, TECLADOS, type Sistema } from '../motor/sistema.ts';
 import { ligarAgente } from './agente-teste.ts';
 import { DadosDoWriter } from './dados.ts';
-import { WriterOS } from './os.ts';
+import { passoDaTecla, WriterOS } from './os.ts';
 
 const HOST = 'writer';
 const PADRAO = 'https://ekfrase.com/api/v1/';
@@ -232,6 +232,8 @@ void app.whenReady().then(async () => {
   janela = criarJanela({
     sessao: sessaoPagina,
     host: HOST,
+    // o mesmo caminho do site (ekfrase.com/writer/): o app abre direto na estante
+    inicio: '/writer/',
     preload: join(__dirname, 'preload.cjs'),
     titulo: 'Ekfrase Writer',
     icone: join(__dirname, 'app', 'icones', 'icone-512.png'),
@@ -241,6 +243,16 @@ void app.whenReady().then(async () => {
   });
   // no Writer OS o Chromium nunca abre o "Sair desta página?" dele (uma caixa do sistema): quem decide é o app
   if (writerOS) janela.webContents.on('will-prevent-unload', (e) => e.preventDefault());
+  if (writerOS) {
+    const w = writerOS;
+    // a janela apareceu: o Cage já abriu, e o sistema liga o Num Lock (ekfrase-numlock.path)
+    janela.once('ready-to-show', () => w.sessaoPronta());
+    // as teclas de brilho do notebook (no Cage não há quem as atenda): o recado sai na página
+    janela.webContents.on('before-input-event', (_e, i) => {
+      const passo = passoDaTecla(i);
+      if (passo) void w.teclaDeBrilho(passo).then((n) => n !== null && janela?.webContents.send('os:brilho-mudou', n));
+    });
+  }
   // fechar: a página grava o que falta (a folha aberta), o espelho termina, os bancos fecham
   janela.on('close', (e) => {
     if (podeFechar) return;

@@ -30,11 +30,18 @@ export AQUI CASCA VERSAO LOGO
 echo "== ferramentas da montagem"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common ca-certificates >/dev/null
+apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common ca-certificates gcc libc6-dev linux-libc-dev >/dev/null
 
 rm -rf "$TRAB"
 mkdir -p "$TRAB" "$SAIDA"
 RAIZ=$TRAB/raiz
+
+# o ekfrase-numlock (fonte/, C): compilado aqui, no mesmo trixie da imagem; o compilador NÃO entra na imagem
+echo "== o ekfrase-numlock"
+NUMLOCK=$TRAB/ekfrase-numlock
+gcc -std=gnu11 -O2 -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -pie -Wl,-z,relro,-z,now \
+  -o "$NUMLOCK" "$AQUI/fonte/ekfrase-numlock.c"
+export NUMLOCK
 COMP="main contrib non-free-firmware"
 
 echo "== o sistema (mmdebstrap, trixie)"

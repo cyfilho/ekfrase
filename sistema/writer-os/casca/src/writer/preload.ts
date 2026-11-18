@@ -51,6 +51,19 @@ ipcRenderer.on('casca:fechar', () => {
 
 const pedir = <T>(canal: string, ...a: unknown[]): Promise<T> => ipcRenderer.invoke(canal, ...a) as Promise<T>;
 
+// as teclas de brilho do notebook (Writer OS): o processo principal conta o brilho novo
+const ouvintesDoBrilho = new Set<(n: number) => void>();
+ipcRenderer.on('os:brilho-mudou', (_e, n: unknown) => {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return;
+  for (const f of [...ouvintesDoBrilho]) {
+    try {
+      f(n);
+    } catch {
+      // um ouvinte com defeito não derruba os outros
+    }
+  }
+});
+
 /** O Writer OS (o pendrive): só quando a casca abriu com `--modo-os` dentro da imagem. */
 const os: PonteSistema | undefined = process.argv.includes('--ekfrase-os=1')
   ? {
@@ -66,6 +79,10 @@ const os: PonteSistema | undefined = process.argv.includes('--ekfrase-os=1')
       esquecer: (ssid: string) => pedir<void>('os:esquecer', String(ssid)),
       bateria: () => pedir<Bateria | null>('os:bateria'),
       brilho: (passo?: number) => pedir<number | null>('os:brilho', typeof passo === 'number' ? passo : undefined),
+      aoMudarBrilho: (f: (n: number) => void) => {
+        ouvintesDoBrilho.add(f);
+        return () => void ouvintesDoBrilho.delete(f);
+      },
       discos: () => pedir<DiscoUSB[]>('os:discos'),
       guardarEm: (id: string) => pedir<RespostaCasca>('os:guardar-em', String(id)),
       guardarNaMemoria: () => pedir<RespostaCasca>('os:guardar-na-memoria'),

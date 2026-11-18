@@ -8,6 +8,7 @@
 import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
 import { ambienteFechado } from './ambiente.ts';
+import { site } from './enderecos.ts';
 import { criarConta, entrar, esqueciSenha, redefinirSenha, type Conta } from './ponte.ts';
 import type { T } from './tipos.ts';
 
@@ -133,11 +134,11 @@ export function FormConta({
               </>
             ) : (
               <>
-                <a href="/#/termos" target="_blank" rel="noopener">
+                <a href={site.pagina('termos')} target="_blank" rel="noopener">
                   {t('nucleo.rodape.termos')}
                 </a>
                 {t('nucleo.conta.aceite.e')}
-                <a href="/#/privacidade" target="_blank" rel="noopener">
+                <a href={site.pagina('privacidade')} target="_blank" rel="noopener">
                   {t('nucleo.conta.aceite.privacidade')}
                 </a>
                 .

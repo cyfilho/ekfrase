@@ -108,6 +108,7 @@
   "estante.editada": "mexida {quando}",
   "estante.ir": "Ir para a estante",
   "estante.sem-conta": "Você está escrevendo sem conta: tudo fica só neste aparelho. Entre na conta Ekfrase (no topo) para guardar na nuvem e abrir em outros aparelhos.",
+  "estante.sem-conta.os": "Você está escrevendo sem conta: nada vai para a nuvem. Para guardar na nuvem e abrir em outros aparelhos, entre na conta Ekfrase pelo menu do sistema (a engrenagem, no alto).",
   "estante.memoria": "Este navegador não deixou gravar. Os textos ficam só na memória e somem ao fechar a página. Exporte antes de sair.",
   "conflito.titulo.one": "{n} cópia de conflito",
   "conflito.titulo.other": "{n} cópias de conflito",
@@ -449,7 +450,6 @@
   "os.wifi.erro.falhou": "Não deu para conectar. Se esta rede pede login numa página, use outra rede por enquanto.",
   "os.wifi.erro.negado": "O sistema não deixou criar esta conexão.",
   "os.cancelar": "Cancelar",
-  "os.painel.titulo": "Sistema",
   "os.energia.titulo": "Bateria e tela",
   "os.bateria.nivel": "Bateria: {n}%",
   "os.bateria.carregando": "Bateria: {n}%, carregando",
@@ -459,7 +459,8 @@
   "os.brilho.menos": "Menos brilho",
   "os.brilho.mais": "Mais brilho",
   "os.servidor.titulo": "Servidor e conta",
-  "os.conta.dica": "Entrar, sair e trocar de conta ficam no botão da conta, no alto da tela.",
+  "os.conta.dica": "Entrar e sair da conta ficam no começo do menu do sistema (a engrenagem, no alto da tela).",
+  "os.brilho.dica": "As teclas de brilho do notebook também mudam o brilho. Ao ligar, a tela sempre começa em 50%.",
   "os.discos.titulo": "Pendrives e discos",
   "os.discos.ejetar": "Ejetar com segurança",
   "os.discos.pode-tirar": "Pode tirar {nome}.",
@@ -536,5 +537,11 @@
   "os.pendrive.erro.senha": "Senha errada.",
   "os.nome": "Writer OS",
   "entrada.os.titulo": "Writer OS: um sistema operacional",
-  "entrada.os.texto": "O Ekfrase Writer OS é um sistema operacional próprio: grave num pendrive ou SSD externo, ligue o computador por ele e a máquina abre direto no Writer, sem Windows e sem distrações. Escreva em qualquer computador e leve tudo com você."
+  "entrada.os.texto": "O Ekfrase Writer OS é um sistema operacional próprio: grave num pendrive ou SSD externo, ligue o computador por ele e a máquina abre direto no Writer, sem Windows e sem distrações. Escreva em qualquer computador e leve tudo com você.",
+  "os.menu.titulo": "Menu do sistema",
+  "os.menu.voltar": "Voltar ao menu",
+  "os.menu.conta-titulo": "Conta",
+  "os.menu.conta": "Conectado como {nome}",
+  "os.menu.sem-conta": "Escrevendo sem conta",
+  "os.menu.ajustes": "Ajustes do Writer"
 }

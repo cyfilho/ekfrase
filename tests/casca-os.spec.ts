@@ -32,6 +32,13 @@ async function janela(app: ElectronApplication): Promise<Page> {
   return p;
 }
 
+/** Troca de tela como o app faz (caminho limpo, sem recarregar; a janela da casca nunca navega de verdade). */
+const irPara = (p: Page, caminho: string): Promise<void> =>
+  p.evaluate((c) => {
+    history.pushState(null, '', c);
+    dispatchEvent(new PopStateEvent('popstate'));
+  }, caminho);
+
 async function fechar(app: ElectronApplication): Promise<void> {
   const saiu = new Promise<void>((ok) => app.once('close', () => ok()));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
@@ -70,9 +77,10 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   };
 
   /** O que, na tela, leva para fora do app (um link que não é interno) ou abre o seletor de arquivos do sistema. */
+  // links para dentro do app (`/writer/...`, caminho limpo) não são saída: o app troca de tela sem recarregar
   const saidas = (pg: Page): Promise<string[]> =>
     pg.evaluate(() => [
-      ...[...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href') ?? '').filter((h) => !h.startsWith('#')),
+      ...[...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href') ?? '').filter((h) => !(h.startsWith('#') || /^\/writer(\/[^#]*)?$/.test(h))),
       ...[...document.querySelectorAll('a[target="_blank"], input[type="file"], form[action]')].map((e) => e.tagName.toLowerCase()),
     ]);
 
@@ -138,36 +146,94 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(sj['idioma'] === 'pt-BR' && sj['teclado'] === 'br' && sj['fuso'] === 'America/Sao_Paulo' && sj['wifiVisto'] === true, `o sistema.json fica ao lado dos textos (${JSON.stringify(sj)})`);
   r.ok(existsSync(join(raiz1, 'dados', 'Ekfrase Writer', 'dados', 'cofre.db')), 'os textos estão na partição de dados (a mesma pasta do computador)');
 
-  // o painel do sistema (Ctrl+Alt+S)
-  await r.tecla('Control+Alt+s');
-  const painel = await r.esperar('painel-sistema', 5000);
-  r.ok(painel, 'Ctrl+Alt+S abre o painel do sistema');
-  if (painel) {
-    await r.passo('o foco vai para dentro do painel', 'painel-sistema');
-    for (const s of ['os-painel-wifi', 'os-painel-energia', 'os-painel-teclado', 'os-painel-fuso', 'os-painel-servidor', 'os-painel-discos', 'os-painel-sobre', 'os-desligar', 'os-reiniciar']) {
-      r.ok((await p.$(`[data-teste="${s}"]`)) !== null, `o painel tem "${s}"`);
-    }
-    await p.waitForTimeout(500);
-    await foto(p, '08-painel');
-    if (await r.tabAte('os-brilho-mais')) {
-      await r.tecla('Enter');
-      await p.waitForTimeout(200);
-      r.ok((await p.textContent('[data-teste="os-painel-energia"]'))?.includes('70') === true, 'o brilho sobe (60% → 70%)');
-    }
-    await r.tecla('Escape');
-    r.ok(!(await p.$('[data-teste="painel-sistema"]')), 'Esc fecha o painel');
-  }
-  r.ok((await p.$('[data-teste="botao-sistema"]')) !== null, 'o topo tem o botão do sistema');
+  // as abas do topo: "Início" antes de todas (18/11)
+  const abas = await p.$$eval('.topo-nav a', (l) => l.map((a) => a.getAttribute('data-teste')));
+  r.ok(abas[0] === 'nav-inicio', `a primeira aba é "Início" (${abas.join(', ')})`);
 
-  // ---- tudo Ekfrase (§6.5): Desligar à vista, nenhum link para fora, importar e salvar pela tela dos pendrives
-  // o menu do sistema: um botão só, só com o ícone (16/11), à vista; o Desligar fica dentro do painel
+  // o menu do sistema (18/11): Ctrl+Alt+S ou a engrenagem; Desligar e Reiniciar em cima, a conta, o resto
+  await r.tecla('Control+Alt+s');
+  const menu = await r.esperar('menu-sistema', 5000);
+  r.ok(menu, 'Ctrl+Alt+S abre o menu do sistema');
+  if (menu) {
+    await r.passo('o foco começa no menu', 'menu-sistema');
+    r.ok(await r.focoEm('os-desligar'), 'o foco começa em Desligar, no alto do menu');
+    const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
+    r.ok(itens[0] === 'os-desligar' && itens[1] === 'os-reiniciar' && itens[2] === 'os-conta-entrar', `Desligar e Reiniciar em cima, depois a conta (${itens.join(', ')})`);
+    for (const s of ['os-menu-wifi', 'os-menu-energia', 'os-menu-teclado', 'os-menu-fuso', 'os-menu-servidor', 'os-menu-discos', 'os-menu-sobre', 'os-menu-ajustes']) r.ok(itens.includes(s), `o menu tem "${s}"`);
+    r.ok(((await p.textContent('[data-teste="os-menu-conta"]')) ?? '').includes('sem conta'), 'o menu mostra a conta (aqui, escrevendo sem conta, com Entrar)');
+    await p.waitForTimeout(300);
+    await foto(p, '08-menu');
+    if (prints) {
+      await p.emulateMedia({ colorScheme: 'dark' });
+      await p.waitForTimeout(200);
+      await foto(p, '08-menu-escuro');
+      await p.emulateMedia({ colorScheme: 'light' });
+    }
+    // as setas andam pelo menu, em roda
+    await r.tecla('ArrowDown');
+    r.ok(await r.focoEm('os-reiniciar'), 'seta para baixo: Reiniciar');
+    await r.tecla('ArrowUp', 2);
+    r.ok(await r.focoEm(itens[itens.length - 1] ?? ''), 'seta para cima no primeiro: vai ao último');
+    // Bateria e tela: setas até ele, Enter
+    for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-energia')); i++) await r.tecla('ArrowDown');
+    await r.tecla('Enter');
+    if (await r.esperar('os-painel-energia', 5000)) {
+      await p.waitForTimeout(300);
+      r.ok((await p.textContent('[data-teste="os-painel-energia"]'))?.includes('50') === true, 'o brilho começa em 50%');
+      await foto(p, '08b-menu-energia');
+      if (await r.tabAte('os-brilho-mais')) {
+        await r.tecla('Enter');
+        await p.waitForTimeout(200);
+        r.ok((await p.textContent('[data-teste="os-painel-energia"]'))?.includes('60') === true, 'o brilho sobe (50% → 60%)');
+      }
+      await r.tecla('Escape');
+      r.ok((await r.esperar('os-menu-energia', 3000)) && (await r.focoEm('os-menu-energia')), 'Esc numa parte volta ao menu, no item dela');
+    } else r.ok(false, 'Enter em "Bateria e tela" abre a parte');
+    // Wi-Fi: a senha da rede escolhida aparece ACIMA da lista (18/11)
+    for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-wifi')); i++) await r.tecla('ArrowUp');
+    await r.tecla('Enter');
+    if ((await r.esperar('os-rede', 5000)) && (await r.tabAte('os-rede'))) {
+      // a rede "Casa" (com senha) vem antes da "Biblioteca" (aberta); o Tab pode ter chegado pela outra ponta
+      const naCasa = () => p.evaluate(() => (document.activeElement?.textContent ?? '').startsWith('Casa'));
+      for (let i = 0; i < 6 && !(await naCasa()); i++) await r.tecla('Shift+Tab');
+      await r.tecla('Enter');
+      if (await r.esperar('os-rede-senha', 3000)) {
+        r.ok(await r.focoEm('os-rede-senha'), 'escolher a rede põe o foco na senha');
+        const acima = await p.evaluate(() => {
+          const senha = document.querySelector('[data-teste="os-rede-senha"]');
+          const rede = document.querySelector('[data-teste="os-rede"]');
+          return !!senha && !!rede && (senha.compareDocumentPosition(rede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+        });
+        r.ok(acima, 'o campo da senha do Wi-Fi fica acima da lista de redes');
+        await foto(p, '08c-menu-wifi-senha');
+        if (await r.tabAte('os-rede-cancelar')) {
+          await r.tecla('Enter');
+          await p.waitForTimeout(150);
+          r.ok(await naCasa(), 'Cancelar: o foco volta para a rede');
+        }
+      } else {
+        const onde = await p.evaluate(() => `${document.activeElement?.getAttribute('data-teste')} | ${document.activeElement?.textContent} | ${[...document.querySelectorAll('[data-teste="os-rede"]')].map((e) => e.textContent).join(' / ')}`);
+        r.ok(false, `a rede com senha pede a senha (foco: ${onde})`);
+      }
+      await r.tecla('Escape');
+    } else r.ok(false, 'a lista de redes aparece no menu');
+    await r.esperar('os-menu-wifi', 3000);
+    await r.tecla('Escape');
+    r.ok(!(await p.$('[data-teste="menu-sistema"]')), 'Esc no menu fecha');
+  }
+  r.ok(existsSync(join(raiz1, 'run', 'sessao', 'pronta')), 'a casca avisou que a sessão abriu (o Num Lock da imagem)');
+
+  // ---- tudo Ekfrase (§6.5): nenhum link para fora, importar e salvar pela tela dos pendrives
+  // o menu do sistema: a engrenagem, só com o ícone, à vista; sem o botão da conta nem o dos Ajustes no topo
   const sistema = await p.$('[data-teste="botao-sistema"]');
   r.ok(sistema !== null && (await sistema.isVisible()) && ((await sistema.textContent()) ?? '').trim().length === 0 && !(await p.$('[data-teste="botao-desligar"]')), 'o topo tem o menu do sistema só com o ícone, à vista');
+  const rotulos = await p.$$eval('.topo .ekf-acoes [aria-label]', (l) => l.map((e) => e.getAttribute('aria-label') ?? ''));
+  r.ok(!(await p.$('[data-teste="botao-ajustes"]')) && !rotulos.some((x) => x.includes('Entrar')), `no topo do OS não há o botão da conta nem o dos Ajustes: estão no menu (${rotulos.join(', ')})`);
   r.ok((await saidas(p)).length === 0, `a estante não leva a lugar nenhum fora do app (${(await saidas(p)).join(', ')})`);
-  await p.evaluate(() => void (location.hash = '#/inicio'));
+  await irPara(p, '/writer/');
   r.ok(await r.esperar('entrada-abrir', 6000), 'o hall abre');
   r.ok((await saidas(p)).length === 0, `o hall não leva a lugar nenhum fora do app (${(await saidas(p)).join(', ')})`);
-  await p.evaluate(() => void (location.hash = '#/arquivos'));
+  await irPara(p, '/writer/app/arquivos');
   if (await r.esperar('tela-arquivos', 6000)) {
     r.ok((await saidas(p)).length === 0, `Arquivos não tem link para fora nem seletor do sistema (${(await saidas(p)).join(', ')})`);
     if (await r.tabAte('importar-pendrive')) await r.tecla('Enter');
@@ -185,7 +251,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       } else r.ok(false, 'o conto aparece na lista do pendrive');
     }
     // exportar: o "salvar" é a tela dos pendrives, não o do sistema
-    await p.evaluate(() => void (location.hash = '#/arquivos'));
+    await irPara(p, '/writer/app/arquivos');
     if (await r.esperar('exportar-md', 6000)) {
       if (await r.tabAte('exportar-md')) await r.tecla('Enter');
       r.ok(await r.esperar('os-pendrive', 5000), 'exportar abre a tela dos pendrives');

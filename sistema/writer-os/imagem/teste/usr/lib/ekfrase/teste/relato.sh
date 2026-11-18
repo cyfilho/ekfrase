@@ -60,4 +60,14 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
   dizer "diagnostico falta"
 ) &
 
+# O Num Lock e o brilho (pedidos de 18/11): numlock <ligado|desligado|sem-teclado|sem-cage|sem-uinput|falta>
+# (o que o ekfrase-numlock contou) · brilho <sem-luz|N de M> (a máquina virtual não tem luz de tela)
+(
+  for _ in $(seq 1 240); do [ -s /run/ekfrase/sessao/numlock ] && break; sleep 1; done
+  dizer "numlock $(cat /run/ekfrase/sessao/numlock 2>/dev/null || echo falta)"
+  luz=
+  for d in /sys/class/backlight/*; do [ -r "$d/brightness" ] && luz="$(cat "$d/brightness") de $(cat "$d/max_brightness")"; done
+  dizer "brilho ${luz:-sem-luz}"
+) &
+
 tail -n +1 -F /run/ekfrase/teste/relato 2>/dev/null | while IFS= read -r l; do dizer "$l"; done

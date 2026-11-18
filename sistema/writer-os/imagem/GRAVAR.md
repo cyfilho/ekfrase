@@ -48,9 +48,10 @@ mas faça backup do que importa antes do primeiro teste (PLANO §10c).
 Da segunda vez em diante: liga → a senha → a estante.
 
 ## 5. Usar e desligar
-- **Ctrl+Alt+S** (ou o botão de ligar, no alto à direita) abre o **painel do sistema**: Wi-Fi, bateria,
-  brilho, teclado, fuso, servidor, pendrives (ejetar), **Desligar** e **Reiniciar**, e "Sobre" (as
-  versões e se o Secure Boot está ligado).
+- **Ctrl+Alt+S** (ou a engrenagem, no alto à direita) abre o **menu do sistema**: em cima **Desligar** e
+  **Reiniciar**; depois a conta (Entrar ou Sair); depois Wi-Fi, bateria e brilho, teclado, fuso, servidor,
+  pendrives (ejetar), "Sobre" (as versões e se o Secure Boot está ligado) e os Ajustes do Writer. Setas, Enter e Esc.
+- A tela começa sempre em 50% de brilho; as teclas de brilho do notebook funcionam. O Num Lock começa ligado.
 - Desligue sempre pelo painel. (Tirar o pendrive com o Writer ligado não estraga o texto já gravado,
   mas o que você digitou nos últimos instantes pode ficar de fora.)
 

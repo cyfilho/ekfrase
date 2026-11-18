@@ -14,12 +14,14 @@ import '@ekfrase/nucleo/estilo/base.css';
 import './tema.css';
 import './biblioteca.css';
 import { aplicarTema, iniciarIdioma, temaAtual } from '@ekfrase/nucleo';
-import { chegouAgora } from '@ekfrase/interface';
+import { capturarLinks, chegouAgora, linksDoApp, migrarHashAntigo } from '@ekfrase/interface';
 import { render } from 'preact';
 import { App } from './App.tsx';
 import { tr } from './textos.ts';
 
 // marca a visita já ao abrir (ir do castelo para cá não conta como chegar por link direto)
+migrarHashAntigo('biblioteca');
+capturarLinks(linksDoApp('biblioteca'));
 chegouAgora();
 iniciarIdioma(tr);
 aplicarTema(temaAtual());

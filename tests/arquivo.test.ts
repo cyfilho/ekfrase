@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import { REGISTRO, TIPO_MIDIA, chaveNoEndereco, gravarEkfr, identificar, lerEkfr, nomeDeArquivo, podeAbrir, quemAbre, type Envelope } from '../packages/arquivo/src/index.ts';
+import { REGISTRO, TIPO_MIDIA, chaveNoEndereco, enderecoDaEntrega, gravarEkfr, identificar, lerEkfr, nomeDeArquivo, podeAbrir, quemAbre, type Envelope } from '../packages/arquivo/src/index.ts';
 
 const raiz = fileURLToPath(new URL('../', import.meta.url));
 const ENV = { app: 'maker', tipo: 'mundo', formato: '1.0.0', gravadoPor: 'maker-web@0.1.0', titulo: 'Terras' } as const;
@@ -62,6 +62,9 @@ describe('o arquivo .ekfr', () => {
   it('a chave da entrega no endereço', () => {
     expect(chaveNoEndereco('#/abrir/0f8fad5b-d9cb-469f-a165-70867728950e')).toBe('0f8fad5b-d9cb-469f-a165-70867728950e');
     expect(chaveNoEndereco('#/abrir/../x')).toBeNull();
+    expect(chaveNoEndereco('/writer/app/abrir/0f8fad5b-d9cb-469f-a165-70867728950e')).toBe('0f8fad5b-d9cb-469f-a165-70867728950e');
+    expect(chaveNoEndereco('/writer/app/abrir/../x')).toBeNull();
+    expect(enderecoDaEntrega('/maker/', '0f8fad5b-d9cb-469f-a165-70867728950e')).toBe('/maker/app/abrir/0f8fad5b-d9cb-469f-a165-70867728950e');
   });
 });
 

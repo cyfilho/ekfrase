@@ -13,21 +13,27 @@ import '@ekfrase/nucleo/estilo/base.css';
 import './tema.css';
 import './writer.css';
 import { aplicarTema, iniciarIdioma, temaAtual } from '@ekfrase/nucleo';
-import { chegouAgora, entradaPedida, limparEntradaPedida } from '@ekfrase/interface';
+import { capturarLinks, chegouAgora, entradaDoApp, entradaPedida, linksDoApp, migrarHashAntigo, noApp, paginaDoApp, partesDoEndereco } from '@ekfrase/interface';
 import { render } from 'preact';
 import { App } from './App.tsx';
-import { comeco } from './rotas.ts';
 import { naCasca } from './computador/casca.ts';
 import { tr } from './textos.ts';
 
 // marca a visita já ao abrir (ir do castelo para cá não conta como chegar por link direto)
 chegouAgora();
-// ekfrase.com/writer cai no hall (as formas de usar); no computador e no pendrive o app abre direto
-if (!naCasca && entradaPedida()) {
-  limparEntradaPedida();
-  comeco.hall = true;
-  addEventListener('hashchange', () => void (comeco.hall = false), { once: true });
-}
+// o sinal `?inicio` (o botão do modo jogo) é lido e apagado do endereço
+if (!naCasca) entradaPedida();
+// dentro da casca a janela abre em app://writer/writer/ (o mesmo caminho do site), mas o app abre direto na estante
+if (naCasca && !location.hash && (partesDoEndereco('writer') ?? []).length === 0) history.replaceState(null, '', noApp('writer') + location.search);
+// os endereços de antes de 18/11/2026 (`/writer/#/ideias`) viram os novos, sem recarregar
+migrarHashAntigo('writer', (resto) => {
+  const [tela = ''] = resto.split('/');
+  if (tela === 'inicio') return entradaDoApp('writer');
+  if (tela === 'computador' || tela === 'os') return paginaDoApp('writer', tela);
+  return noApp('writer', resto);
+});
+// os <a href="/writer/..."> trocam de tela sem recarregar
+capturarLinks(linksDoApp('writer'));
 iniciarIdioma(tr);
 aplicarTema(temaAtual());
 render(<App />, document.getElementById('app')!);
@@ -36,7 +42,7 @@ render(<App />, document.getElementById('app')!);
 // inglês instala com o nome e a descrição em inglês
 const manifestNoIdioma = () => {
   const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-  if (link) link.href = `./manifest.${tr.idioma()}.webmanifest`;
+  if (link) link.href = `${import.meta.env.BASE_URL}manifest.${tr.idioma()}.webmanifest`;
 };
 if (import.meta.env.PROD) {
   manifestNoIdioma();
