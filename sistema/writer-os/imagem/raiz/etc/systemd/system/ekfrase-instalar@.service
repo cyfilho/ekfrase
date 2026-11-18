@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# Um pedido de instalar no computador (PLANO §8c). A entrada e a saída são o socket; nada de rede nem de shell.
+[Unit]
+Description=Ekfrase Writer OS: instalar no computador (um pedido)
+After=ekfrase-dados.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ekfrase/ekfrase-instalar.sh
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectHome=yes
+NoNewPrivileges=yes

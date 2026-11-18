@@ -14,7 +14,7 @@
  * Toda tela tem `data-teste` (o agente de teste conta qual está aberta) e o foco começa na opção
  * padrão: Enter segue em frente (o CI digita pelo QMP do QEMU).
  */
-import type { Bateria, DiscoUSB, PonteSistema, RedeWifi, RespostaCasca, SobreOS } from '@ekfrase/writer-nucleo';
+import { INSTALAR_MAXIMO, INSTALAR_MINIMO, type Bateria, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
 import { FormConta, IconeEngrenagem, Janela, ponte, useConta } from '@ekfrase/interface';
 import type { ComponentChildren, TargetedKeyboardEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -23,7 +23,7 @@ import { teclaDe } from '../comandos.ts';
 import { aoPedido, pedir } from '../pedidos.ts';
 import { t, tr } from '../textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, confirmar, focaveis } from '../ui.tsx';
-import { gravarAgora, mudarEstado, mudarEstadoOS, noOS, sistemaOS, useEstadoCasca, useEstadoOS } from './casca.ts';
+import { casca, gravarAgora, mudarEstado, mudarEstadoOS, noOS, sistemaOS, useEstadoCasca, useEstadoOS } from './casca.ts';
 import { EscolhaServidor, Moldura, PerguntaEspelho, Senha, textoDoErroCasca } from './Telas.tsx';
 
 /** O sistema (só é usado com `noOS`; cada tela é desenhada só dentro do `PortaoOS`). */
@@ -39,8 +39,15 @@ export function PortaoOS({ children }: { children: ComponentChildren }) {
   const estado = useEstadoCasca();
   const osEstado = useEstadoOS();
   const [escolhendo, setEscolhendo] = useState(false);
+  const instalando = useInstalarAberto();
   if (!estado || !osEstado) return <div class="tela-cheia-carregando" aria-busy="true" />;
+  // instalou no computador: o cofre fechou, só falta desligar e tirar o pendrive (PLANO §8c)
+  if (osEstado.instalado) return <Instalado />;
+  // a tela de instalar ocupa tudo (o app sai antes: a folha aberta grava e a sessão fecha)
+  if (instalando && osEstado.boot === 'usb') return <TelaInstalar voltar={() => abrirInstalar(false)} />;
   if (!osEstado.idioma) return <EscolherIdioma />;
+  // ligou pelo pendrive e ainda não respondeu: "Como você quer usar o Writer OS?" (pedido do Alcy, 18/11)
+  if (osEstado.boot === 'usb' && !osEstado.usoVisto) return <EscolherUso />;
   if (!osEstado.teclado) return <EscolherTeclado />;
   if (!osEstado.fuso) return <EscolherFuso />;
   if (!estado.aberta) {
@@ -136,6 +143,264 @@ function EscolherFuso() {
     <Moldura titulo={t('writer.os.fuso.titulo')} teste="os-fuso" foco={lista ? 'fuso' : 'carregando'}>
       <p>{t('writer.os.fuso.texto')}</p>
       {lista && <Escolhas opcoes={lista} atual={null} nome={nomeDoFuso} escolher={(id) => void os.usarFuso(id).then(mudarEstadoOS)} teste="os-fuso" />}
+    </Moldura>
+  );
+}
+
+// ---------- a hora e a data (pedido do Alcy em 18/11: em todas as telas, depois do boot) ----------
+
+const formatarRelogio = (d: Date, idioma: string): { hora: string; data: string } => ({
+  hora: d.toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit' }),
+  data: d.toLocaleDateString(idioma, { weekday: 'short', day: 'numeric', month: 'short' }),
+});
+
+/**
+ * O relógio do Writer OS: a data e a hora, fixos no canto de baixo de TODAS as telas (o primeiro uso, a senha, o app e
+ * a folha). Muda no começo de cada minuto; o idioma é o da pessoa. A folha deixa de mostrar o relógio dela no OS.
+ */
+export function RelogioOS() {
+  const [agora, setAgora] = useState(() => new Date());
+  const [, setV] = useState(0);
+  useEffect(() => tr.aoTrocar(() => setV((n) => n + 1)), []);
+  useEffect(() => {
+    let relogio: ReturnType<typeof setTimeout>;
+    const proximo = () => {
+      const d = new Date();
+      setAgora(d);
+      relogio = setTimeout(proximo, 60_000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 50);
+    };
+    proximo();
+    return () => clearTimeout(relogio);
+  }, []);
+  const { hora, data } = formatarRelogio(agora, tr.idioma());
+  return (
+    <time class="relogio-os" dateTime={agora.toISOString()} aria-label={t('writer.os.relogio', { data, hora })} data-teste="os-relogio">
+      <span class="relogio-os-data">{data}</span>
+      <span class="relogio-os-hora">{hora}</span>
+    </time>
+  );
+}
+
+// ---------- como usar: só pelo pendrive ou instalar no computador (PLANO §8c) ----------
+
+let instalarAberto = false;
+const ouvintesInstalar = new Set<() => void>();
+
+/** Abre (ou fecha) a tela de instalar no computador: do primeiro uso e do menu do sistema. */
+export function abrirInstalar(sim = true): void {
+  instalarAberto = sim;
+  for (const f of [...ouvintesInstalar]) f();
+}
+
+function useInstalarAberto(): boolean {
+  const [, setV] = useState(0);
+  useEffect(() => {
+    const f = () => setV((n) => n + 1);
+    ouvintesInstalar.add(f);
+    return () => void ouvintesInstalar.delete(f);
+  }, []);
+  return instalarAberto;
+}
+
+function EscolherUso() {
+  return (
+    <Moldura titulo={t('writer.os.uso.titulo')} teste="os-uso" foco="uso">
+      <p>{t('writer.os.uso.texto')}</p>
+      <div class="acoes-coluna lista-os">
+        <button type="button" class="botao principal" onClick={() => void os.passarUso().then(mudarEstadoOS)} data-foco-inicial data-teste="os-uso-pendrive">
+          {t('writer.os.uso.pendrive')}
+        </button>
+        <small class="dica">{t('writer.os.uso.pendrive.dica')}</small>
+        <button type="button" class="botao" onClick={() => abrirInstalar()} data-teste="os-uso-instalar">
+          {t('writer.os.uso.instalar')}
+        </button>
+        <small class="dica">{t('writer.os.uso.instalar.dica')}</small>
+      </div>
+    </Moldura>
+  );
+}
+
+/** O disco onde instalar: o GPT, sem o Writer, com o maior espaço livre. */
+const melhorDisco = (discos: DiscoInterno[]): DiscoInterno | undefined => [...discos].filter((d) => d.tabela === 'gpt' && !d.writer).sort((a, b) => b.livre - a.livre)[0];
+
+/** Por que não dá para instalar (ou `null`: dá). */
+function motivoDeNaoInstalar(info: InfoInstalacao): 'nao-uefi' | 'sem-disco' | 'ja-instalado' | 'nao-gpt' | 'sem-espaco' | null {
+  if (!info.uefi) return 'nao-uefi';
+  if (!info.discos.length) return 'sem-disco';
+  if (info.discos.some((d) => d.writer)) return 'ja-instalado';
+  const d = melhorDisco(info.discos);
+  if (!d) return 'nao-gpt';
+  return d.livre < INSTALAR_MINIMO ? 'sem-espaco' : null;
+}
+
+/** A barra do disco (as cores do Guia): o que existe fica como está; o espaço livre vira o Writer OS. */
+function BarraDoDisco({ disco }: { disco: DiscoInterno }) {
+  const novo = Math.min(disco.livre, INSTALAR_MAXIMO);
+  const pedacos: { tipo: 'windows' | 'outra' | 'novo' | 'livre'; tamanho: number; inicio: number }[] = disco.partes.map((p) => ({ tipo: p.fs === 'ntfs' && p.tamanho > 8 * 1024 ** 3 ? 'windows' : 'outra', tamanho: p.tamanho, inicio: p.inicio }));
+  if (disco.livre > 0) {
+    pedacos.push({ tipo: 'novo', tamanho: novo, inicio: disco.livreInicio });
+    if (disco.livre > novo) pedacos.push({ tipo: 'livre', tamanho: disco.livre - novo, inicio: disco.livreInicio + novo });
+  }
+  pedacos.sort((a, b) => a.inicio - b.inicio);
+  const total = Math.max(1, pedacos.reduce((s, p) => s + p.tamanho, 0));
+  const windows = disco.partes.filter((p) => p.fs === 'ntfs').reduce((s, p) => s + p.tamanho, 0);
+  return (
+    <figure class="barra-disco" data-teste="os-instalar-barra">
+      <div class="barra-disco-faixa" aria-hidden="true">
+        {pedacos.map((p, i) => (
+          <span key={i} class={`barra-disco-${p.tipo}`} style={{ flexGrow: Math.max(p.tamanho / total, 0.015) }} />
+        ))}
+      </div>
+      <figcaption>
+        <span class="legenda-disco">
+          <span class="barra-disco-windows" aria-hidden="true" /> {t('writer.os.instalar.windows', { tamanho: tamanho(windows) })}
+        </span>
+        <span class="legenda-disco">
+          <span class="barra-disco-novo" aria-hidden="true" /> {t('writer.os.instalar.novo', { tamanho: tamanho(novo) })}
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/**
+ * A TELA DE INSTALAR (uma só, PLANO §8c): a barra do disco, "Levar os textos deste pendrive" (marcado quando há textos),
+ * Instalar e Voltar. Nada é apagado: as duas partições novas nascem no espaço livre e a ordem de boot não muda.
+ * Sem espaço, explica o "preparar" do Gravador; sem UEFI, sem GPT ou já instalado, explica e só volta.
+ */
+function TelaInstalar({ voltar }: { voltar: () => void }) {
+  const estado = useEstadoCasca();
+  const [info, setInfo] = useState<InfoInstalacao | null>(null);
+  const [levar, setLevar] = useState<boolean | null>(null);
+  const [passo, setPasso] = useState<{ passo: PassoInstalar; feito: number; total: number } | null>(null);
+  const [instalando, setInstalando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => void os.instalacao().then(setInfo), []);
+  useEffect(() => os.aoPassoDaInstalacao((p, feito, total) => setPasso({ passo: p, feito, total })), []);
+  const temTextos = !!estado?.temSenha;
+  const marcado = levar ?? temTextos;
+  const motivo = info ? motivoDeNaoInstalar(info) : null;
+  const disco = info ? melhorDisco(info.discos) : undefined;
+
+  const instalar = async () => {
+    if (!disco) return;
+    setErro(null);
+    setInstalando(true);
+    setPasso({ passo: 'particoes', feito: 0, total: 0 });
+    await gravarAgora();
+    const r = await os.instalar(disco.id, marcado && temTextos);
+    // o cofre fechou para a cópia: a casca conta como ficou (sem a senha, de novo, se não deu certo)
+    if (casca) mudarEstado(await casca.estado());
+    if (r.ok) return mudarEstadoOS(r.estado);
+    setInstalando(false);
+    setPasso(null);
+    setErro(t(`writer.os.instalar.erro.${r.erro}`));
+  };
+
+  const pct = passo?.passo === 'copiar' && passo.total > 0 ? Math.round((passo.feito / passo.total) * 100) : null;
+  const ordem: readonly PassoInstalar[] = ['particoes', 'copiar', 'conferir', 'textos', 'entrada'];
+  const geral = passo ? Math.round(((ordem.indexOf(passo.passo) + (pct ?? 0) / 100) / ordem.length) * 100) : 0;
+
+  return (
+    <Moldura titulo={t('writer.os.instalar.titulo')} teste="os-instalar" foco={instalando ? 'instalando' : info ? `pronto-${motivo ?? 'ok'}` : 'carregando'}>
+      {!info && <p aria-busy="true">{t('writer.os.instalar.procurando')}</p>}
+      {info && instalando && passo && (
+        <div role="status" data-teste="os-instalar-progresso">
+          <p>{t(`writer.os.instalar.passo.${passo.passo}`)}</p>
+          <progress max={100} value={geral} aria-label={t('writer.os.instalar.progresso')} />
+          <p class="dica">{t('writer.os.instalar.nao-desligue')}</p>
+        </div>
+      )}
+      {info && !instalando && motivo && (
+        <>
+          <p data-teste={`os-instalar-motivo-${motivo}`}>{t(`writer.os.instalar.motivo.${motivo}`)}</p>
+          {motivo === 'sem-espaco' && (
+            <ol class="passos-os">
+              <li>{t('writer.os.instalar.preparar.1')}</li>
+              <li>{t('writer.os.instalar.preparar.2')}</li>
+              <li>{t('writer.os.instalar.preparar.3')}</li>
+            </ol>
+          )}
+          <div class="acoes-linha">
+            <button type="button" class="botao principal" onClick={voltar} data-foco-inicial data-teste="os-instalar-voltar">
+              {t('writer.os.instalar.voltar')}
+            </button>
+          </div>
+        </>
+      )}
+      {info && !instalando && !motivo && disco && (
+        <>
+          <p>{t('writer.os.instalar.texto', { disco: disco.modelo || disco.id })}</p>
+          <BarraDoDisco disco={disco} />
+          <p class="dica">{t('writer.os.instalar.nada-apaga')}</p>
+          <label class="campo-marcar">
+            <input type="checkbox" checked={marcado && temTextos} disabled={!temTextos} onChange={(e) => setLevar(e.currentTarget.checked)} data-teste="os-instalar-levar" />
+            <span>{t(temTextos ? 'writer.os.instalar.levar' : 'writer.os.instalar.sem-textos')}</span>
+          </label>
+          <div class="acoes-linha">
+            <button type="button" class="botao" onClick={voltar} data-teste="os-instalar-voltar">
+              {t('writer.os.instalar.voltar')}
+            </button>
+            <button type="button" class="botao principal" onClick={() => void instalar()} data-foco-inicial data-teste="os-instalar-botao">
+              {t('writer.os.instalar.botao')}
+            </button>
+          </div>
+        </>
+      )}
+      {erro && (
+        <p class="ekf-erro" role="alert" data-teste="os-instalar-erro">
+          {erro}
+        </p>
+      )}
+    </Moldura>
+  );
+}
+
+/** Os três passos para ligar no Writer OS instalado (PLANO §8c item 4), com o desenho por código; e o "ligar direto". */
+function Tutorial() {
+  return (
+    <div class="tutorial-os" data-teste="os-tutorial">
+      <ol class="passos-os passos-desenhados">
+        <li>
+          <span class="desenho-passo desenho-pendrive" aria-hidden="true" />
+          <span>{t('writer.os.tutorial.1')}</span>
+        </li>
+        <li>
+          <span class="desenho-passo desenho-tecla" aria-hidden="true">
+            F12
+          </span>
+          <span>{t('writer.os.tutorial.2')}</span>
+        </li>
+        <li>
+          <span class="desenho-passo desenho-menu" aria-hidden="true">
+            <span />
+            <span class="escolhida" />
+            <span />
+          </span>
+          <span>{t('writer.os.tutorial.3')}</span>
+        </li>
+      </ol>
+      <p class="dica">{t('writer.os.tutorial.teclas')}</p>
+      <details class="tutorial-direto">
+        <summary data-teste="os-tutorial-direto">{t('writer.os.tutorial.direto')}</summary>
+        <p>{t('writer.os.tutorial.direto.texto')}</p>
+        <p class="aviso-casca">{t('writer.os.tutorial.bitlocker')}</p>
+      </details>
+    </div>
+  );
+}
+
+/** A tela final: instalado. O cofre já fechou; desligar, tirar o pendrive e ligar pelo menu do computador. */
+function Instalado() {
+  return (
+    <Moldura titulo={t('writer.os.instalado.titulo')} teste="os-instalado" foco="instalado">
+      <p>{t('writer.os.instalado.texto')}</p>
+      <Tutorial />
+      <div class="acoes-linha">
+        <button type="button" class="botao principal" onClick={() => void os.desligar()} data-foco-inicial data-teste="os-instalado-desligar">
+          <IconeLigar tamanho={16} /> {t('writer.os.desligar')}
+        </button>
+      </div>
     </Moldura>
   );
 }
@@ -474,8 +739,9 @@ function WifiPrimeiroUso() {
 // ---------- o menu do sistema (§6.4) ----------
 
 /** As partes do sistema que o menu abre (PLANO §6.4); cada uma é uma tela dentro do próprio menu. */
-type SecaoOS = 'wifi' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'sobre';
-const SECOES: readonly { id: SecaoOS; titulo: string }[] = [
+type SecaoOS = 'wifi' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'sobre' | 'tutorial';
+const TITULO_TUTORIAL = 'writer.os.menu.tutorial';
+const SECOES: readonly { id: Exclude<SecaoOS, 'tutorial'>; titulo: string }[] = [
   { id: 'wifi', titulo: 'writer.os.wifi.titulo' },
   { id: 'energia', titulo: 'writer.os.energia.titulo' },
   { id: 'teclado', titulo: 'writer.os.teclado.titulo' },
@@ -537,7 +803,8 @@ export function MenuSistema({ fechar, semAjustes = false }: { fechar: () => void
     setSecao(s);
   };
   const foco = (teste: string) => (teste === ultimo ? { 'data-foco-inicial': true } : {});
-  const titulo = secao ? t(SECOES.find((s) => s.id === secao)?.titulo ?? 'writer.os.menu.titulo') : t('writer.os.menu.titulo');
+  const titulo = secao ? t(secao === 'tutorial' ? TITULO_TUTORIAL : (SECOES.find((s) => s.id === secao)?.titulo ?? 'writer.os.menu.titulo')) : t('writer.os.menu.titulo');
+  const osEstado = useEstadoOS();
 
   return (
     <Camada titulo={titulo} fechar={secao ? () => setSecao(null) : fechar} tipo="menu" teste="menu-sistema" classe="painel-sistema">
@@ -608,6 +875,27 @@ export function MenuSistema({ fechar, semAjustes = false }: { fechar: () => void
                 >
                   <span>{t('writer.os.menu.ajustes')}</span>
                   <small>Ctrl+,</small>
+                </button>
+              )}
+              {/* ligou pelo pendrive: instalar, SEMPRE (pedido do Alcy em 18/11); o último item (o qemu.py chega nele com End) */}
+              {osEstado?.boot === 'usb' && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="item-menu-os"
+                  onClick={() => {
+                    fechar();
+                    abrirInstalar();
+                  }}
+                  data-teste="os-menu-instalar"
+                >
+                  <span>{t('writer.os.menu.instalar')}</span>
+                </button>
+              )}
+              {/* ligou pelo disco do computador: como escolher o Writer OS ou o Windows ao ligar */}
+              {osEstado?.boot === 'computador' && (
+                <button type="button" role="menuitem" class="item-menu-os" onClick={() => abrir('tutorial')} {...foco('os-menu-tutorial')} data-teste="os-menu-tutorial">
+                  <span>{t(TITULO_TUTORIAL)}</span>
                 </button>
               )}
             </div>
@@ -748,6 +1036,12 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
       );
     case 'discos':
       return <ParteDosDiscos recado={recado} />;
+    case 'tutorial':
+      return (
+        <Secao titulo={t(TITULO_TUTORIAL)} teste="os-painel-tutorial">
+          <Tutorial />
+        </Secao>
+      );
     case 'sobre':
       return (
         <Secao titulo={t('writer.os.sobre.titulo')} teste="os-painel-sobre">

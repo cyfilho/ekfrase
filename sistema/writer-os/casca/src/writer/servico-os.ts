@@ -33,7 +33,7 @@ import { ligarAgente } from './agente-teste.ts';
 import { chamarCanal, criarCanais } from './canais.ts';
 import { DadosDoWriter } from './dados.ts';
 import { deJson, paraJson } from './json-bytes.ts';
-import { WriterOS } from './os.ts';
+import { dadosSimulados, WriterOS } from './os.ts';
 import type { Pagina } from './pagina.ts';
 
 const PADRAO = 'https://ekfrase.com/api/v1/';
@@ -57,7 +57,7 @@ function sistemaDoOS(): Sistema | null {
     const s = new SistemaSimulado(raiz, env('EKFRASE_CASCA_OS_TESTE') === '1');
     const comDados = (env('EKFRASE_CASCA_OS_DADOS') ?? 'pendrive') === 'pendrive';
     if (comDados) mkdirSync(s.caminhos.dados, { recursive: true });
-    writeFileSync(join(s.caminhos.run, 'dados.json'), JSON.stringify(comDados ? { modo: 'pendrive', motivo: '' } : { modo: 'sem-dados', motivo: 'sem-espaco' }));
+    writeFileSync(join(s.caminhos.run, 'dados.json'), dadosSimulados(comDados, env('EKFRASE_CASCA_OS_BOOT')));
     return s;
   }
   if (process.argv.includes('--modo-os') && process.platform === 'linux' && existsSync('/etc/ekfrase/writer-os')) return new SistemaLinux(existsSync('/etc/ekfrase/teste'));
@@ -332,7 +332,8 @@ async function ligar(): Promise<void> {
   });
   // o que a página guarda (escrever sem conta, idioma, tema) vai cifrado para o cofre de tempos em tempos
   setInterval(() => void writerOS.salvarPagina(), 20000);
-  if (sistema!.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistema!.caminhos.teste, 'relato'), pagina, dados, sistema: sistema! });
+  writerOS.ouvirInstalacao((passo, feito, total) => pagina.enviar('os:instalar-passo', passo, feito, total));
+  if (sistema!.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistema!.caminhos.teste, 'relato'), pagina, dados, sistema: sistema!, os: writerOS });
 
   const servidor = createServer((pedido, r) => {
     atender(pedido, r).catch(() => {

@@ -20,9 +20,12 @@ import {
   type ErroSistema,
   type EscolhaEspelho,
   type EstadoOS,
+  type InfoInstalacao,
   type ItemDePasta,
   type ListaDePasta,
+  type PassoInstalar,
   type RespostaCasca,
+  type RespostaInstalar,
   type RespostaSistema,
   type SobreOS,
 } from '@ekfrase/writer-nucleo';
@@ -40,11 +43,22 @@ interface ArquivoSistema {
   wifiVisto: boolean;
   /** A resposta do espelho `.md` (no pendrive ela vale para os próximos boots: o boot é só senha → estante). */
   espelho: EscolhaEspelho | null;
+  /** "Como você quer usar o Writer OS?" (PLANO §8c, pedido do Alcy de 18/11): `pendrive` = respondida, só pelo pendrive. */
+  uso: 'pendrive' | null;
 }
 
 interface RedeGuardada {
   ssid: string;
   senha: string | null;
+}
+
+/**
+ * O `dados.json` que o `ekfrase-dados.service` da imagem teria escrito, para o simulado: com ou sem a partição de dados,
+ * e de onde ligou (`EKFRASE_CASCA_OS_BOOT=usb|computador`; o padrão é o pendrive).
+ */
+export function dadosSimulados(comDados: boolean, boot: string | undefined): string {
+  const lugar = boot === 'computador' ? 'computador' : 'usb';
+  return JSON.stringify(comDados ? { modo: 'pendrive', motivo: '', lugar } : { modo: 'sem-dados', motivo: 'sem-espaco', lugar });
 }
 
 /** O teclado que o Cage abriu (as variáveis que o `ekfrase-sessao.sh` passou). */
@@ -79,21 +93,31 @@ export class WriterOS {
   private sair: () => Promise<void> = async () => undefined;
   private paginaVoltou = false;
   private versaoApp = '';
+  /** De onde o sistema ligou (o `lugar` do `dados.json`). */
+  private boot: EstadoOS['boot'] = 'outro';
+  /** Instalou no computador neste boot: o cofre fechou e só falta desligar. */
+  private instalado = false;
+  private instalando = false;
+  /** O progresso da instalação vai à página (`os:instalar-passo`). */
+  private aoPasso: ((passo: PassoInstalar, feito: number, total: number) => void) | null = null;
   depurar: ((l: string) => void) | null = null;
+  /** Só o agente de teste: o fim de uma instalação (`ok` ou o código do erro). */
+  aoInstalar: ((r: string) => void) | null = null;
 
   constructor(sistema: Sistema) {
     this.sistema = sistema;
     const d = this.lerDadosJson();
     this.motivo = d.modo === 'pendrive' ? null : d.motivo || 'sem-dados';
+    this.boot = d.lugar === 'usb' || d.lugar === 'computador' ? d.lugar : 'outro';
   }
 
   /** O que o `ekfrase-dados.service` achou no boot (`/run/ekfrase/dados.json`). */
-  private lerDadosJson(): { modo: string; motivo: string } {
+  private lerDadosJson(): { modo: string; motivo: string; lugar: string } {
     try {
-      const j = JSON.parse(readFileSync(join(this.sistema.caminhos.run, 'dados.json'), 'utf8')) as { modo?: string; motivo?: string };
-      return { modo: String(j.modo ?? ''), motivo: String(j.motivo ?? '') };
+      const j = JSON.parse(readFileSync(join(this.sistema.caminhos.run, 'dados.json'), 'utf8')) as { modo?: string; motivo?: string; lugar?: string };
+      return { modo: String(j.modo ?? ''), motivo: String(j.motivo ?? ''), lugar: String(j.lugar ?? '') };
     } catch {
-      return { modo: '', motivo: 'sem-servico' };
+      return { modo: '', motivo: 'sem-servico', lugar: '' };
     }
   }
 
@@ -122,12 +146,13 @@ export class WriterOS {
           fuso: (FUSOS as readonly string[]).includes(String(j.fuso)) ? String(j.fuso) : null,
           wifiVisto: j.wifiVisto === true,
           espelho: j.espelho === 'sim' || j.espelho === 'sempre' || j.espelho === 'nao' ? j.espelho : null,
+          uso: j.uso === 'pendrive' ? 'pendrive' : null,
         };
       } catch {
         // o próximo
       }
     }
-    return { idioma: null, teclado: null, fuso: null, wifiVisto: false, espelho: null };
+    return { idioma: null, teclado: null, fuso: null, wifiVisto: false, espelho: null, uso: null };
   }
 
   private gravarSistema(mudar: Partial<ArquivoSistema>): void {
@@ -164,8 +189,48 @@ export class WriterOS {
   }
 
   estado(): EstadoOS {
-    const { idioma, teclado, fuso, wifiVisto } = this.lerSistema();
-    return { idioma, teclado, fuso, wifiVisto, motivo: this.motivo, simulado: this.sistema.simulado };
+    const { idioma, teclado, fuso, wifiVisto, uso } = this.lerSistema();
+    return { idioma, teclado, fuso, wifiVisto, motivo: this.motivo, boot: this.boot, usoVisto: uso !== null, instalado: this.instalado, simulado: this.sistema.simulado };
+  }
+
+  /** "Só pelo pendrive": a pergunta do primeiro uso não volta (o item "Instalar neste computador" fica no menu). */
+  passarUso(): EstadoOS {
+    this.gravarSistema({ uso: 'pendrive' });
+    return this.estado();
+  }
+
+  // ---------- instalar no computador (PLANO §8c; quem mexe no disco é o ekfrase-instalar.service) ----------
+
+  /** O que há no computador (o serviço só lê). Sem resposta do serviço, nenhum disco. */
+  async instalacao(): Promise<InfoInstalacao> {
+    return (await this.sistema.consultarInstalacao()) ?? { uefi: true, discos: [] };
+  }
+
+  ouvirInstalacao(f: (passo: PassoInstalar, feito: number, total: number) => void): void {
+    this.aoPasso = f;
+  }
+
+  /**
+   * Instala no disco `disco`. Antes, o que a página guarda vai ao cofre e os bancos fecham (o WAL entra no arquivo):
+   * o serviço copia a pasta dos textos como ela está no disco. Deu certo: o cofre fica fechado (a tela final só
+   * desliga); deu errado: a pessoa dá a senha de novo e continua no pendrive.
+   */
+  async instalar(disco: string, levar: boolean): Promise<RespostaInstalar> {
+    if (this.boot !== 'usb') return { ok: false, erro: 'nao-usb' };
+    if (this.instalando || this.instalado) return { ok: false, erro: this.instalado ? 'ja-instalado' : 'ocupado' };
+    if (typeof disco !== 'string' || !/^(nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)$/.test(disco)) return { ok: false, erro: 'disco' };
+    this.instalando = true;
+    try {
+      await this.salvarPagina();
+      await this.dados?.trancar();
+      const r = await this.sistema.instalar(disco, levar === true, (passo, feito, total) => this.aoPasso?.(passo, feito, total));
+      this.aoInstalar?.(r.ok ? 'ok' : r.erro);
+      if (!r.ok) return r;
+      this.instalado = true;
+      return { ok: true, estado: this.estado() };
+    } finally {
+      this.instalando = false;
+    }
   }
 
   /** A resposta do espelho fica lembrada (a pergunta só aparece no primeiro uso). */

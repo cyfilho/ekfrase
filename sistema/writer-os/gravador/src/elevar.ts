@@ -18,9 +18,9 @@ import { createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Aviso } from './nucleo/gravar.ts';
-import { rodarTrabalhador, type Mensagem, type Pedido } from './nucleo/trabalhador.ts';
+import { rodarTrabalhador, type FimComputador, type Mensagem, type Pedido } from './nucleo/trabalhador.ts';
 
-export type Resultado = { ok: true; dados: string | null } | { ok: false; erro: string; detalhe?: string };
+export type Resultado = { ok: true; dados: string | null; computador?: FimComputador } | { ok: false; erro: string; detalhe?: string };
 
 export interface OpcoesElevar {
   pedido: Omit<Pedido, 'canal' | 'token'>;
@@ -28,7 +28,7 @@ export interface OpcoesElevar {
   executavel: string;
   /** Linux: o `dist/trabalhador.cjs`. */
   trabalhador?: string;
-  aviso: (a: Aviso) => void;
+  aviso: (a: Aviso | { fase: 'computador'; etapa: string }) => void;
   /** Roda aqui mesmo, sem pedir permissão (só os testes e o desenvolvimento). */
   semElevar?: boolean;
 }
@@ -66,7 +66,7 @@ export async function gravarElevado(o: OpcoesElevar): Promise<Resultado> {
           continue;
         }
         if ('aviso' in m) o.aviso(m.aviso);
-        else if ('fim' in m) fim = m.ok ? { ok: true, dados: m.dados } : { ok: false, erro: m.erro, detalhe: m.detalhe };
+        else if ('fim' in m) fim = m.ok ? { ok: true, dados: m.dados, ...(m.computador ? { computador: m.computador } : {}) } : { ok: false, erro: m.erro, detalhe: m.detalhe };
       }
     });
     s.on('error', () => undefined);

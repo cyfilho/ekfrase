@@ -104,6 +104,10 @@ describe('idiomas', () => {
       ...['sem-espaco', 'nao-usb', 'sem-medio', 'nao-monta', 'protegido', 'sem-servico', 'sem-dados', 'nao-grava', 'outras-particoes', 'nao-cria', 'nao-formata'].map((m) => `os.onde.motivo.${m}`),
       ...['ligado', 'desligado', 'desconhecido'].map((s) => `os.sobre.secure-boot.${s}`),
       ...['senha', 'falhou', 'negado'].flatMap((e) => [`os.wifi.erro.${e}`, `os.discos.erro.${e}`]),
+      // instalar no computador (PLANO §8c): os passos e os erros do ekfrase-instalar.sh e os motivos da tela
+      ...['particoes', 'copiar', 'conferir', 'textos', 'entrada'].map((p) => `os.instalar.passo.${p}`),
+      ...['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'falhou'].map((e) => `os.instalar.erro.${e}`),
+      ...['nao-uefi', 'sem-disco', 'ja-instalado', 'nao-gpt', 'sem-espaco'].map((m) => `os.instalar.motivo.${m}`),
       ...['senha', 'senha-curta', 'pasta', 'nao-abre', 'fechada', 'ja-tem', 'diferentes'].map((e) => `computador.erro.${e}`),
     ];
     for (const k of montadas) if (!tem(k)) faltando.push(k);

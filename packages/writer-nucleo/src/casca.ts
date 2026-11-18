@@ -113,9 +113,58 @@ export interface EstadoOS {
   wifiVisto: boolean;
   /** Por que não há a partição de dados (`sem-espaco`, `nao-usb`, `sem-medio`…; `null` = há). */
   motivo: string | null;
+  /** De onde o sistema ligou: do pendrive (USB), do disco do computador (instalado, PLANO §8c) ou não se sabe. */
+  boot: 'usb' | 'computador' | 'outro';
+  /** A pergunta "Como você quer usar o Writer OS?" do primeiro uso já foi respondida (pedido do Alcy, 18/11). */
+  usoVisto: boolean;
+  /** O Writer OS acabou de ser instalado no computador neste boot: só falta desligar (o cofre já fechou). */
+  instalado: boolean;
   /** Os testes e os prints (fora do pendrive de verdade). */
   simulado: boolean;
 }
+
+// ---------- instalar no computador (PLANO §8c, fase 3d) ----------
+
+/** Uma partição do disco interno, para a barra do disco (nada dela muda ao instalar). */
+export interface ParteInterna {
+  /** Onde começa e quanto ocupa, em bytes. */
+  inicio: number;
+  tamanho: number;
+  /** O sistema de arquivos (`ntfs`, `vfat`…; vazio se não se sabe). */
+  fs: string;
+  /** O nome da partição na GPT e o rótulo do sistema de arquivos (podem vir vazios). */
+  nome: string;
+  rotulo: string;
+}
+
+/** Um disco interno do computador (SATA, NVMe, eMMC; nunca USB). */
+export interface DiscoInterno {
+  /** O nome do kernel (`nvme0n1`, `sda`): é o que o pedido de instalar leva. */
+  id: string;
+  modelo: string;
+  tamanho: number;
+  /** O maior espaço livre (sem partição): onde começa e quanto tem, em bytes. */
+  livreInicio: number;
+  livre: number;
+  /** `gpt`, `dos` ou `nenhuma`. */
+  tabela: string;
+  /** O Writer OS já está instalado nele. */
+  writer: boolean;
+  partes: ParteInterna[];
+}
+
+export interface InfoInstalacao {
+  uefi: boolean;
+  discos: DiscoInterno[];
+}
+
+export type PassoInstalar = 'particoes' | 'copiar' | 'conferir' | 'textos' | 'entrada';
+export type ErroInstalar = 'sem-espaco' | 'nao-gpt' | 'nao-uefi' | 'ja-instalado' | 'nao-usb' | 'disco' | 'copia' | 'textos' | 'entrada' | 'ocupado' | 'falhou';
+export type RespostaInstalar = { ok: true; estado: EstadoOS } | { ok: false; erro: ErroInstalar };
+
+/** O espaço livre mínimo para instalar (8 GiB) e o máximo que a instalação usa (32 GiB); igual ao ekfrase-instalar.sh. */
+export const INSTALAR_MINIMO = 8 * 1024 ** 3;
+export const INSTALAR_MAXIMO = 32 * 1024 ** 3;
 
 export interface RedeWifi {
   ssid: string;
@@ -180,6 +229,14 @@ export interface PonteSistema {
   usarFuso(id: string): Promise<EstadoOS>;
   /** O passo do Wi-Fi do primeiro uso terminou. */
   passarWifi(): Promise<EstadoOS>;
+  /** A pergunta "Como você quer usar?" foi respondida com "Só pelo pendrive". */
+  passarUso(): Promise<EstadoOS>;
+  /** O que há no computador para instalar (pergunta ao serviço do sistema; nada muda). */
+  instalacao(): Promise<InfoInstalacao>;
+  /** Instala no maior espaço livre do disco. Antes, a casca grava e fecha os textos; `levar` copia a pasta deles. */
+  instalar(disco: string, levar: boolean): Promise<RespostaInstalar>;
+  /** O progresso da instalação (o passo e, ao copiar, os bytes). Devolve o "parar de ouvir". */
+  aoPassoDaInstalacao(f: (passo: PassoInstalar, feito: number, total: number) => void): () => void;
   redes(): Promise<RedeWifi[]>;
   conectar(ssid: string, senha: string | null): Promise<RespostaSistema>;
   esquecer(ssid: string): Promise<void>;

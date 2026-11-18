@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ambienteSimulado, MARCA_SIMULADA, particaoLinux } from '../sistema/writer-os/gravador/src/nucleo/ambientes.ts';
 import { CHAVE_EKFRASE, ID_CHAVE_EKFRASE } from '../sistema/writer-os/gravador/src/nucleo/chave.ts';
+import { computadorSimulado, entradasDoWriter, executarComputador, GB, guardaDoSistema, lerInfo, recusaDoPreparar, scriptPreparar, SEM_COMPUTADOR, TAMANHOS_GB, tamanhosQueCabem } from '../sistema/writer-os/gravador/src/nucleo/computador.ts';
 import { discosDoLinux, discosDoWindows, MINIMO_DISCO, type Disco } from '../sistema/writer-os/gravador/src/nucleo/discos.ts';
 import { lerBpb, traduzir4k } from '../sistema/writer-os/gravador/src/nucleo/fat4k.ts';
 import { bytesParaGuid, crc32, guidParaBytes, lerGpt, montarGpt, NOME_BOOT, NOME_DADOS, TIPO } from '../sistema/writer-os/gravador/src/nucleo/gpt.ts';
@@ -398,5 +399,83 @@ describe('o Release e o download com retomada', () => {
     writeFileSync(outro, Buffer.alloc(2 * MIB));
     await expect(imagemDoArquivo(outro)).rejects.toThrow('nao-e-writer-os');
     expect(statSync(c.arquivoImagem).size).toBe(c.imagem.length);
+  });
+});
+
+describe('este computador: preparar e remover o Writer OS (computador.ts, PLANO §8c)', () => {
+  const json = (o: Record<string, unknown>) =>
+    JSON.stringify({ numero: 0, serial: ' S123 ', nome: 'SAMSUNG MZ', tamanho: 256 * GB, setor: 512, estilo: 'GPT', livreMaior: 1048576, letra: 'C', tamanhoC: 237 * GB, livreC: 120 * GB, particoes: [{ tipo: '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}', tamanho: 100 * 1024 * 1024 }, { tipo: '{ebd0a0a2-b9e5-4433-87c0-68b6b72699c7}', tamanho: 237 * GB }], ...o });
+
+  it('lê o disco do sistema e o C: do PowerShell (o estilo vem em texto ou número; o firmware do cmd)', () => {
+    const i = lerInfo(json({}), 'UEFI\r\n');
+    expect(i).toMatchObject({ disponivel: true, uefi: true, writer: false, windows: { letra: 'C', livre: 120 * GB } });
+    expect(i.disco).toMatchObject({ numero: 0, gpt: true, livreMaior: 1048576 });
+    expect(lerInfo(json({ estilo: 2 }), 'UEFI').disco?.gpt).toBe(true);
+    expect(lerInfo(json({ estilo: 'MBR' }), 'Legacy')).toMatchObject({ uefi: false, disco: { gpt: false } });
+    // a ESP de 1400 MiB e uma partição Linux: o Writer OS está instalado
+    const comWriter = json({ particoes: [{ tipo: '{C12A7328-F81F-11D2-BA4B-00A0C93EC93B}', tamanho: 1400 * 1024 * 1024 }, { tipo: '{0fc63daf-8483-4772-8e79-3d69d8477de4}', tamanho: 16 * GB }] });
+    expect(lerInfo(comWriter, 'UEFI').writer).toBe(true);
+  });
+
+  it('as recusas do preparar (PLANO §8c) e os tamanhos que cabem', () => {
+    const i = lerInfo(json({}), 'UEFI');
+    expect(recusaDoPreparar(i, 16)).toBeNull();
+    expect(recusaDoPreparar({ ...i, uefi: false }, 16)).toBe('nao-uefi');
+    expect(recusaDoPreparar({ ...i, disco: { ...i.disco!, gpt: false } }, 16)).toBe('nao-gpt');
+    expect(recusaDoPreparar({ ...i, writer: true }, 16)).toBe('ja-instalado');
+    expect(recusaDoPreparar({ ...i, disco: { ...i.disco!, livreMaior: 9 * GB } }, 16)).toBe('ja-tem-espaco');
+    const apertado = { ...i, windows: { ...i.windows!, livre: 40 * GB } };
+    expect(recusaDoPreparar(apertado, 16)).toBeNull();
+    expect(recusaDoPreparar(apertado, 32)).toBe('pouco-livre');
+    expect(tamanhosQueCabem(apertado)).toEqual([8, 16]);
+    expect(recusaDoPreparar(SEM_COMPUTADOR, 8)).toBe('nao-windows');
+    expect(TAMANHOS_GB).toEqual([8, 16, 32]);
+  });
+
+  it('os scripts começam pela guarda (o disco do sistema, o número de série, a letra) e recusam o que não é deles', () => {
+    const s = scriptPreparar({ tipo: 'preparar', disco: 0, serial: "S'1", letra: 'C', bytes: 16 * GB });
+    expect(s).toContain("-ne 'S''1'");
+    expect(s).toContain('$c.DiskNumber -ne 0');
+    expect(s).toContain('IsSystem');
+    expect(s.indexOf('pouco-livre')).toBeLessThan(s.indexOf('Resize-Partition'));
+    expect(s.indexOf('nao-encolhe')).toBeLessThan(s.indexOf('Resize-Partition'));
+    expect(guardaDoSistema({ disco: 2, serial: 'x', letra: 'D' }, false)).not.toContain('IsSystem');
+    expect(() => guardaDoSistema({ disco: 0, serial: 'x', letra: 'C:; rm' })).toThrow();
+    expect(() => scriptPreparar({ tipo: 'preparar', disco: 0, serial: 'x', letra: 'C', bytes: 1024 })).toThrow();
+  });
+
+  it('acha no bcdedit só as entradas "Ekfrase Writer OS" (os rótulos vêm traduzidos)', () => {
+    const saida = [
+      'Gerenciador de Inicialização de Firmware',
+      '----------------------------------------',
+      'identificador           {fwbootmgr}',
+      'displayorder            {bootmgr}',
+      '                        {0b1c2d3e-0000-1111-2222-333344445555}',
+      '',
+      'Aplicativo de Firmware (101fffff)',
+      '-------------------------------',
+      'identificador           {0b1c2d3e-0000-1111-2222-333344445555}',
+      'descrição               Ekfrase Writer OS',
+      '',
+      'Aplicativo de Firmware (101fffff)',
+      '-------------------------------',
+      'identificador           {9999aaaa-0000-1111-2222-333344445555}',
+      'descrição               Windows Boot Manager',
+      '',
+      'Firmware Application (101fffff)',
+      'identifier              {ABCDEF01-0000-1111-2222-333344445555}',
+      'description             Ekfrase Writer OS',
+    ].join('\r\n');
+    expect(entradasDoWriter(saida)).toEqual(['{0b1c2d3e-0000-1111-2222-333344445555}', '{abcdef01-0000-1111-2222-333344445555}']);
+    expect(entradasDoWriter('')).toEqual([]);
+  });
+
+  it('o simulado: preparar devolve o espaço pedido; remover conta as etapas e copia para onde foi pedido', async () => {
+    expect(await executarComputador({ tipo: 'preparar', disco: 0, serial: 'S', letra: 'C', bytes: 16 * GB }, { simulado: true })).toEqual({ livre: 16 * GB });
+    const etapas: string[] = [];
+    expect(await executarComputador({ tipo: 'remover', disco: 0, serial: 'S', letra: 'C', copiarPara: 'X:\\copia' }, { simulado: true, avisar: (e) => etapas.push(e) })).toEqual({ copiado: 'X:\\copia', espaco: 'devolvido' });
+    expect(etapas).toEqual(['copiar', 'entrada', 'remover', 'devolver']);
+    expect(computadorSimulado('writer').writer).toBe(true);
+    expect(computadorSimulado(undefined).disponivel).toBe(false);
   });
 });
