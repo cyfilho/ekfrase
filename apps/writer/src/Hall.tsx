@@ -24,7 +24,7 @@ export function Hall() {
         tr={tr}
         app="writer"
         semPasseio={noOS}
-        {...(noOS ? { antesNoTopo: <BotaoSistema /> } : {})}
+        {...(noOS ? { depoisNoTopo: <BotaoSistema /> } : {})}
         {...(naCasca && !noOS ? { aoPasseio: () => avisar(t('writer.passeio.casca')) } : {})}
         logo={logo}
         nome={t(noOS ? 'writer.os.nome' : 'writer.nome')}

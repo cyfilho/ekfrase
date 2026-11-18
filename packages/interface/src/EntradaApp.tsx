@@ -29,8 +29,8 @@ export interface EntradaAppProps {
   semPasseio?: boolean;
   /** Em vez de levar ao castelo, o botão do passeio faz isto (o Writer no computador, até o castelo existir lá). */
   aoPasseio?: () => void;
-  /** Botões a mais no topo, antes dos de sempre (a engrenagem do sistema no Writer OS: Desligar sem entrar no app). */
-  antesNoTopo?: ComponentChildren;
+  /** Botões a mais no topo, depois de todos, na ponta direita (a engrenagem do sistema no Writer OS: Desligar sem entrar no app). */
+  depoisNoTopo?: ComponentChildren;
   logo: string;
   nome: string;
   descricao: string;
@@ -75,7 +75,7 @@ export function EntradaApp(p: EntradaAppProps) {
   const abrir = (m: ModoConta) => (p.entrarProprio ? p.entrarProprio(m) : setJanela(m));
   return (
     <div class="ekf-entrada-app">
-      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? jogo.hall(p.app) })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} {...(p.antesNoTopo ? { antes: p.antesNoTopo } : {})} />
+      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? jogo.hall(p.app) })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} {...(p.depoisNoTopo ? { depois: p.depoisNoTopo } : {})} />
       <main class="ekf-entrada-miolo">
         <section class="ekf-heroi">
           <img class="ekf-heroi-logo" src={p.logo} width={96} height={96} alt="" />

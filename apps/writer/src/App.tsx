@@ -129,7 +129,7 @@ function AppDoWriter() {
           tr={tr}
           app="writer"
           semPasseio={noOS}
-          {...(noOS ? { antesNoTopo: <BotaoSistema /> } : {})}
+          {...(noOS ? { depoisNoTopo: <BotaoSistema /> } : {})}
           {...(naCasca && !noOS ? { aoPasseio: passeioDoComputador } : {})}
           logo={logo}
           nome={t(noOS ? 'writer.os.nome' : 'writer.nome')}
@@ -319,16 +319,15 @@ function Casca() {
               <button type="button" class="ekf-icone" title={`${t('writer.cmd.atalhos')} (F1)`} aria-label={t('writer.cmd.atalhos')} onClick={() => pedir('atalhos')} data-teste="botao-atalhos">
                 <IconeTeclado />
               </button>
-              {/* no Writer OS os Ajustes moram no menu do sistema (a engrenagem é dele) */}
-              {noOS ? (
-                <BotaoSistema />
-              ) : (
+              {/* no Writer OS os Ajustes moram no menu do sistema (a engrenagem é dele, na ponta direita: `depois`) */}
+              {!noOS && (
                 <button type="button" class="ekf-icone" title={`${t('writer.cmd.ajustes')} (Ctrl+,)`} aria-label={t('writer.cmd.ajustes')} onClick={() => pedir('ajustes')} data-teste="botao-ajustes">
                   <IconeEngrenagem />
                 </button>
               )}
             </>
           }
+          {...(noOS ? { depois: <BotaoSistema /> } : {})}
         />
       </header>
       <main class="conteudo writer" id="conteudo" tabIndex={-1}>

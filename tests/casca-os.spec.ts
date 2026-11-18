@@ -138,6 +138,13 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       ...[...document.querySelectorAll('a[target="_blank"], input[type="file"], form[action]')].map((e) => e.tagName.toLowerCase()),
     ]);
 
+  /** A engrenagem do menu do sistema é o último botão do topo, na ponta direita (pedido do Alcy, 18/11). */
+  const engrenagemNaPonta = (pg: Page): Promise<boolean> =>
+    pg.evaluate(() => {
+      const botoes = [...document.querySelectorAll('.ekf-acoes button, .ekf-acoes a')].filter((b) => (b as HTMLElement).offsetParent !== null);
+      return botoes[botoes.length - 1]?.getAttribute('data-teste') === 'botao-sistema';
+    });
+
   const base = mkdtempSync(join(tmpdir(), 'ekfrase-os-'));
   const comum = { EKFRASE_CASCA_OS: 'simulado', EKFRASE_CASCA_SERVIDOR: 'http://127.0.0.1:9/api/v1/', EKFRASE_CASCA_ESPELHO_MS: '200' };
 
@@ -185,6 +192,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok((await p.$('[data-teste="botao-passeio"]')) === null && (await p.$('a[href*="torre"]')) === null, 'no Writer OS não há o botão do modo jogo');
   // desligar sem entrar no app (Alcy, 18/11): a engrenagem no topo da tela inicial e o Ctrl+Alt+S
   r.ok(!!(await p.$('[data-teste="botao-sistema"]')), 'a tela inicial tem a engrenagem do sistema no topo');
+  r.ok(await engrenagemNaPonta(p), 'na tela inicial, a engrenagem é o último botão do topo (a ponta direita)');
   await r.tecla('Control+Alt+s');
   if (await r.esperar('menu-sistema', 5000)) {
     r.ok(await r.focoEm('os-desligar'), 'na tela inicial, Ctrl+Alt+S abre o menu com o foco em Desligar');
@@ -282,6 +290,16 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       await r.tecla('Escape');
     } else r.ok(false, 'a lista de redes aparece no menu');
     await r.esperar('os-menu-wifi', 3000);
+    // "Servidor e conta": entrar (e sair) dali mesmo, não só o servidor (Alcy, 18/11)
+    for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-servidor')); i++) await r.tecla('ArrowDown');
+    await r.tecla('Enter');
+    if (await r.esperar('os-servidor-conta', 5000)) {
+      const temEntrar = await p.evaluate(() => !!document.querySelector('[data-teste="os-servidor-conta"] input[type="email"]') && !!document.querySelector('[data-teste="os-servidor-conta"] input[type="password"]'));
+      r.ok(temEntrar, '"Servidor e conta" tem o formulário de entrar (e-mail e senha) ali mesmo');
+      await foto(p, '08d-menu-servidor-conta');
+      await r.tecla('Escape');
+      r.ok((await r.esperar('os-menu-servidor', 3000)) && (await r.focoEm('os-menu-servidor')), 'Esc em "Servidor e conta" volta ao menu');
+    } else r.ok(false, 'Enter em "Servidor e conta" mostra a conta');
     await r.tecla('Escape');
     r.ok(!(await p.$('[data-teste="menu-sistema"]')), 'Esc no menu fecha');
   }
@@ -293,10 +311,12 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(sistema !== null && (await sistema.isVisible()) && ((await sistema.textContent()) ?? '').trim().length === 0 && !(await p.$('[data-teste="botao-desligar"]')), 'o topo tem o menu do sistema só com o ícone, à vista');
   const rotulos = await p.$$eval('.topo .ekf-acoes [aria-label]', (l) => l.map((e) => e.getAttribute('aria-label') ?? ''));
   r.ok(!(await p.$('[data-teste="botao-ajustes"]')) && !rotulos.some((x) => x.includes('Entrar')), `no topo do OS não há o botão da conta nem o dos Ajustes: estão no menu (${rotulos.join(', ')})`);
+  r.ok(await engrenagemNaPonta(p), 'na estante, a engrenagem é o último botão do topo (a ponta direita)');
   r.ok((await saidas(p)).length === 0, `a estante não leva a lugar nenhum fora do app (${(await saidas(p)).join(', ')})`);
   await irPara(p, '/writer/');
   r.ok(await r.esperar('entrada-abrir', 6000), 'o hall abre');
   r.ok(!!(await p.$('[data-teste="botao-sistema"]')), 'o hall (Início) tem a engrenagem do sistema no topo');
+  r.ok(await engrenagemNaPonta(p), 'no hall, a engrenagem é o último botão do topo (a ponta direita)');
   r.ok((await saidas(p)).length === 0, `o hall não leva a lugar nenhum fora do app (${(await saidas(p)).join(', ')})`);
   await irPara(p, '/writer/app/arquivos');
   if (await r.esperar('tela-arquivos', 6000)) {

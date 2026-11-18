@@ -168,7 +168,7 @@ export function BotaoSistema({ tamanho }: { tamanho?: number } = {}) {
 
 /**
  * O menu do sistema FORA do app (a tela inicial e o Início, que não montam as janelas do app): a engrenagem do topo
- * (`BotaoSistema`, pelo `antesNoTopo` do `EntradaApp`) e o Ctrl+Alt+S abrem o mesmo `MenuSistema`, sem os Ajustes do
+ * (`BotaoSistema`, pelo `depoisNoTopo` do `EntradaApp`) e o Ctrl+Alt+S abrem o mesmo `MenuSistema`, sem os Ajustes do
  * Writer (só existem com os textos abertos). Sem isto, quem não entrou no app não tinha como desligar (Alcy, 18/11).
  */
 export function SistemaForaDoApp() {
@@ -618,6 +618,34 @@ export function MenuSistema({ fechar, semAjustes = false }: { fechar: () => void
   );
 }
 
+/**
+ * A conta no próprio "Servidor e conta" (pedido do Alcy em 18/11): quem entrou vê o nome e Sair; quem não entrou, o
+ * formulário de entrar (ou criar a conta) ali mesmo, no servidor escolhido acima.
+ */
+function ContaNoServidor() {
+  const { conta } = useConta();
+  return (
+    <div class="conta-servidor" role="group" aria-label={t('writer.os.menu.conta-titulo')} data-teste="os-servidor-conta">
+      <h3>{t('writer.os.menu.conta-titulo')}</h3>
+      {conta ? (
+        <>
+          <p>{t('writer.os.menu.conta', { nome: conta.nome })}</p>
+          <div class="acoes-linha">
+            <button type="button" class="botao" onClick={() => void ponte.sair()} data-teste="os-servidor-sair">
+              {t('nucleo.conta.sair')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{t('writer.os.menu.sem-conta')}</p>
+          <FormConta t={t} app="ekfrase" idioma={document.documentElement.lang || 'pt-BR'} podeCriar aoEntrar={() => undefined} />
+        </>
+      )}
+    </div>
+  );
+}
+
 function Secao({ titulo, children, teste }: { titulo: string; children: ComponentChildren; teste: string }) {
   return (
     <section class="secao-os" data-teste={teste} aria-label={titulo}>
@@ -715,7 +743,7 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
       return (
         <Secao titulo={t('writer.os.servidor.titulo')} teste="os-painel-servidor">
           <EscolhaServidor />
-          <p class="dica">{t('writer.os.conta.dica')}</p>
+          <ContaNoServidor />
         </Secao>
       );
     case 'discos':

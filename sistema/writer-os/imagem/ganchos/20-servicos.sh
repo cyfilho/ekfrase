@@ -5,7 +5,7 @@
 # depuração, modo de recuperação e de emergência, tudo mascarado).
 set -euo pipefail
 
-systemctl enable ekfrase-dados.service ekfrase-diagnostico.service ekfrase-sessao.service ekfrase-numlock.path NetworkManager.service systemd-timesyncd.service
+systemctl enable ekfrase-dados.service ekfrase-diagnostico.service ekfrase-sessao.service ekfrase-numlock.path NetworkManager.service chrony.service
 systemctl set-default graphical.target
 systemctl mask getty@.service autovt@.service serial-getty@.service console-getty.service container-getty@.service \
   ctrl-alt-del.target debug-shell.service rescue.service emergency.service

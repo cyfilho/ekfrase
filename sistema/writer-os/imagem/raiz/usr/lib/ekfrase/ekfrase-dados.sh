@@ -105,7 +105,20 @@ if [ -f "$SJ" ]; then
   FUSO=$(grep -o '"fuso"[[:space:]]*:[[:space:]]*"[A-Za-z0-9_+/-]*"' "$SJ" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
   case "$FUSO" in
     '' | *..*) ;;
-    *) [ -f "/usr/share/zoneinfo/$FUSO" ] && ln -sf "/usr/share/zoneinfo/$FUSO" /etc/localtime ;;
+    *)
+      if [ -f "/usr/share/zoneinfo/$FUSO" ]; then
+        # o relógio da placa guarda a hora LOCAL (/etc/adjtime = LOCAL, como o Windows; 18/11), e o systemd a leu no
+        # fuso padrão da imagem. No fuso escolhido, a mesma hora da placa é outro instante: anda a diferença.
+        # (A hora da rede, se houver, chega depois: o chrony começa depois deste serviço.)
+        segundos() { local z=$1 s=1; [ "${z:0:1}" = - ] && s=-1; echo $((s * (10#${z:1:2} * 3600 + 10#${z:3:2} * 60))); }
+        ANTES=$(segundos "$(date +%z)")
+        ln -sf "/usr/share/zoneinfo/$FUSO" /etc/localtime
+        DEPOIS=$(segundos "$(date +%z)")
+        if [ "$ANTES" != "$DEPOIS" ]; then
+          date -s "@$(($(date +%s) + ANTES - DEPOIS))" >/dev/null || true
+        fi
+      fi
+      ;;
   esac
 fi
 
