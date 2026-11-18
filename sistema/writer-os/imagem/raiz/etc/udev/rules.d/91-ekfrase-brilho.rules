@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: MPL-2.0
+# O brilho da tela começa SEMPRE em 50% (pedido do Alcy em 18/11/2026): quando a luz da tela aparece no boot,
+# o ekfrase-brilho.sh a põe na metade. O systemd-backlight, que voltaria o brilho do último desligamento, está
+# mascarado (ganchos/20-servicos.sh). As teclas de brilho do notebook quem atende é a casca (os.ts).
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/usr/lib/ekfrase/ekfrase-brilho.sh %k"

@@ -13,9 +13,13 @@ import './telas/telas.css';
 import { render } from 'preact';
 import { App } from './App.tsx';
 import { aplicarTema, iniciarIdioma, temaAtual } from '@ekfrase/nucleo';
-import { chegouAgora } from '@ekfrase/interface';
+import { capturarLinks, chegouAgora, linksDoApp, migrarHashAntigo } from '@ekfrase/interface';
+import { traduzirHashAntigo } from './rotas.ts';
 import { tr } from './textos.ts';
 
+// endereço antigo (`/vernakula/#/x`) vira o novo; os links do app trocam de tela sem recarregar
+migrarHashAntigo('vernakula', traduzirHashAntigo);
+capturarLinks(linksDoApp('vernakula'));
 // marca a visita já ao abrir (ir do castelo para cá não conta como chegar por link direto)
 chegouAgora();
 iniciarIdioma(tr);

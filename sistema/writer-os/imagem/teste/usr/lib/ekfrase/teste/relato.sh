@@ -60,4 +60,43 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
   dizer "diagnostico falta"
 ) &
 
+# O Num Lock e o brilho (pedidos de 18/11): numlock <ligado|desligado|sem-teclado|sem-cage|sem-uinput|falta>
+# (o que o ekfrase-numlock contou) · brilho <sem-luz|N de M> (a máquina virtual não tem luz de tela)
+(
+  for _ in $(seq 1 240); do [ -s /run/ekfrase/sessao/numlock ] && break; sleep 1; done
+  dizer "numlock $(cat /run/ekfrase/sessao/numlock 2>/dev/null || echo falta)"
+  luz=
+  for d in /sys/class/backlight/*; do [ -r "$d/brightness" ] && luz="$(cat "$d/brightness") de $(cat "$d/max_brightness")"; done
+  dizer "brilho ${luz:-sem-luz}"
+) &
+
+# As medidas (P3, 18/11: o Electron contra o Cog, com os mesmos números): "medida …"
+#   janela <s desde o boot> <s desde a sessão>: quando a casca avisou que a janela apareceu (/run/ekfrase/sessao/pronta)
+#   memoria <quando> usada <MB> pss <MB> [<processo>=<MB>…]: o sistema todo (MemTotal − MemAvailable) e o PSS dos
+#   processos do writer (a sessão: o Cage, o navegador e o resto), 30 s e 150 s depois da janela
+#   disco <MB> squashfs <MB>: a casca em /opt/ekfrase-writer e o sistema inteiro
+medir_memoria() {
+  usada=$(awk '/^MemTotal/{t=$2} /^MemAvailable/{a=$2} END{printf "%d", (t-a)/1024}' /proc/meminfo)
+  uid=$(id -u writer)
+  pss=$(for d in /proc/[0-9]*; do
+    [ "$(stat -c %u "$d" 2>/dev/null)" = "$uid" ] || continue
+    k=$(awk '/^Pss:/{print $2}' "$d/smaps_rollup" 2>/dev/null)
+    [ -n "$k" ] && printf '%s %s\n' "$(cat "$d/comm" 2>/dev/null | tr ' ' '_')" "$k"
+  done | awk '{s[$1]+=$2; t+=$2} END{printf "%d", t/1024; for (c in s) if (s[c] >= 5120) printf " %s=%d", c, s[c]/1024}')
+  dizer "medida memoria $1 usada ${usada} pss ${pss}"
+}
+(
+  for _ in $(seq 1 300); do [ -e /run/ekfrase/sessao/pronta ] && break; sleep 1; done
+  if [ -e /run/ekfrase/sessao/pronta ]; then
+    agora=$(date +%s.%N); up=$(cut -d' ' -f1 /proc/uptime); pronta=$(date -r /run/ekfrase/sessao/pronta +%s.%N)
+    ini=$(systemctl show -p ActiveEnterTimestampMonotonic --value ekfrase-sessao.service)
+    dizer "$(awk -v a="$agora" -v u="$up" -v p="$pronta" -v i="$ini" 'BEGIN{t=u-(a-p); printf "medida janela %.1f %.1f", t, t-i/1e6}')"
+  else
+    dizer "medida janela falta"
+  fi
+  dizer "medida disco $(du -sm /opt/ekfrase-writer 2>/dev/null | cut -f1) squashfs $(du -m /run/live/medium/live/filesystem.squashfs 2>/dev/null | cut -f1)"
+  sleep 30; medir_memoria 30s
+  sleep 120; medir_memoria 150s
+) &
+
 tail -n +1 -F /run/ekfrase/teste/relato 2>/dev/null | while IFS= read -r l; do dizer "$l"; done

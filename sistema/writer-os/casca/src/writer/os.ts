@@ -26,7 +26,7 @@ import {
   type RespostaSistema,
   type SobreOS,
 } from '@ekfrase/writer-nucleo';
-import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs';
+import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { extname, join, sep } from 'node:path';
 import { gravarInteiro } from '../motor/pastas.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
@@ -424,4 +424,54 @@ export class WriterOS {
   sobre(): SobreOS {
     return { sistema: this.sistema.versao(), app: this.versaoApp, kernel: this.sistema.kernel(), secureBoot: this.sistema.secureBoot() };
   }
+
+  // ---------- as teclas de brilho e o Num Lock (pedidos do Alcy em 18/11) ----------
+
+  private mudandoBrilho = false;
+
+  /**
+   * Uma tecla de brilho do notebook: 10% a mais ou a menos. Em alguns notebooks o firmware (ou o kernel) já muda
+   * o brilho sozinho com a mesma tecla; então, se o brilho mudou logo depois da tecla, só conta o novo (nunca
+   * muda duas vezes). Uma tecla por vez (segurar a tecla não empilha pedidos). `null` = nada a contar.
+   */
+  async teclaDeBrilho(passo: number, esperar = 150): Promise<number | null> {
+    if (this.mudandoBrilho || !passo) return null;
+    this.mudandoBrilho = true;
+    try {
+      const antes = await this.sistema.brilho();
+      if (antes === null) return null;
+      await new Promise((ok) => setTimeout(ok, esperar));
+      const depois = await this.sistema.brilho();
+      if (depois !== null && depois !== antes) return depois;
+      return await this.sistema.brilho(passo);
+    } finally {
+      this.mudandoBrilho = false;
+    }
+  }
+
+  /**
+   * A janela do Writer apareceu (o Cage já abriu e já tem os teclados): o aviso que liga o Num Lock. O
+   * `ekfrase-numlock.path` da imagem vê o arquivo mudar e o `ekfrase-numlock` (root) aperta o Num Lock numa
+   * tecla virtual, que o Cage junta ao grupo dos teclados. Uma vez por sessão do Cage (a casca é o único app dele).
+   */
+  sessaoPronta(): void {
+    const pasta = join(this.sistema.caminhos.run, 'sessao');
+    try {
+      if (this.sistema.simulado) mkdirSync(pasta, { recursive: true });
+      writeFileSync(join(pasta, 'pronta'), `${process.pid} ${Date.now()}\n`);
+    } catch {
+      // sem a pasta da sessão (o serviço do diagnóstico a cria): fica sem o Num Lock, nada mais
+    }
+  }
+}
+
+/**
+ * As teclas de brilho do notebook. No Cage, a tecla chega ao Writer como qualquer outra (o XKB a chama de
+ * XF86MonBrightnessUp/Down; o Chromium, de "BrightnessUp"/"BrightnessDown"): +10, −10 ou 0 (não é de brilho).
+ */
+export function passoDaTecla(i: { type: string; key: string; code: string }): number {
+  if (i.type !== 'keyDown') return 0;
+  if (i.key === 'BrightnessUp' || i.code === 'BrightnessUp') return 10;
+  if (i.key === 'BrightnessDown' || i.code === 'BrightnessDown') return -10;
+  return 0;
 }

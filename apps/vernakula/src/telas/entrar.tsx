@@ -3,6 +3,7 @@
 import { useState } from 'preact/hooks';
 import { api, type Conta } from '../api.ts';
 import { avisoDoErro, type Aviso } from '../avisos.ts';
+import { enderecoDe } from '../rotas.ts';
 import { t } from '../textos.ts';
 
 export function MostrarAviso({ aviso }: { aviso: Aviso | undefined }) {
@@ -50,10 +51,10 @@ export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntr
         </button>
       </form>
       <p class="link-abaixo">
-        <a href="#/esqueci">{t('vernakula.entrar.esqueci')}</a>
+        <a href={enderecoDe('esqueci')}>{t('vernakula.entrar.esqueci')}</a>
       </p>
       <p class="link-abaixo">
-        <a href="#/criar">{t('vernakula.entrar.criar')}</a>
+        <a href={enderecoDe('criar')}>{t('vernakula.entrar.criar')}</a>
       </p>
     </section>
   );

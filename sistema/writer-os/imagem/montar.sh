@@ -30,11 +30,18 @@ export AQUI CASCA VERSAO LOGO
 echo "== ferramentas da montagem"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common ca-certificates >/dev/null
+apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common ca-certificates gcc libc6-dev linux-libc-dev >/dev/null
 
 rm -rf "$TRAB"
 mkdir -p "$TRAB" "$SAIDA"
 RAIZ=$TRAB/raiz
+
+# o ekfrase-numlock (fonte/, C): compilado aqui, no mesmo trixie da imagem; o compilador NÃO entra na imagem
+echo "== o ekfrase-numlock"
+NUMLOCK=$TRAB/ekfrase-numlock
+gcc -std=gnu11 -O2 -Wall -Wextra -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -pie -Wl,-z,relro,-z,now \
+  -o "$NUMLOCK" "$AQUI/fonte/ekfrase-numlock.c"
+export NUMLOCK
 COMP="main contrib non-free-firmware"
 
 echo "== o sistema (mmdebstrap, trixie)"
@@ -55,6 +62,8 @@ cp "$(ls "$RAIZ"/boot/initrd.img-* | sort -V | tail -1)" "$TRAB/initrd.img"
 # só ~12% a mais (era 557 MB de 1400 em xz); A e B da atualização (fase 4) ainda cabem na EKFR-BOOT.
 mksquashfs "$RAIZ" "$TRAB/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
   -wildcards -e 'boot/*' 'proc/*' 'sys/*' 'dev/*' 'run/*' 'tmp/*'
+# as medidas (P3, 18/11): o sistema inteiro comprimido e, sem comprimir, a casca e o sistema
+echo "  medida squashfs $(du -m "$TRAB/filesystem.squashfs" | cut -f1) MB · raiz $(du -sm "$RAIZ" | cut -f1) MB · casca $(du -sm "$RAIZ/opt/ekfrase-writer" | cut -f1) MB"
 
 echo "== o squashfs do teste (só na imagem de teste)"
 TESTE=$TRAB/teste

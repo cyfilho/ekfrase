@@ -3,7 +3,7 @@
 /**
  * A ENTREGA: um app (ou o roteador do site) passa um `.ekfr` para o app dono dele. Todos os apps moram
  * no mesmo endereço (ekfrase.com), então dividem o mesmo IndexedDB: quem entrega guarda os bytes com
- * uma chave aleatória e abre `/<app>/#/abrir/<chave>`; o app lê (`receber`) e a entrega some. Uma
+ * uma chave aleatória e abre `/<app>/app/abrir/<chave>`; o app lê (`receber`) e a entrega some. Uma
  * entrega esquecida vence em 10 minutos.
  */
 
@@ -36,12 +36,12 @@ function pedido<T>(db: IDBDatabase, modo: IDBTransactionMode, f: (s: IDBObjectSt
   });
 }
 
-/** O endereço que abre a entrega no app (`/<app>/#/abrir/<chave>`). */
-export const enderecoDaEntrega = (enderecoDoApp: string, chave: string) => `${enderecoDoApp}#/abrir/${chave}`;
+/** O endereço que abre a entrega no app (`/<app>/app/abrir/<chave>`; padrão em `docs/ENDERECOS.md`). */
+export const enderecoDaEntrega = (enderecoDoApp: string, chave: string) => `${enderecoDoApp.replace(/\/?$/, '/')}app/abrir/${chave}`;
 
-/** A chave de uma entrega no endereço (`#/abrir/<chave>`), ou null. */
-export function chaveNoEndereco(hash = location.hash): string | null {
-  return /^#\/abrir\/([a-f0-9-]{36})$/.exec(hash)?.[1] ?? null;
+/** A chave de uma entrega no endereço (`/<app>/app/abrir/<chave>`, ou o antigo `#/abrir/<chave>`), ou null. */
+export function chaveNoEndereco(endereco = location.pathname + location.hash): string | null {
+  return /(?:^|\/app\/|#\/)abrir\/([a-f0-9-]{36})\/?$/.exec(endereco)?.[1] ?? null;
 }
 
 /** Guarda o arquivo para o outro app e devolve a chave. */

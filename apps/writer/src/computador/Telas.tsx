@@ -10,10 +10,10 @@
  * - `EscolhaServidor`: "Servidor: ekfrase.com / Outro…" acima do formulário de entrar (na casca não
  *   há CORS: quem confere é o processo principal).
  * - `AjustesDaCasca`: a pasta, o espelho e "fechar os textos" dentro dos Ajustes (Ctrl+,).
- * - `Baixar`: a página de download (`#/computador`), com o passo a passo do aviso do SmartScreen
+ * - `Baixar`: a página de download (`/writer/computador`), com o passo a passo do aviso do SmartScreen
  *   (sem certificado de assinatura, DEC-P064).
  */
-import { LINKS, PaginaApp, definirAntesDoEntrar } from '@ekfrase/interface';
+import { LINKS, PaginaApp, definirAntesDoEntrar, entradaDoApp, paginaDoApp } from '@ekfrase/interface';
 import { SENHA_MINIMA, type ErroCasca, type EscolhaEspelho, type InfoServidor, type PonteCasca, type RespostaCasca } from '@ekfrase/writer-nucleo';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -379,7 +379,7 @@ export function Baixar() {
         </section>
         <section class="ekf-pagina">
           <p>
-            <a href="#/os" data-teste="baixar-ir-os">
+            <a href={paginaDoApp('writer', 'os')} data-teste="baixar-ir-os">
               {t('writer.baixar.ir-os')}
             </a>
           </p>
@@ -390,7 +390,7 @@ export function Baixar() {
           </p>
         </section>
         <p class="ekf-voltar">
-          <a class="ekf-botao" href="#/inicio" data-teste="baixar-voltar">
+          <a class="ekf-botao" href={entradaDoApp('writer')} data-teste="baixar-voltar">
             {t('writer.inicio.voltar')}
           </a>
         </p>

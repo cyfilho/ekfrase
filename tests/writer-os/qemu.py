@@ -284,9 +284,16 @@ def teste_completo(imagem, pasta):
         ok(q.esperar('gravado 5', b, 60) is not None, 'o agente grava')
         ok(q.esperar('diagnostico ok', b, 240) is not None, 'o diagnóstico foi gravado na EKFRASE-DADOS (Ekfrase Writer/.diagnostico)')
         ok(q.esperar('quedas 0', b, 5) is not None, 'a sessão não caiu nenhuma vez')
+        # o Num Lock (18/11): o ekfrase-numlock apertou numa tecla virtual e a luz do teclado do QEMU acendeu
+        i = q.esperar(re.compile(r'^numlock '), b, 60)
+        ok(i is not None and q.linhas()[i] == 'numlock ligado', f'o Num Lock fica ligado na sessão ({q.linhas()[i] if i is not None else "sem resposta"})')
+        i = q.esperar(re.compile(r'^brilho '), b, 10)
+        print(f'   {q.linhas()[i] if i is not None else "brilho: sem resposta"} (a máquina virtual não tem luz de tela; o 50% se vê no notebook)', flush=True)
         for l in q.linhas()[b:]:
             if l.startswith('tempo'):
                 print('   ' + l, flush=True)
+        # as medidas (P3: o Electron contra o Cog) saem até 150 s depois da janela: espera a última do 1º boot
+        q.esperar(re.compile(r'^medida memoria 150s '), b, 120)
         time.sleep(2)
         q.foto('conta')
 
@@ -331,6 +338,13 @@ def teste_completo(imagem, pasta):
         time.sleep(3)
         q.foto('depois-de-arrancar')
     finally:
+        # as medidas de todos os boots (a janela, a memória, o disco): só informam, para comparar uma casca com outra
+        boot = 0
+        for l in q.linhas():
+            if l == 'boot':
+                boot += 1
+            elif l.startswith('medida '):
+                print(f'   boot {boot}: {l}', flush=True)
         q.desligar()
 
 

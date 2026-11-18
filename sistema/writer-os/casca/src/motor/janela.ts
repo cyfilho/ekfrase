@@ -5,7 +5,8 @@
  *
  * - `nodeIntegration:false`, `contextIsolation:true`, `sandbox:true`: a página não tem Node; só o
  *   que o preload põe nela com `contextBridge`;
- * - carrega SÓ `app://<host>/` (os arquivos empacotados do app; nunca uma página da internet);
+ * - carrega SÓ `app://<host>/` (os arquivos empacotados do app; nunca uma página da internet). O que não é arquivo
+ *   e não tem extensão (as telas do app: `/writer/app/ideias`) recebe o `index.html`, como o site;
  * - `will-navigate`, `will-redirect` e `setWindowOpenHandler` bloqueiam tudo (nenhum link sai,
  *   nenhuma janela nova abre, nem `window.open`, nem link externo);
  * - DevTools desligado no build (`devTools:false`); no desenvolvimento, só com EKFRASE_CASCA_DEVTOOLS=1;
@@ -92,6 +93,8 @@ export interface OpcoesJanela {
   sessao: Session;
   esquema?: string;
   host: string;
+  /** O caminho em que a janela abre (padrão `/`; o Writer abre em `/writer/`, o mesmo endereço do site). */
+  inicio?: string;
   preload: string;
   titulo: string;
   icone?: string;
@@ -119,20 +122,30 @@ export function servirApp(o: OpcoesServir): void {
     if (caminho === '/' || caminho === '') caminho = '/index.html';
     const arquivo = normalize(join(raiz, caminho));
     if (arquivo !== raiz && !arquivo.startsWith(raiz + sep)) return new Response('', { status: 404 });
-    try {
-      const corpo = await readFile(arquivo);
-      return new Response(corpo, {
+    const entregar = async (f: string): Promise<Response> =>
+      new Response(await readFile(f), {
         status: 200,
-        headers: { 'content-type': TIPOS[extname(arquivo).toLowerCase()] ?? 'application/octet-stream', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' },
+        headers: { 'content-type': TIPOS[extname(f).toLowerCase()] ?? 'application/octet-stream', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' },
       });
+    try {
+      return await entregar(arquivo);
     } catch {
+      // caminho SEM extensão que não é arquivo = uma tela do app (`/writer/app/ideias`, `/writer/os`): o `index.html`,
+      // como o `.htaccess` do site (a pasta é a mesma; nada fora dela). Com extensão (um .js que falta) = 404.
+      if (extname(caminho) === '') {
+        try {
+          return await entregar(join(raiz, 'index.html'));
+        } catch {
+          /* sem index.html: 404 */
+        }
+      }
       return new Response('', { status: 404 });
     }
   });
 }
 
-/** A URL inicial (e a única permitida) da janela. */
-export const urlDoApp = (host: string, esquema = 'app'): string => `${esquema}://${host}/`;
+/** A URL inicial da janela (`inicio` = o caminho dentro do host: o do Writer é `/writer/`, igual ao do site). */
+export const urlDoApp = (host: string, esquema = 'app', inicio = '/'): string => `${esquema}://${host}${inicio.startsWith('/') ? inicio : `/${inicio}`}`;
 
 /** O endereço é do próprio app (mesma origem `app://host`)? */
 export function ehDoApp(url: string, host: string, esquema = 'app'): boolean {
@@ -146,7 +159,7 @@ export function ehDoApp(url: string, host: string, esquema = 'app'): boolean {
 
 /** Trava um `webContents` (a janela, e qualquer outro que apareça). */
 export function travarConteudo(wc: WebContents, devTools = false): void {
-  // navegar: NUNCA (as telas do app são rotas `#/...`, que não navegam; recarregar é só pelo processo principal)
+  // navegar: NUNCA (as telas do app trocam de endereço por `history.pushState`, que não navega; recarregar é só pelo processo principal)
   const naoNavegar = (e: { preventDefault(): void }, url: string) => {
     e.preventDefault();
     anotar({ tipo: 'navegar', alvo: url });
@@ -240,6 +253,6 @@ export function criarJanela(o: OpcoesJanela): BrowserWindow {
   win.setMenu(null);
   win.removeMenu();
   win.once('ready-to-show', () => win.show());
-  void win.loadURL(urlDoApp(o.host, esquema));
+  void win.loadURL(urlDoApp(o.host, esquema, o.inicio));
   return win;
 }
