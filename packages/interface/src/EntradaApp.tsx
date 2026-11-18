@@ -9,11 +9,12 @@
  * No passeio, o mesmo papel é do hall da torre do app no castelo.
  */
 import type { Tradutor } from '@ekfrase/nucleo';
-import type { VNode } from 'preact';
+import type { ComponentChildren, VNode } from 'preact';
 import { useState } from 'preact/hooks';
 import { FormConta, type ModoConta } from './Conta.tsx';
 import { IconeBaixar, IconeNuvem, IconePendrive, IconeTroca } from './icones.tsx';
 import { Janela } from './Janela.tsx';
+import { jogo } from './enderecos.ts';
 import type { Conta } from './ponte.ts';
 import { RodapeEkfrase } from './Rodape.tsx';
 import { TopoEkfrase } from './Topo.tsx';
@@ -28,6 +29,8 @@ export interface EntradaAppProps {
   semPasseio?: boolean;
   /** Em vez de levar ao castelo, o botão do passeio faz isto (o Writer no computador, até o castelo existir lá). */
   aoPasseio?: () => void;
+  /** Botões a mais no topo, antes dos de sempre (a engrenagem do sistema no Writer OS: Desligar sem entrar no app). */
+  antesNoTopo?: ComponentChildren;
   logo: string;
   nome: string;
   descricao: string;
@@ -72,7 +75,7 @@ export function EntradaApp(p: EntradaAppProps) {
   const abrir = (m: ModoConta) => (p.entrarProprio ? p.entrarProprio(m) : setJanela(m));
   return (
     <div class="ekf-entrada-app">
-      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? `/#/torre/${p.app}` })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
+      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? jogo.hall(p.app) })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} {...(p.antesNoTopo ? { antes: p.antesNoTopo } : {})} />
       <main class="ekf-entrada-miolo">
         <section class="ekf-heroi">
           <img class="ekf-heroi-logo" src={p.logo} width={96} height={96} alt="" />

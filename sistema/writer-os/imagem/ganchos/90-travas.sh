@@ -6,6 +6,14 @@ set -euo pipefail
 
 echo "  initrd (live-boot + Plymouth + os módulos do pendrive)"
 update-initramfs -u -k all >/dev/null
+# o initrd sem os drivers de vídeo pesados (raiz/etc/initramfs-tools/hooks/ekfrase-video, P3b): confere o pronto
+INITRD=$(ls /boot/initrd.img-* | sort -V | tail -1)
+CONTEUDO=$(lsinitramfs "$INITRD")
+pesado=$(grep -E '/(amdgpu|radeon|nouveau|xe)\.ko|/firmware/(amdgpu|radeon|nvidia)/' <<< "$CONTEUDO" || true)
+[ -z "$pesado" ] || { echo "O initrd ainda leva drivers de vídeo pesados:"; head -5 <<< "$pesado"; exit 1; }
+grep -q '/i915\.ko' <<< "$CONTEUDO" || { echo "O initrd ficou sem o i915 (a tela do boot nas placas Intel)"; exit 1; }
+grep -q 'scripts/live' <<< "$CONTEUDO" || { echo "O initrd ficou sem o live-boot"; exit 1; }
+echo "  initrd de $(du -m "$INITRD" | cut -f1) MB, sem amdgpu, radeon, nouveau e xe"
 
 # nenhum programa SUID/SGID (o polkit decide o que o writer pode, pelo D-Bus)
 find / -xdev -type f -perm /6000 -exec chmod u-s,g-s {} +
@@ -35,3 +43,13 @@ if [ -n "$suid" ]; then
 fi
 [ "$sobrou" = 0 ] || exit 1
 echo "  travas conferidas: sem sudo, su, login, getty, pkexec, apt, dpkg e sem SUID"
+
+# os timers do apt e do dpkg (que já não existem) não acordam nunca
+systemctl mask apt-daily.timer apt-daily-upgrade.timer dpkg-db-backup.timer >/dev/null 2>&1 || true
+
+# O sistema já nasce "atualizado" (P3b): sem o /etc/.updated e o /var/.updated, o systemd acha a cada boot que o /usr
+# mudou (ConditionNeedsUpdate) e roda o ldconfig e o catálogo do journal antes da sessão (~2 s no notebook, 17/11).
+# Fica por último: os carimbos guardam a hora do /usr de agora.
+/usr/lib/systemd/systemd-update-done
+[ -s /etc/.updated ] && [ -s /var/.updated ] || { echo "Faltam o /etc/.updated e o /var/.updated"; exit 1; }
+echo "  /etc e /var marcados como atualizados (sem ldconfig a cada boot)"

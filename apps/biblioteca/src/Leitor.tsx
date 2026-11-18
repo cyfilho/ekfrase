@@ -10,7 +10,7 @@
  *   anotações com exportação (.md e .txt) e guardar onde parou (capítulo e quanto já foi), na nuvem.
  *   Sem o livro no inventário, a seleção mostra o convite para pôr o livro lá.
  */
-import { Janela, RodapeEkfrase, acervo, ponte, useConta } from '@ekfrase/interface';
+import { Janela, RodapeEkfrase, acervo, irPara, noApp, ponte, useConta } from '@ekfrase/interface';
 import { temaEfetivo } from '@ekfrase/nucleo';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -39,7 +39,7 @@ function lerPref(): Preferencias {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const ir = (h: string) => (location.hash = h);
+const ir = (tela: string) => irPara(noApp('biblioteca', tela));
 
 interface Capitulo {
   n: number;
@@ -114,8 +114,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
     // o ref tem o que já foi lido nesta visita (o estado só muda com as anotações)
     const d = dadosRef.current;
     if (d && d.fracao > 0) restaurar.current = d.fracao;
-    history.replaceState(null, '', `#/ler/${id}/${d?.capitulo ?? 1}`);
-    dispatchEvent(new HashChangeEvent('hashchange'));
+    irPara(noApp('biblioteca', `ler/${id}/${d?.capitulo ?? 1}`), { substituir: true });
   }, [pronto, capitulo]);
 
   useEffect(() => {
@@ -214,8 +213,8 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
       if (e.key === 'Escape') {
         setFoco(false);
         setPainel(null);
-      } else if (e.key === 'ArrowRight' && capitulo !== null && capitulo < total && !e.altKey) ir(`#/ler/${id}/${capitulo + 1}`);
-      else if (e.key === 'ArrowLeft' && capitulo !== null && capitulo > 1 && !e.altKey) ir(`#/ler/${id}/${capitulo - 1}`);
+      } else if (e.key === 'ArrowRight' && capitulo !== null && capitulo < total && !e.altKey) ir(`ler/${id}/${capitulo + 1}`);
+      else if (e.key === 'ArrowLeft' && capitulo !== null && capitulo > 1 && !e.altKey) ir(`ler/${id}/${capitulo - 1}`);
     };
     addEventListener('keydown', tecla);
     return () => removeEventListener('keydown', tecla);
@@ -258,7 +257,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
     return (
       <main class="conteudo pilha">
         <p class="erro">{t('biblioteca.nao_achado')}</p>
-        <a href="#/">{t('biblioteca.voltar')}</a>
+        <a href={noApp('biblioteca')}>{t('biblioteca.voltar')}</a>
       </main>
     );
 
@@ -267,7 +266,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
     <div ref={raiz} class={`leitor tema-${pref.tema}${foco ? ' foco' : ''}`} style={{ '--tamanho': `${pref.tamanho}%` }}>
       {!foco && (
         <header class="leitor-topo">
-          <a class="botao pequeno" href={`#/livro/${id}`} title={t('biblioteca.leitor.voltar')} aria-label={t('biblioteca.leitor.voltar')}>
+          <a class="botao pequeno" href={noApp('biblioteca', `livro/${id}`)} title={t('biblioteca.leitor.voltar')} aria-label={t('biblioteca.leitor.voltar')}>
             ←
           </a>
           <div class="leitor-titulo">
@@ -327,7 +326,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
         {cap && (
           <nav class="leitor-navegar" aria-label={t('biblioteca.leitor.navegar')}>
             {cap.n > 1 ? (
-              <a class="botao" href={`#/ler/${id}/${cap.n - 1}`}>
+              <a class="botao" href={noApp('biblioteca', `ler/${id}/${cap.n - 1}`)}>
                 {t('biblioteca.leitor.anterior')}
               </a>
             ) : (
@@ -335,11 +334,11 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
             )}
             <small>{t('biblioteca.leitor.de', { n: cap.n, total })}</small>
             {cap.n < total ? (
-              <a class="botao principal" href={`#/ler/${id}/${cap.n + 1}`}>
+              <a class="botao principal" href={noApp('biblioteca', `ler/${id}/${cap.n + 1}`)}>
                 {t('biblioteca.leitor.proximo')}
               </a>
             ) : (
-              <a class="botao" href={`#/livro/${id}`}>
+              <a class="botao" href={noApp('biblioteca', `livro/${id}`)}>
                 {t('biblioteca.leitor.fim')}
               </a>
             )}
@@ -383,7 +382,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
             <ol class="leitor-sumario">
               {(sumario ?? []).map((s, i) => (
                 <li key={i} aria-current={i + 1 === capitulo ? 'page' : undefined}>
-                  <a href={`#/ler/${id}/${i + 1}`} onClick={() => setPainel(null)}>
+                  <a href={noApp('biblioteca', `ler/${id}/${i + 1}`)} onClick={() => setPainel(null)}>
                     {s}
                   </a>
                 </li>
@@ -397,7 +396,7 @@ export function Leitor({ id, capitulo }: { id: string; capitulo: number | null }
               id={id}
               irPara={(a) => {
                 setPainel(null);
-                if (a.capitulo !== capitulo) ir(`#/ler/${id}/${a.capitulo}`);
+                if (a.capitulo !== capitulo) ir(`ler/${id}/${a.capitulo}`);
                 setTimeout(() => texto.current?.querySelector(`mark[data-anotacao="${a.id}"]`)?.scrollIntoView({ block: 'center' }), 300);
               }}
               editar={setEditando}

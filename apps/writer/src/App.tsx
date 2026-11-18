@@ -12,14 +12,13 @@
  * Teclado: os atalhos de todos os comandos passam por aqui (`comandos.ts`); com uma janela ou gaveta
  * aberta, quem manda é ela.
  */
-import { AcoesTopo, EntradaApp, RodapeEkfrase, definirAmbienteFechado, voltarAoModoDoApp } from '@ekfrase/interface';
+import { AcoesTopo, EntradaApp, RodapeEkfrase, definirAmbienteFechado, entradaDoApp, jogo, noApp, voltarAoModoDoApp } from '@ekfrase/interface';
 import { DONO_LOCAL } from '@ekfrase/writer-nucleo';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Ajustes } from './Ajustes.tsx';
 import { Abrir, Arquivos } from './Arquivos.tsx';
 import { useContaDoWriter } from './conta.ts';
 import { comandosDeAgora, emCampo, teclaDe, useComandos } from './comandos.ts';
-import { Escrever } from './Escrever.tsx';
 import { Estante, novaHistoria } from './Estante.tsx';
 import { ProvedorDeSessao, abrirSessao, fecharSessao, levarLocais, textosLocais, useSessao, type Sessao } from './estado.ts';
 import { Historia } from './Historia.tsx';
@@ -32,12 +31,12 @@ import { Atalhos, Paleta } from './Paleta.tsx';
 import { aoPedido, pedir, type Pedido } from './pedidos.ts';
 import { Personagens } from './Personagens.tsx';
 import { mudarPrefs, usePrefs } from './prefs.ts';
-import { comeco, ir, useRota, type Rota } from './rotas.ts';
+import { ir, lerRota, useRota, type Rota } from './rotas.ts';
 import { t, tr, textoDoErro } from './textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, camadaAberta, focarTela } from './ui.tsx';
 import { naCasca, noOS } from './computador/casca.ts';
 import { PendriveOS } from './computador/PendriveOS.tsx';
-import { BotaoSistema, PainelSistema, PortaoOS } from './computador/SistemaOS.tsx';
+import { BotaoSistema, EntrarOS, MenuSistema, PortaoOS, SistemaForaDoApp, useAvisoDeBrilho } from './computador/SistemaOS.tsx';
 import { BaixarOS } from './computador/BaixarOS.tsx';
 import { Baixar, PortaoDaCasca } from './computador/Telas.tsx';
 import { Hall } from './Hall.tsx';
@@ -78,7 +77,7 @@ function AppDoWriter() {
   useEffect(() => {
     if (carregando || !conta || semRede || voltou) return;
     setVoltou(true);
-    if (!naCasca && !location.hash.replace(/^#\/?/, '')) voltarAoModoDoApp('writer');
+    if (!naCasca && lerRota().tela === 'inicio') voltarAoModoDoApp('writer');
   }, [carregando, conta]);
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const dono = carregando ? null : conta ? String(conta.id) : p.semConta ? DONO_LOCAL : null;
@@ -120,7 +119,7 @@ function AppDoWriter() {
   if (rotaAgora.tela === 'os' && !naCasca) return <BaixarOS />;
   if (carregando) return <div class="tela-cheia-carregando" aria-busy="true" />;
   // o hall: os caminhos para escrever (web, computador, pendrive). Sem onde escrever, é a própria tela inicial.
-  if ((rotaAgora.tela === 'inicio' || (comeco.hall && rotaAgora.tela === 'estante')) && dono !== null) return <Hall />;
+  if (rotaAgora.tela === 'inicio' && dono !== null) return <Hall />;
   if (dono === null) {
     return (
       <>
@@ -130,6 +129,7 @@ function AppDoWriter() {
           tr={tr}
           app="writer"
           semPasseio={noOS}
+          {...(noOS ? { antesNoTopo: <BotaoSistema /> } : {})}
           {...(naCasca && !noOS ? { aoPasseio: passeioDoComputador } : {})}
           logo={logo}
           nome={t(noOS ? 'writer.os.nome' : 'writer.nome')}
@@ -144,14 +144,14 @@ function AppDoWriter() {
             titulo: t('writer.entrada.sem-conta.titulo'),
             texto: t(naCasca ? 'writer.computador.sem-conta.texto' : 'writer.entrada.sem-conta.texto'),
             botao: t('writer.entrada.sem-conta.botao'),
-            // "Começar a escrever" leva à estante: o link direto chega em #/inicio (entradaPedida), e lá ficaria o hall
+            // "Começar a escrever" leva à estante (e não ao hall do começo)
             aoEscolher: () => {
-              comeco.hall = false;
               mudarPrefs({ semConta: true });
               if (rotaAgora.tela === 'inicio') ir({ tela: 'estante' });
             },
           }}
         />
+        {noOS && <SistemaForaDoApp />}
       </>
     );
   }
@@ -189,6 +189,7 @@ function Casca() {
   const [aberta, setAberta] = useState<Pedido | null>(null);
 
   useEffect(() => aoPedido(setAberta), []);
+  useAvisoDeBrilho();
   useEffect(() => {
     scrollTo(0, 0);
     // trocou de tela pelo teclado e o foco ficou na tela velha: vai ao título da nova
@@ -225,10 +226,10 @@ function Casca() {
     { id: 'arquivos', rotulo: t('writer.cmd.arquivos'), fazer: () => ir({ tela: 'arquivos' }) },
     s.conta
       ? { id: 'sincronizar', rotulo: t('writer.cmd.sincronizar'), fazer: () => void s.sinc.sincronizar() }
-      : { id: 'entrar', rotulo: t('writer.cmd.entrar'), fazer: () => document.querySelector<HTMLElement>(`.ekf-acoes button[aria-label="${t('nucleo.conta.entrar.ekfrase')}"]`)?.click() },
+      : { id: 'entrar', rotulo: t('writer.cmd.entrar'), fazer: () => (noOS ? pedir('conta') : document.querySelector<HTMLElement>(`.ekf-acoes button[aria-label="${t('nucleo.conta.entrar.ekfrase')}"]`)?.click()) },
     ...(s.conta ? [{ id: 'levar', rotulo: t('writer.levar.botao'), fazer: () => pedir('levar') }] : []),
     { id: 'ir-conteudo', rotulo: t('writer.cmd.ir-conteudo'), fazer: () => document.getElementById('conteudo')?.focus() },
-    ...(noOS ? [{ id: 'sistema', rotulo: t('writer.os.painel.titulo'), atalho: 'Ctrl+Alt+S', fazer: () => pedir('sistema') }] : []),
+    ...(noOS ? [{ id: 'sistema', rotulo: t('writer.os.menu.titulo'), atalho: 'Ctrl+Alt+S', fazer: () => pedir('sistema') }] : []),
   ]);
 
   // o teclado: o atalho de cada comando (F1 também é "?", fora de um campo)
@@ -257,7 +258,8 @@ function Casca() {
       {aberta === 'ajustes' && <Ajustes fechar={fechar} />}
       {aberta === 'ideia' && <IdeiaRapida fechar={fechar} />}
       {aberta === 'levar' && <Levar fechar={fechar} />}
-      {aberta === 'sistema' && <PainelSistema fechar={fechar} />}
+      {aberta === 'sistema' && <MenuSistema fechar={fechar} />}
+      {aberta === 'conta' && <EntrarOS fechar={fechar} />}
       {noOS && <PendriveOS />}
       <Confirmacoes />
       <Avisos />
@@ -267,7 +269,7 @@ function Casca() {
   if (rota.tela === 'escrever') {
     return (
       <>
-        <Escrever id={rota.id} />
+        <FolhaSobDemanda id={rota.id} />
         {camadas}
       </>
     );
@@ -279,21 +281,22 @@ function Casca() {
         {t('writer.pular')}
       </a>
       <header class="topo">
-        <a class="marca" href="#/" data-teste="marca">
+        <a class="marca" href={noApp('writer')} data-teste="marca">
           <img src={logo} width={48} height={48} alt="" class="pixel" />
           <span>{t(noOS ? 'writer.os.nome' : 'writer.nome')}</span>
         </a>
         <nav class="topo-nav" aria-label={t('writer.nav.rotulo')}>
-          <a href="#/" aria-current={rota.tela === 'estante' ? 'page' : undefined} data-teste="nav-estante">
-            {t('writer.estante.titulo')}
-          </a>
-          <a href="#/inicio" data-teste="nav-inicio">
+          {/* "Início" antes de todas as outras (pedido do Alcy em 18/11) */}
+          <a href={entradaDoApp('writer')} data-teste="nav-inicio">
             {t('writer.nav.inicio')}
           </a>
-          <a href="#/ideias" aria-current={rota.tela === 'ideias' ? 'page' : undefined} data-teste="nav-ideias">
+          <a href={noApp('writer')} aria-current={rota.tela === 'estante' ? 'page' : undefined} data-teste="nav-estante">
+            {t('writer.estante.titulo')}
+          </a>
+          <a href={noApp('writer', 'ideias')} aria-current={rota.tela === 'ideias' ? 'page' : undefined} data-teste="nav-ideias">
             {t('writer.ideias.titulo')}
           </a>
-          <a href="#/arquivos" aria-current={rota.tela === 'arquivos' ? 'page' : undefined} data-teste="nav-arquivos">
+          <a href={noApp('writer', 'arquivos')} aria-current={rota.tela === 'arquivos' ? 'page' : undefined} data-teste="nav-arquivos">
             {t('writer.arquivos.curto')}
           </a>
         </nav>
@@ -301,8 +304,9 @@ function Casca() {
           t={t}
           tr={tr}
           app="writer"
-          entrar
-          {...(noOS ? {} : { passeio: naCasca ? passeioDoComputador : '/#/torre/writer/salas' })}
+          entrar={!noOS}
+          semConta={noOS}
+          {...(noOS ? {} : { passeio: naCasca ? passeioDoComputador : jogo.sala('writer') })}
           antes={
             <>
               <Nuvem />
@@ -315,10 +319,14 @@ function Casca() {
               <button type="button" class="ekf-icone" title={`${t('writer.cmd.atalhos')} (F1)`} aria-label={t('writer.cmd.atalhos')} onClick={() => pedir('atalhos')} data-teste="botao-atalhos">
                 <IconeTeclado />
               </button>
-              <button type="button" class="ekf-icone" title={`${t('writer.cmd.ajustes')} (Ctrl+,)`} aria-label={t('writer.cmd.ajustes')} onClick={() => pedir('ajustes')} data-teste="botao-ajustes">
-                <IconeEngrenagem />
-              </button>
-              {noOS && <BotaoSistema />}
+              {/* no Writer OS os Ajustes moram no menu do sistema (a engrenagem é dele) */}
+              {noOS ? (
+                <BotaoSistema />
+              ) : (
+                <button type="button" class="ekf-icone" title={`${t('writer.cmd.ajustes')} (Ctrl+,)`} aria-label={t('writer.cmd.ajustes')} onClick={() => pedir('ajustes')} data-teste="botao-ajustes">
+                  <IconeEngrenagem />
+                </button>
+              )}
             </>
           }
         />
@@ -385,4 +393,23 @@ function Levar({ fechar }: { fechar: () => void }) {
       </div>
     </Camada>
   );
+}
+
+/**
+ * A folha (o CodeMirror) carrega só quando abre (pedido do P3, 18/11): o pacote principal fica sem o editor, que é
+ * o pedaço mais pesado; a estante, as ideias e o Writer OS abrem mais leves. A folha põe o foco no texto sozinha.
+ */
+type ModuloDaFolha = typeof import('./Escrever.tsx');
+let folha: Promise<ModuloDaFolha> | null = null;
+const carregarFolha = (): Promise<ModuloDaFolha> => (folha ??= import('./Escrever.tsx'));
+function FolhaSobDemanda({ id }: { id: string }) {
+  const [m, setM] = useState<ModuloDaFolha | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void carregarFolha().then((x) => vivo && setM(x));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  return m ? <m.Escrever id={id} /> : <main class="folha-carregando" aria-busy="true" data-teste="folha-carregando" />;
 }

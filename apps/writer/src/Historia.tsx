@@ -14,13 +14,14 @@ import type { TargetedKeyboardEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Capa, capaDe, proximaCapa } from './Capa.tsx';
 import { teclaDe, useComandos } from './comandos.ts';
-import { SeletorStatus } from './Escrever.tsx';
+import { SeletorStatus } from './SeletorStatus.tsx';
 import { useSessao, useVivo } from './estado.ts';
 import { IconeAlca, IconeAviso, IconeMais, IconeNotas, IconePena } from './icones.tsx';
 import { useHistoriaDeAgora } from './pedidos.ts';
 import { ir } from './rotas.ts';
 import { diaEHora, palavras, t, tr, textoDoErro } from './textos.ts';
 import { Camada, Campo, MenuAcoes, avisar, confirmar } from './ui.tsx';
+import { noApp } from '@ekfrase/interface';
 
 interface Dados {
   arvore: Arvore;
@@ -139,7 +140,7 @@ export function Historia({ id }: { id: string }) {
     return (
       <div class="vazio">
         <p>{t('writer.historia.nao-existe')}</p>
-        <a class="botao" href="#/">
+        <a class="botao" href={noApp('writer')}>
           {t('writer.estante.ir')}
         </a>
       </div>
@@ -272,7 +273,7 @@ export function Historia({ id }: { id: string }) {
           <span class="alca" title={t('writer.arvore.arrastar')} {...arrastar('cena', c.id)}>
             <IconeAlca tamanho={14} />
           </span>
-          <a class="linha-titulo" href={`#/escrever/${c.id}`} tabIndex={-1}>
+          <a class="linha-titulo" href={noApp('writer', `escrever/${c.id}`)} tabIndex={-1}>
             {c.titulo || t('writer.cena.sem-titulo')}
           </a>
           {c.conflito_de && (
@@ -344,9 +345,9 @@ export function Historia({ id }: { id: string }) {
       </header>
 
       <nav class="historia-links" aria-label={t('writer.historia.partes')}>
-        <a href={`#/personagens/${id}`}>{t('writer.cmd.personagens')}</a>
-        <a href={`#/ideias/${id}`}>{t('writer.cmd.ideias-historia')}</a>
-        <a href={`#/arquivos/${id}`}>{t('writer.cmd.exportar-historia')}</a>
+        <a href={noApp('writer', `personagens/${id}`)}>{t('writer.cmd.personagens')}</a>
+        <a href={noApp('writer', `ideias/${id}`)}>{t('writer.cmd.ideias-historia')}</a>
+        <a href={noApp('writer', `arquivos/${id}`)}>{t('writer.cmd.exportar-historia')}</a>
       </nav>
 
       <div class="arvore-acoes">

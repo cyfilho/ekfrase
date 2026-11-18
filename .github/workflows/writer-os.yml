@@ -31,7 +31,14 @@ jobs:
         run: |
           VERSAO=$(node -p "require('./sistema/writer-os/casca/package.json').version")
           [[ "$GITHUB_REF_NAME" =~ ^writer-os-v${VERSAO//./\\.}(-teste\.[0-9]+)?$ ]] || { echo "A tag ($GITHUB_REF_NAME) não é writer-os-v$VERSAO nem writer-os-v$VERSAO-teste.N"; exit 1; }
+          # uma de teste com a versão de uma estável que já saiu nunca chega ao pendrive: o Gravador de teste
+          # escolhe a estável (X.Y.Z vale mais que X.Y.Z-teste.N) e grava a imagem velha (18/11). Sobe a versão da casca.
+          if [[ "$GITHUB_REF_NAME" == *-teste.* ]] && gh release view "writer-os-v$VERSAO" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "writer-os-v$VERSAO já saiu como estável: suba a versão em sistema/writer-os/casca/package.json antes de uma de teste"; exit 1
+          fi
           echo "VERSAO=$VERSAO" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: node sistema/writer-os/casca/scripts/montar.ts --os --sem-abrir
       - name: Montar a imagem (Debian trixie, num contêiner)
         run: |

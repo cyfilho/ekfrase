@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import type { Conta, Escola } from '../api.ts';
+import { enderecoDe } from '../rotas.ts';
 import { t } from '../textos.ts';
 import { podeAdministrar } from './admin.tsx';
 import { podeEditarTextos } from './textos-escola.tsx';
@@ -15,19 +16,19 @@ export function Inicio({ conta, escola, aoSair }: { conta: Conta; escola: Escola
       <h1>{t('vernakula.inicio.ola', { nome: conta.nome.split(' ')[0] ?? conta.nome })}</h1>
       <p class="obras">{t('vernakula.inicio.obras')}</p>
       <nav class="acoes" aria-label={t('vernakula.menu.rotulo')}>
-        <a class="botao" href="#/conta">
+        <a class="botao" href={enderecoDe('conta')}>
           {t('vernakula.menu.conta')}
         </a>
         {podeAdministrar(escola) && (
-          <a class="botao" href="#/admin">
+          <a class="botao" href={enderecoDe('admin')}>
             {t('vernakula.menu.admin')}
           </a>
         )}
-        <a class="botao" href="#/escolas">
+        <a class="botao" href={enderecoDe('escolas')}>
           {t(conta.organizacoes.length > 1 ? 'vernakula.menu.trocar_escola' : 'vernakula.menu.escolas')}
         </a>
         {podeEditarTextos(escola) && (
-          <a class="botao" href="#/textos">
+          <a class="botao" href={enderecoDe('textos')}>
             {t('vernakula.menu.textos')}
           </a>
         )}

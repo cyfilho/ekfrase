@@ -16,23 +16,18 @@
  *   gravado <N>             o laço de gravação (cada linha depois do COMMIT): é o teste de arrancar
  */
 import { DONO_LOCAL, Escrita } from '@ekfrase/writer-nucleo';
-import type { BrowserWindow } from 'electron';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Sistema } from '../motor/sistema.ts';
 import type { DadosDoWriter } from './dados.ts';
+import type { Pagina } from './pagina.ts';
 
 export const HISTORIA_DE_TESTE = 'Teste do Writer OS';
 const MARCA = 'Escrito no Writer OS.';
 /** Quantas gravações o laço faz (uma a cada 250 ms: ~75 s). */
 const VOLTAS = 300;
 
-const QUAL_TELA = `(() => {
-  const m = document.querySelector('main[data-teste]') || document.querySelector('[data-teste^="tela-"]');
-  return m ? m.getAttribute('data-teste') : '';
-})()`;
-
-export function ligarAgente(o: { relato: string; janela: () => BrowserWindow | null; dados: DadosDoWriter; sistema: Sistema }): (linha: string) => void {
+export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoWriter; sistema: Sistema }): (linha: string) => void {
   mkdirSync(dirname(o.relato), { recursive: true });
   const dizer = (linha: string) => {
     try {
@@ -46,10 +41,9 @@ export function ligarAgente(o: { relato: string; janela: () => BrowserWindow | n
   let conferindo = false;
 
   setInterval(() => {
-    const j = o.janela();
-    if (j && !j.isDestroyed()) {
-      j.webContents
-        .executeJavaScript(QUAL_TELA)
+    if (o.pagina.aberta()) {
+      o.pagina
+        .qualTela()
         .then((t: unknown) => {
           if (typeof t === 'string' && t && t !== tela) {
             tela = t;

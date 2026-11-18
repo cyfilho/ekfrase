@@ -8,6 +8,7 @@
  */
 import type { Tradutor } from '@ekfrase/nucleo';
 import type { ComponentChildren } from 'preact';
+import { jogo } from './enderecos.ts';
 import { RodapeEkfrase } from './Rodape.tsx';
 import { TopoEkfrase } from './Topo.tsx';
 import type { T } from './tipos.ts';
@@ -29,7 +30,7 @@ export interface PaginaAppProps {
 export function PaginaApp(p: PaginaAppProps) {
   return (
     <div class="ekf-entrada-app" data-teste={p.dataTeste}>
-      <TopoEkfrase t={p.t} tr={p.tr} app={p.app} passeio={`/#/torre/${p.app}`} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
+      <TopoEkfrase t={p.t} tr={p.tr} app={p.app} passeio={jogo.hall(p.app)} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
       <main class="ekf-entrada-miolo">
         <section class="ekf-heroi">
           <img class="ekf-heroi-logo" src={p.logo} width={96} height={96} alt="" />

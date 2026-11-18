@@ -14,6 +14,7 @@ import { historiaDeAgora, pedir, useHistoriaDeAgora } from './pedidos.ts';
 import { ir } from './rotas.ts';
 import { t, textoDoErro } from './textos.ts';
 import { Camada, MenuAcoes, avisar, confirmar } from './ui.tsx';
+import { noApp } from '@ekfrase/interface';
 
 const falhou = (e: unknown) => avisar(textoDoErro((e as { codigo?: string }).codigo), 'erro');
 
@@ -264,7 +265,7 @@ export function Ideias({ historia }: { historia?: string }) {
       </header>
       {historia && (
         <p>
-          <a href={`#/historia/${historia}`}>{t('writer.voltar-historia')}</a> · <a href="#/ideias">{t('writer.ideias.todas')}</a>
+          <a href={noApp('writer', `historia/${historia}`)}>{t('writer.voltar-historia')}</a> · <a href={noApp('writer', 'ideias')}>{t('writer.ideias.todas')}</a>
         </p>
       )}
       <div class="filtros-ideias" role="search">
@@ -329,7 +330,7 @@ export function Ideias({ historia }: { historia?: string }) {
               </ul>
             )}
             <p class="cartao-pe">
-              {i.historia && !historia && <a href={`#/historia/${i.historia}`}>{nomeDaHistoria(i.historia) || t('writer.historia.sem-titulo')}</a>}
+              {i.historia && !historia && <a href={noApp('writer', `historia/${i.historia}`)}>{nomeDaHistoria(i.historia) || t('writer.historia.sem-titulo')}</a>}
               {i.virou_tipo && i.virou_id && <VirouEm ideia={i} />}
             </p>
           </li>
@@ -356,7 +357,7 @@ export function Ideias({ historia }: { historia?: string }) {
 function VirouEm({ ideia }: { ideia: Ideia }) {
   const tipo = ideia.virou_tipo!;
   const id = ideia.virou_id!;
-  const href = tipo === 'historia' ? `#/historia/${id}` : tipo === 'cena' ? `#/escrever/${id}` : ideia.historia ? `#/personagens/${ideia.historia}` : null;
+  const href = tipo === 'historia' ? noApp('writer', `historia/${id}`) : tipo === 'cena' ? noApp('writer', `escrever/${id}`) : ideia.historia ? noApp('writer', `personagens/${ideia.historia}`) : null;
   const texto = t(`writer.virou.${tipo}`);
   return href ? (
     <a class="selo-virou" href={href}>

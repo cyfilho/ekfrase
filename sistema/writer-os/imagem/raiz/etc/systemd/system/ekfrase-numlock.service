@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MPL-2.0
+# Liga o Num Lock da sessão: uma tecla virtual por uinput, que o Cage junta ao grupo dos teclados
+# (fonte/ekfrase-numlock.c). Chamado pelo ekfrase-numlock.path. Não lê tecla de ninguém, não abre rede.
+[Unit]
+Description=Ekfrase Writer OS: liga o Num Lock
+
+[Service]
+Type=oneshot
+ExecStartPre=-/usr/sbin/modprobe -q uinput
+ExecStart=/usr/lib/ekfrase/ekfrase-numlock
+TimeoutStartSec=40
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ReadWritePaths=/run/ekfrase/sessao
+DevicePolicy=closed
+DeviceAllow=/dev/uinput rw
+DeviceAllow=char-input r
