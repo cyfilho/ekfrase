@@ -28,12 +28,6 @@ const LUPA: readonly Px[] = [
   [3, 0, 4, 1], [2, 1, 1, 1], [7, 1, 1, 1], [1, 2, 1, 4], [8, 2, 1, 4], [2, 6, 1, 1], [7, 6, 1, 1], [3, 7, 4, 1],
   [8, 7, 1, 1], [9, 8, 1, 1], [10, 9, 1, 1], [11, 10, 1, 1], [9, 9, 1, 1], [10, 10, 1, 1],
 ];
-// A engrenagem (ajustes): o aro e os oito dentes.
-// prettier-ignore
-const ENGRENAGEM: readonly Px[] = [
-  [5, 0, 2, 3], [5, 9, 2, 3], [0, 5, 3, 2], [9, 5, 3, 2], [2, 2, 2, 2], [8, 2, 2, 2], [2, 8, 2, 2], [8, 8, 2, 2],
-  [4, 3, 4, 1], [3, 4, 1, 4], [8, 4, 1, 4], [4, 8, 4, 1],
-];
 // O teclado (a lista de atalhos).
 // prettier-ignore
 const TECLADO: readonly Px[] = [
@@ -84,7 +78,8 @@ export const IconeEntra = (p: P) => <Pixels px={ENTRA} {...p} />;
 export const IconeMais = (p: P) => <Pixels px={MAIS} {...p} />;
 export const IconeMenu = (p: P) => <Pixels px={MENU} {...p} />;
 export const IconeLupa = (p: P) => <Pixels px={LUPA} {...p} />;
-export const IconeEngrenagem = (p: P) => <Pixels px={ENGRENAGEM} {...p} />;
+// a engrenagem é comum a todo app (packages/interface): ajustes e, no Writer OS, o menu do sistema
+export { IconeEngrenagem } from '@ekfrase/interface';
 export const IconeTeclado = (p: P) => <Pixels px={TECLADO} {...p} />;
 export const IconeLampada = (p: P) => <Pixels px={LAMPADA} {...p} />;
 export const IconeLixeira = (p: P) => <Pixels px={LIXEIRA} {...p} />;

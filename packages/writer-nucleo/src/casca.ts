@@ -186,6 +186,8 @@ export interface PonteSistema {
   bateria(): Promise<Bateria | null>;
   /** O brilho (0 a 100), ou `null` se a tela não deixa. Com `passo` (+10, −10), muda antes de responder. */
   brilho(passo?: number): Promise<number | null>;
+  /** As teclas de brilho do notebook (a casca as lê): o brilho novo, a cada tecla. Devolve o "parar de ouvir". */
+  aoMudarBrilho(f: (n: number) => void): () => void;
   discos(): Promise<DiscoUSB[]>;
   /** Guarda os textos neste disco (`Ekfrase Writer/` nele). Vindo da memória, leva o que já estava lá. */
   guardarEm(id: string): Promise<RespostaCasca>;

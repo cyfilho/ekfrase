@@ -32,3 +32,4 @@ sistema/writer-os/gravador/instalador/
 
 # o Writer OS: as imagens montadas (o CI d? como artefato)
 sistema/writer-os/imagem/saida/
+prints-*/

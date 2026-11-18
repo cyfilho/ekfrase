@@ -5,7 +5,8 @@
  *
  * - `nodeIntegration:false`, `contextIsolation:true`, `sandbox:true`: a página não tem Node; só o
  *   que o preload põe nela com `contextBridge`;
- * - carrega SÓ `app://<host>/` (os arquivos empacotados do app; nunca uma página da internet);
+ * - carrega SÓ `app://<host>/` (os arquivos empacotados do app; nunca uma página da internet). O que não é arquivo
+ *   e não tem extensão (as telas do app: `/writer/app/ideias`) recebe o `index.html`, como o site;
  * - `will-navigate`, `will-redirect` e `setWindowOpenHandler` bloqueiam tudo (nenhum link sai,
  *   nenhuma janela nova abre, nem `window.open`, nem link externo);
  * - DevTools desligado no build (`devTools:false`); no desenvolvimento, só com EKFRASE_CASCA_DEVTOOLS=1;
@@ -19,56 +20,12 @@
  * Tudo o que for bloqueado fica anotado em `travas.bloqueado` (os testes leem pelo processo principal).
  */
 import { BrowserWindow, Menu, app, protocol, type Session, type WebContents } from 'electron';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { anotar, arquivoDoApp, CSP } from './servir.ts';
 import { teclaProibida } from './teclas.ts';
 
 export { teclaProibida } from './teclas.ts';
 
-export interface Bloqueio {
-  tipo: 'navegar' | 'janela' | 'tecla' | 'permissao' | 'webview' | 'rede-pagina' | 'rede' | 'devtools';
-  alvo: string;
-}
-
-/** O que foi bloqueado (para os testes; a casca não mostra). */
-export const travas = { bloqueado: [] as Bloqueio[] };
-export const anotar = (b: Bloqueio): void => {
-  travas.bloqueado.push(b);
-  if (travas.bloqueado.length > 500) travas.bloqueado.splice(0, 100);
-};
-
-/** O tipo de cada arquivo servido pelo `app://`. */
-const TIPOS: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.txt': 'text/plain; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-};
-
-/** A política de conteúdo das páginas do `app://` (nada de fora; só o que veio no pacote). */
-export const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "media-src 'self' blob:",
-  "worker-src 'none'",
-  "object-src 'none'",
-  "frame-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+export { anotar, CSP, travas, type Bloqueio } from './servir.ts';
 
 /** Precisa vir ANTES de `app.whenReady()`: o `app://` é um esquema "de verdade" (origem, fetch, cookies). */
 export function registrarEsquema(esquema = 'app'): void {
@@ -92,6 +49,8 @@ export interface OpcoesJanela {
   sessao: Session;
   esquema?: string;
   host: string;
+  /** O caminho em que a janela abre (padrão `/`; o Writer abre em `/writer/`, o mesmo endereço do site). */
+  inicio?: string;
   preload: string;
   titulo: string;
   icone?: string;
@@ -108,31 +67,19 @@ export interface OpcoesJanela {
 /** Serve os arquivos do app pelo `app://` (nunca fora da pasta; o que não existe = 404). */
 export function servirApp(o: OpcoesServir): void {
   const esquema = o.esquema ?? 'app';
-  const raiz = normalize(o.pasta);
-  const base = (o.base ?? '/').replace(/\/?$/, '/');
   o.sessao.protocol.handle(esquema, async (pedido) => {
     const u = new URL(pedido.url);
     if (u.host !== o.host) return new Response('', { status: 404 });
-    let caminho = decodeURIComponent(u.pathname);
+    const caminho = decodeURIComponent(u.pathname);
     if (o.api && caminho.startsWith('/api/')) return o.api(pedido, caminho.slice('/api/'.length));
-    if (base !== '/' && caminho.startsWith(base)) caminho = `/${caminho.slice(base.length)}`;
-    if (caminho === '/' || caminho === '') caminho = '/index.html';
-    const arquivo = normalize(join(raiz, caminho));
-    if (arquivo !== raiz && !arquivo.startsWith(raiz + sep)) return new Response('', { status: 404 });
-    try {
-      const corpo = await readFile(arquivo);
-      return new Response(corpo, {
-        status: 200,
-        headers: { 'content-type': TIPOS[extname(arquivo).toLowerCase()] ?? 'application/octet-stream', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' },
-      });
-    } catch {
-      return new Response('', { status: 404 });
-    }
+    const a = await arquivoDoApp(o.pasta, o.base ?? '/', caminho);
+    if (!a) return new Response('', { status: 404 });
+    return new Response(new Uint8Array(a.corpo), { status: 200, headers: { 'content-type': a.tipo, 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' } });
   });
 }
 
-/** A URL inicial (e a única permitida) da janela. */
-export const urlDoApp = (host: string, esquema = 'app'): string => `${esquema}://${host}/`;
+/** A URL inicial da janela (`inicio` = o caminho dentro do host: o do Writer é `/writer/`, igual ao do site). */
+export const urlDoApp = (host: string, esquema = 'app', inicio = '/'): string => `${esquema}://${host}${inicio.startsWith('/') ? inicio : `/${inicio}`}`;
 
 /** O endereço é do próprio app (mesma origem `app://host`)? */
 export function ehDoApp(url: string, host: string, esquema = 'app'): boolean {
@@ -146,7 +93,7 @@ export function ehDoApp(url: string, host: string, esquema = 'app'): boolean {
 
 /** Trava um `webContents` (a janela, e qualquer outro que apareça). */
 export function travarConteudo(wc: WebContents, devTools = false): void {
-  // navegar: NUNCA (as telas do app são rotas `#/...`, que não navegam; recarregar é só pelo processo principal)
+  // navegar: NUNCA (as telas do app trocam de endereço por `history.pushState`, que não navega; recarregar é só pelo processo principal)
   const naoNavegar = (e: { preventDefault(): void }, url: string) => {
     e.preventDefault();
     anotar({ tipo: 'navegar', alvo: url });
@@ -240,6 +187,6 @@ export function criarJanela(o: OpcoesJanela): BrowserWindow {
   win.setMenu(null);
   win.removeMenu();
   win.once('ready-to-show', () => win.show());
-  void win.loadURL(urlDoApp(o.host, esquema));
+  void win.loadURL(urlDoApp(o.host, esquema, o.inicio));
   return win;
 }

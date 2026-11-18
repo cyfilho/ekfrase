@@ -4,7 +4,7 @@
  * EXPORTAR e IMPORTAR (PLANO §2.1 item 6). Exportar: `.md` num arquivo só, `.zip` (uma pasta, uma
  * cena por arquivo), `.docx` (manuscrito padrão) e `.ekfr`. Importar: `.ekfr`, `.md` e `.zip`; tudo
  * entra como registros NOVOS (nunca escreve por cima). Um `.ekfr` de outro app da família: oferece
- * abrir lá (como o Maker faz, DEC-P053). E `#/abrir/<chave>`: um arquivo entregue por outro app.
+ * abrir lá (como o Maker faz, DEC-P053). E `/writer/app/abrir/<chave>`: um arquivo entregue por outro app.
  */
 import { ACEITA, TIPO_MIDIA, enderecoDaEntrega, entregar, identificar, podeAbrir, receber } from '@ekfrase/arquivo';
 import {
@@ -26,7 +26,7 @@ import { useComandos } from './comandos.ts';
 import { useSessao, useVivo } from './estado.ts';
 import { noOS } from './computador/casca.ts';
 import { importarDoPendrive } from './computador/pendrive.ts';
-import { IconeBaixar } from '@ekfrase/interface';
+import { IconeBaixar, noApp } from '@ekfrase/interface';
 import { IconeEntra } from './icones.tsx';
 import { ir } from './rotas.ts';
 import { t, tr, textoDoErro } from './textos.ts';
@@ -247,7 +247,7 @@ export function Arquivos({ historia }: { historia?: string }) {
   );
 }
 
-/** `#/abrir/<chave>`: o arquivo que outro app (ou o site) entregou para o Writer. */
+/** `/writer/app/abrir/<chave>`: o arquivo que outro app (ou o site) entregou para o Writer. */
 export function Abrir({ chave }: { chave: string }) {
   const s = useSessao();
   const [msg, setMsg] = useState<string | null>(null);
@@ -270,7 +270,7 @@ export function Abrir({ chave }: { chave: string }) {
     <div class="vazio" data-teste="tela-abrir">
       <p>{msg ?? t('writer.abrir.abrindo')}</p>
       {msg && (
-        <a class="botao" href="#/">
+        <a class="botao" href={noApp('writer')}>
           {t('writer.estante.ir')}
         </a>
       )}

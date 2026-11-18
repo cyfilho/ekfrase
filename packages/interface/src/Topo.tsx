@@ -11,6 +11,7 @@ import { Menu } from './Menu.tsx';
 import { FormConta } from './Conta.tsx';
 import { Janela } from './Janela.tsx';
 import { ambienteFechado } from './ambiente.ts';
+import { site } from './enderecos.ts';
 import { aoMudarConta, aoMudarPerfil, contaAtual, eu, sair, verPerfil, type Conta } from './ponte.ts';
 import { SeletorIdioma } from './SeletorIdioma.tsx';
 import type { T } from './tipos.ts';
@@ -95,14 +96,14 @@ export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void
           </p>
           {!ambienteFechado() && (
             <>
-              <a role="menuitem" href="/#/conta">
+              <a role="menuitem" href={site.conta}>
                 {t('nucleo.conta.ekfrase.link')}
               </a>
-              <a role="menuitem" href="/#/conta/inventario">
+              <a role="menuitem" href={site.inventario}>
                 {t('nucleo.inventario.titulo')}
               </a>
               {conta.equipe && (
-                <a role="menuitem" href="/#/equipe">
+                <a role="menuitem" href={site.equipe}>
                   {t('nucleo.equipe.titulo')}
                 </a>
               )}
@@ -137,6 +138,8 @@ export interface AcoesTopoProps {
   aoSair?: () => void;
   /** Sem conta, mostrar o botão Entrar (conta Ekfrase). */
   entrar?: boolean;
+  /** Sem o botão da conta (o Writer OS põe a conta no menu do sistema). */
+  semConta?: boolean;
 }
 
 /** Os botões do topo, iguais em todo app: [antes] passeio · idioma · tema · feedback · conta. */
@@ -148,7 +151,7 @@ export function AcoesTopo(p: AcoesTopoProps) {
       <SeletorIdioma tr={p.tr} {...(p.aoTrocarIdioma ? { aoTrocar: p.aoTrocarIdioma } : {})} />
       <BotaoTema t={p.t} />
       <BotaoFeedback t={p.t} app={p.app} />
-      <BotaoConta t={p.t} {...(p.aoSair ? { aoSair: p.aoSair } : {})} {...(p.entrar ? { comEntrar: true } : {})} />
+      {!p.semConta && <BotaoConta t={p.t} {...(p.aoSair ? { aoSair: p.aoSair } : {})} {...(p.entrar ? { comEntrar: true } : {})} />}
     </div>
   );
 }

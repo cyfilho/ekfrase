@@ -293,6 +293,18 @@ textarea {
   box-shadow: -4px 0 0 0 var(--sombra);
 }
 
+/* o menu do sistema do Writer OS (a engrenagem): preso ao canto de cima, à direita, como o Menu Iniciar */
+.camada-fundo.menu {
+  justify-content: flex-end;
+  padding: 3.6rem 0.75rem 1rem;
+  background: transparent;
+}
+
+.camada.menu {
+  width: min(24rem, 100%);
+  max-height: calc(100dvh - 4.6rem);
+}
+
 .camada-topo {
   display: flex;
   align-items: center;
@@ -1594,9 +1606,72 @@ kbd {
   font-size: 1rem;
 }
 
-.painel-sistema .desligar-os {
-  justify-content: flex-end;
-  padding-top: 0.75rem;
+/* o menu do sistema (a engrenagem do Writer OS): Desligar e Reiniciar em cima, a conta, as partes do sistema */
+.menu-sistema {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.menu-sistema-energia,
+.menu-sistema-conta {
+  display: grid;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--borda);
+}
+
+.menu-sistema-energia {
+  grid-template-columns: 1fr 1fr;
+}
+
+.menu-sistema-conta p {
+  margin: 0.25rem 0.7rem;
+  color: var(--tinta-suave, var(--tinta));
+  overflow-wrap: anywhere;
+}
+
+.menu-sistema-partes {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.item-menu-os {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  background: none;
+  color: var(--tinta);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.item-menu-os small {
+  margin-inline-start: auto;
+  opacity: 0.75;
+}
+
+.menu-sistema-energia .item-menu-os {
+  justify-content: center;
+  font-weight: 700;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+}
+
+.item-menu-os:hover,
+.item-menu-os:focus-visible {
+  background: var(--papel-forte);
+  box-shadow: inset 4px 0 0 var(--destaque);
+}
+
+.item-menu-os:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: -3px;
 }
 
 /* Writer OS: "Desligar" bem à vista no topo (PLANO §6.5 item 2): botão com o nome, na cor de aviso do app */

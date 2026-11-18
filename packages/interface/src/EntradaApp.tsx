@@ -14,6 +14,7 @@ import { useState } from 'preact/hooks';
 import { FormConta, type ModoConta } from './Conta.tsx';
 import { IconeBaixar, IconeNuvem, IconePendrive, IconeTroca } from './icones.tsx';
 import { Janela } from './Janela.tsx';
+import { jogo } from './enderecos.ts';
 import type { Conta } from './ponte.ts';
 import { RodapeEkfrase } from './Rodape.tsx';
 import { TopoEkfrase } from './Topo.tsx';
@@ -72,7 +73,7 @@ export function EntradaApp(p: EntradaAppProps) {
   const abrir = (m: ModoConta) => (p.entrarProprio ? p.entrarProprio(m) : setJanela(m));
   return (
     <div class="ekf-entrada-app">
-      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? `/#/torre/${p.app}` })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
+      <TopoEkfrase t={t} tr={p.tr} app={p.app} {...(p.semPasseio ? {} : { passeio: p.aoPasseio ?? jogo.hall(p.app) })} {...(p.aoTrocarIdioma ? { aoTrocarIdioma: p.aoTrocarIdioma } : {})} />
       <main class="ekf-entrada-miolo">
         <section class="ekf-heroi">
           <img class="ekf-heroi-logo" src={p.logo} width={96} height={96} alt="" />

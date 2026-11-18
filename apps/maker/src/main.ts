@@ -15,6 +15,7 @@ import {
   type Point,
 } from '@ekfrase/maker-core';
 import { chaveNoEndereco, enderecoDaEntrega, entregar, identificar, podeAbrir, receber } from '@ekfrase/arquivo';
+import { aoMudarEndereco, avisarMudanca, capturarLinks, linksDoApp, migrarHashAntigo, noApp, telaNoApp } from '@ekfrase/interface';
 import { DocError, type Command } from '@ekfrase/maker-doc';
 import { BIOMES, DEFAULT_GENERATOR, GenError, type BiomeId } from '@ekfrase/maker-gen';
 import { BRUSHES, brushAvailable, layersOf, type Brush } from './brushes';
@@ -584,7 +585,7 @@ function redo(): void {
 }
 
 /**
- * Abre um arquivo do aparelho ou entregue por outro app (`#/abrir/<chave>`). Antes, o envelope do
+ * Abre um arquivo do aparelho ou entregue por outro app (`/maker/app/abrir/<chave>`). Antes, o envelope do
  * `.ekfr` diz de que app ele é (docs/formato-ekfr.md): se é de outro app da família, oferece abrir lá.
  */
 async function abrirArquivo(bytes: Uint8Array, nome: string): Promise<void> {
@@ -1272,6 +1273,9 @@ function resize(): void {
 }
 
 function init(): void {
+  // endereços antigos (`/maker/#/novo`) viram os novos; links `/maker/...` trocam de tela sem recarregar
+  migrarHashAntigo('maker');
+  capturarLinks(linksDoApp('maker'));
   const prefs = loadPrefs();
   // o idioma e o tema do Ekfrase (os mesmos em todo o site) mandam: src/casca.tsx
   iniciarIdiomaETema();
@@ -1329,18 +1333,21 @@ function init(): void {
   fitWorld(false);
   requestDraw();
 
-  // Pedidos que chegam do passeio do castelo (DEC-P040): cada objeto do salão do cartógrafo abre
-  // uma parte do Maker. /maker/#/novo (globo), #/mapa (quadro), #/satelite (luneta), #/editar (escrivaninha).
+  // Pedidos que chegam do passeio do castelo (DEC-P040): cada objeto do salão do cartógrafo abre uma parte do
+  // Maker. /maker/app/novo (globo), /mapa (quadro), /satelite (luneta), /editar (escrivaninha); e o .ekfr
+  // entregue por outro app ou pelo roteador do site: /maker/app/abrir/<chave>.
   const pedido = (): void => {
-    const p = location.hash.replace(/^#\/?/, '');
-    if (!p) return;
-    // um .ekfr entregue por outro app ou pelo roteador do site (#/abrir/<chave>)
-    const chave = chaveNoEndereco(location.hash);
-    history.replaceState(null, '', location.pathname + location.search);
+    const tela = telaNoApp('maker');
+    if (!tela || tela.length === 0) return;
+    // o endereço é limpo antes de atender: vira `/maker/app`
+    const chave = chaveNoEndereco();
+    history.replaceState(null, '', noApp('maker') + location.search);
+    avisarMudanca();
     if (chave) {
       void receber(chave).then((e) => (e ? abrirArquivo(e.bytes, e.nome) : showToast(t('file.handoffExpired'))));
       return;
     }
+    const p = tela[0];
     if (p === 'novo') void gerarNovoMundo();
     else if (p === 'mapa') chooseStyle('map');
     else if (p === 'satelite') chooseStyle('satellite');
@@ -1369,7 +1376,7 @@ function init(): void {
     estadoNuvem: (texto) => ($('doc-cloud').textContent = texto),
     pronto: () => {
       pedido();
-      addEventListener('hashchange', pedido);
+      aoMudarEndereco(pedido);
     },
   });
 }

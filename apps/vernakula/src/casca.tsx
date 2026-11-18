@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { AcoesTopo, RodapeEkfrase } from '@ekfrase/interface';
+import { AcoesTopo, RodapeEkfrase, jogo } from '@ekfrase/interface';
 import logoVernakula from './img/logo-vernakula.png';
+import { enderecoDe } from './rotas.ts';
 import { t, tr } from './textos.ts';
 
 /**
@@ -9,17 +10,17 @@ import { t, tr } from './textos.ts';
  * que a pessoa entrou logo abaixo (FB-0017), e os botões-ícone de sempre: passeio (a torre do
  * Vernákula no castelo, DEC-P040), idioma, tema, feedback e a conta.
  */
-export function Cabecalho({ escola }: { escola?: string | undefined }) {
+export function Cabecalho({ escola, entrou }: { escola?: string | undefined; entrou: boolean }) {
   return (
     <header class="topo">
-      <a class="marca" href="#">
+      <a class="marca" href={enderecoDe(entrou ? 'inicio' : 'entrada')}>
         <img src={logoVernakula} width={48} height={48} alt="" />
         <span class="marca-nomes">
           <span>{t('vernakula.nome_curto')}</span>
           {escola && <small class="marca-escola">{escola}</small>}
         </span>
       </a>
-      <AcoesTopo t={t} tr={tr} app="vernakula" passeio="/#/torre/vernakula/salas" aoSair={() => location.reload()} />
+      <AcoesTopo t={t} tr={tr} app="vernakula" passeio={jogo.sala('vernakula')} aoSair={() => location.reload()} />
     </header>
   );
 }

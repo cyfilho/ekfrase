@@ -60,8 +60,8 @@ export interface CamadaProps {
   titulo: string;
   fechar: () => void;
   children: ComponentChildren;
-  /** `janela` (no meio) ou `gaveta` (do lado direito; no celular, a tela toda). */
-  tipo?: 'janela' | 'gaveta';
+  /** `janela` (no meio), `gaveta` (do lado direito; no celular, a tela toda) ou `menu` (preso ao canto de cima, à direita). */
+  tipo?: 'janela' | 'gaveta' | 'menu';
   teste?: string;
   /** Classe a mais na caixa. */
   classe?: string;
