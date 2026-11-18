@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+#
+# O initrd sem os drivers de vídeo pesados (P3b, 18/11/2026). Com MODULES=most, o gancho do Plymouth põe na fila
+# TODOS os drivers de kernel/drivers/gpu/drm, e cada um traz o firmware dele: o initrd tinha 103 MB e o kernel
+# levava 2 s só para o descomprimir. Aqui saem da fila o amdgpu, o radeon, o nouveau e o xe (e com eles o firmware
+# da AMD e da NVIDIA). Nessas placas a tela do boot usa o simpledrm (o quadro do firmware UEFI), e o driver de
+# verdade carrega depois, já do squashfs, que tem o firmware todo. O i915 (Intel, o do notebook de teste) fica.
+#
+# O initramfs-tools 0.148 (trixie) só ENFILEIRA os módulos nos ganchos ($__MODULES_TO_ADD, um nome por linha) e os
+# copia depois de todos eles; os ganchos de /etc/initramfs-tools/hooks rodam depois dos de /usr/share. Se a fila
+# mudar de forma, o 90-travas.sh confere o initrd pronto e falha a montagem.
+set -e
+
+case "${1:-}" in
+  prereqs) echo ""; exit 0 ;;
+esac
+
+[ -n "${__MODULES_TO_ADD:-}" ] && [ -f "$__MODULES_TO_ADD" ] || { echo "E: ekfrase-video: a fila de módulos do initramfs-tools mudou" >&2; exit 1; }
+
+FORA=$(mktemp)
+for d in amd radeon nouveau xe; do
+  [ -d "/lib/modules/$version/kernel/drivers/gpu/drm/$d" ] || continue
+  find "/lib/modules/$version/kernel/drivers/gpu/drm/$d" -name '*.ko*' -printf '%f\n' | sed 's/\.ko.*$//'
+done | sort -u > "$FORA"
+
+if [ -s "$FORA" ]; then
+  grep -vxF -f "$FORA" "$__MODULES_TO_ADD" > "$FORA.fila" || true
+  cat "$FORA.fila" > "$__MODULES_TO_ADD"
+fi
+rm -f "$FORA" "$FORA.fila"

@@ -108,6 +108,7 @@
   "estante.editada": "edited {quando}",
   "estante.ir": "Go to the bookshelf",
   "estante.sem-conta": "You are writing without an account: everything stays only on this device. Sign in to the Ekfrase account (at the top) to save to the cloud and open it on other devices.",
+  "estante.sem-conta.os": "You are writing without an account: nothing goes to the cloud. To keep your texts in the cloud and open them on other devices, sign in to your Ekfrase account from the system menu (the gear at the top).",
   "estante.memoria": "This browser did not allow saving. Texts stay only in memory and disappear when the page closes. Export before leaving.",
   "conflito.titulo.one": "{n} conflict copy",
   "conflito.titulo.other": "{n} conflict copies",
@@ -449,7 +450,6 @@
   "os.wifi.erro.falhou": "Could not connect. If this network asks you to log in on a page, use another network for now.",
   "os.wifi.erro.negado": "The system did not allow this connection.",
   "os.cancelar": "Cancel",
-  "os.painel.titulo": "System",
   "os.energia.titulo": "Battery and screen",
   "os.bateria.nivel": "Battery: {n}%",
   "os.bateria.carregando": "Battery: {n}%, charging",
@@ -459,7 +459,8 @@
   "os.brilho.menos": "Dimmer",
   "os.brilho.mais": "Brighter",
   "os.servidor.titulo": "Server and account",
-  "os.conta.dica": "Signing in, out and switching accounts are on the account button at the top.",
+  "os.conta.dica": "Signing in and out is at the top of the system menu (the gear at the top of the screen).",
+  "os.brilho.dica": "The laptop's brightness keys change it too. The screen always starts at 50% when the computer turns on.",
   "os.discos.titulo": "Drives",
   "os.discos.ejetar": "Eject safely",
   "os.discos.pode-tirar": "You can unplug {nome}.",
@@ -536,5 +537,11 @@
   "os.pendrive.erro.senha": "Wrong password.",
   "os.nome": "Writer OS",
   "entrada.os.titulo": "Writer OS: an operating system",
-  "entrada.os.texto": "Ekfrase Writer OS is an operating system of its own: put it on a USB stick or external SSD, start the computer from it and the machine opens straight into Writer, with no Windows and no distractions. Write on any computer and take everything with you."
+  "entrada.os.texto": "Ekfrase Writer OS is an operating system of its own: put it on a USB stick or external SSD, start the computer from it and the machine opens straight into Writer, with no Windows and no distractions. Write on any computer and take everything with you.",
+  "os.menu.titulo": "System menu",
+  "os.menu.voltar": "Back to the menu",
+  "os.menu.conta-titulo": "Account",
+  "os.menu.conta": "Signed in as {nome}",
+  "os.menu.sem-conta": "Writing without an account",
+  "os.menu.ajustes": "Writer settings"
 }
