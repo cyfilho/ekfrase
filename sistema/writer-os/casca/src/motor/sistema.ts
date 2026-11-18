@@ -226,7 +226,17 @@ export class SistemaLinux implements Sistema {
     const base = '/sys/class/backlight';
     let dispositivo: string | undefined;
     try {
-      dispositivo = readdirSync(base)[0];
+      dispositivo = escolherLuz(
+        readdirSync(base).map((nome) => {
+          let tipo = '';
+          try {
+            tipo = readFileSync(join(base, nome, 'type'), 'utf8').trim();
+          } catch {
+            // sem o tipo: fica por último
+          }
+          return { nome, tipo };
+        }),
+      );
     } catch {
       return null;
     }
@@ -339,6 +349,19 @@ export class SistemaLinux implements Sistema {
 }
 
 // ======================================================================================
+/**
+ * Qual luz de tela usar quando o notebook tem mais de uma em /sys/class/backlight (a do ACPI e a da placa de
+ * vídeo, p. ex.): a do firmware, depois a da plataforma, por último a "raw" do driver (a ordem que o kernel
+ * recomenda; é a mesma do GNOME e do systemd).
+ */
+export function escolherLuz(lista: readonly { nome: string; tipo: string }[]): string | undefined {
+  const peso = (tipo: string) => {
+    const i = ['firmware', 'platform', 'raw'].indexOf(tipo);
+    return i < 0 ? 3 : i;
+  };
+  return [...lista].sort((a, b) => peso(a.tipo) - peso(b.tipo) || a.nome.localeCompare(b.nome))[0]?.nome;
+}
+
 // o simulado (testes e prints)
 // ======================================================================================
 
@@ -353,7 +376,8 @@ export class SistemaSimulado implements Sistema {
   private readonly raiz: string;
   private conhecidas = new Map<string, string | null>();
   private conectada: string | null = null;
-  private luz = 60;
+  // como a imagem: a tela começa sempre em 50% (ekfrase-brilho.sh)
+  private luz = 50;
   private outroMontado = false;
   saiu: 'desligar' | 'reiniciar' | null = null;
 
