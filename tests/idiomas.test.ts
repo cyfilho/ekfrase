@@ -112,6 +112,10 @@ describe('idiomas', () => {
       ...['windows', 'recuperacao', 'efi', 'linux', 'writer', 'outra'].map((p) => `os.instalar.parte.${p}`),
       ...['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'positivo', 'outra'].flatMap((m) => [`os.tutorial.tecla.${m}`, `os.tutorial.config.${m}`]),
       ...['senha', 'senha-curta', 'pasta', 'nao-abre', 'fechada', 'ja-tem', 'diferentes'].map((e) => `computador.erro.${e}`),
+      // as atualizações (U1 e U2): as situações e os erros, e as frases do computador (que não "liga": abre)
+      ...['parado', 'procurando', 'em-dia', 'disponivel', 'baixando', 'aplicando', 'pronta', 'erro'].map((s) => `atualizacoes.situacao.${s}`),
+      ...['sem-rede', 'lacre', 'sem-espaco', 'sem-dados', 'pendente', 'falhou'].map((e) => `atualizacoes.erro.${e}`),
+      ...['situacao.parado', 'situacao.aplicando', 'situacao.pronta', 'modo.automaticas.dica', 'erro.sem-espaco'].map((k) => `atualizacoes.${k}.pc`),
     ];
     for (const k of montadas) if (!tem(k)) faltando.push(k);
     // os atalhos fixos da lista de atalhos (apps/writer/src/Paleta.tsx) são chaves inteiras no código

@@ -13,11 +13,18 @@ import { baseDoServidor, conferirServidor, type EscolhaEspelho, type MetodoArmaz
 import { gravarLembrado, lerLembrado } from '../motor/pastas.ts';
 import { origemDe } from '../motor/rede-node.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
-import type { AtualizacoesOS } from './atualizacoes-os.ts';
 import type { DadosDoWriter } from './dados.ts';
 import type { WriterOS } from './os.ts';
 
 type Funcao = (...a: never[]) => unknown;
+
+/** O que os canais `at:*` pedem: o `AtualizacoesOS` (Writer OS, U1) e o `Atualizador` (computador, U2) têm os dois. */
+export interface MotorDeAtualizacoes {
+  estado(): unknown;
+  procurar(): Promise<unknown>;
+  instalar(): Promise<unknown>;
+  usarModo(m: 'automaticas' | 'perguntar'): unknown;
+}
 
 export interface Canais {
   pedidos: Record<string, Funcao>;
@@ -41,8 +48,10 @@ export interface OpcoesCanais {
   lembrado: string;
   writerOS: WriterOS | null;
   sistema: Sistema | null;
-  /** As atualizações do app (docs/ATUALIZACOES.md; no Writer OS desde a U1). */
-  atualizacoes?: AtualizacoesOS | null;
+  /** As atualizações do app (docs/ATUALIZACOES.md): o Writer OS (U1, a cópia de reserva) ou o computador (U2). */
+  atualizacoes?: MotorDeAtualizacoes | null;
+  /** "Reiniciar agora" (só o computador): fecha, aplica a versão pronta e abre de novo. */
+  reiniciarAtualizacao?: (() => Promise<void>) | null;
   /** "Escolher outra pasta…" (o seletor do Windows; no Writer OS não há: `null`). */
   escolherPasta: () => Promise<string | null>;
   /** Trocou de servidor: esquecer os cookies da conta e recarregar a página. */
@@ -138,6 +147,8 @@ export function criarCanais(o: OpcoesCanais): Canais {
       'at:instalar': () => at.instalar(),
       'at:modo': (m: string) => at.usarModo(m === 'perguntar' ? 'perguntar' : 'automaticas'),
     } satisfies Record<string, Funcao>);
+    const reiniciar = o.reiniciarAtualizacao;
+    if (reiniciar) pedidos['at:reiniciar'] = () => reiniciar();
   }
 
   return {

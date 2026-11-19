@@ -89,6 +89,8 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         procurar: () => pedir<EstadoAtualizacoes>('at:procurar'),
         instalar: () => pedir<EstadoAtualizacoes>('at:instalar'),
         usarModo: (m: ModoAtualizacoes) => pedir<EstadoAtualizacoes>('at:modo', m === 'perguntar' ? 'perguntar' : 'automaticas'),
+        // "Reiniciar agora": só no computador (no Writer OS, a nova vale ao ligar de novo; o menu tem o Reiniciar)
+        ...(info.os ? {} : { reiniciar: () => pedir<void>('at:reiniciar') }),
         aoMudar: (f: (e: EstadoAtualizacoes) => void) => {
           ouvintesDaAtualizacao.add(f);
           return () => void ouvintesDaAtualizacao.delete(f);

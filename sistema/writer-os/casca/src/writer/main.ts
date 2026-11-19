@@ -22,6 +22,9 @@
  * `EKFRASE_CASCA_ATUALIZACOES_ATRASO` (ms até a primeira busca), `EKFRASE_CASCA_OS_VERSAO`, `EKFRASE_CASCA_OS_CANAL`,
  * `EKFRASE_CASCA_OS_VOLTOU`. Na imagem de TESTE: o endereço vem de `/run/ekfrase/teste/atualizacoes` e a chave de teste
  * de `/usr/share/ekfrase/atualizacao-teste.pub` (as duas só existem nela).
+ *
+ * As do Writer no computador (U2, docs/ATUALIZACOES.md §5): `atualizacoes-pc.ts` (o simulado: as mesmas
+ * `EKFRASE_CASCA_ATUALIZACOES_*`, mais `EKFRASE_CASCA_VERSAO` e `EKFRASE_CASCA_ATUALIZACOES_RELATO`).
  */
 import { app, BrowserWindow, dialog, ipcMain, session, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { CHAVE_EKFRASE } from '@ekfrase/atualizacoes';
@@ -35,6 +38,7 @@ import { Rede } from '../motor/rede.ts';
 import { SistemaLinux, SistemaSimulado, type Sistema } from '../motor/sistema.ts';
 import { ligarAgente } from './agente-teste.ts';
 import { AtualizacoesOS } from './atualizacoes-os.ts';
+import { atualizacoesDoPC } from './atualizacoes-pc.ts';
 import { chamarCanal, criarCanais } from './canais.ts';
 import { DadosDoWriter } from './dados.ts';
 import { dadosSimulados, passoDaTecla, WriterOS } from './os.ts';
@@ -114,6 +118,32 @@ const nativo = join(empacotado ? process.resourcesPath : __dirname, 'nativo', 'b
 const padrao = baseDoServidor(env('EKFRASE_CASCA_SERVIDOR') ?? '') ?? PADRAO;
 const arquivoLembrado = (): string => join(app.getPath('userData'), 'casca.json');
 
+/** As atualizações do Writer no computador (U2, `atualizacoes-pc.ts`): NSIS no Windows, AppImage no Linux. */
+const doPC = writerOS
+  ? null
+  : atualizacoesDoPC({ versao: app.getVersion(), plataforma: process.platform, empacotado, userData: app.getPath('userData'), lembrado: arquivoLembrado(), execPath: process.execPath, ambiente: process.env });
+/** O que os canais `at:*` usam: o do Writer OS ou o do computador. */
+const motorAt = atualizacoes ?? doPC?.atualizador ?? null;
+/** "Reiniciar agora" pedido: ao sair, a versão pronta vale e o Writer abre de novo. */
+let reiniciando = false;
+let aplicou = false;
+app.on('will-quit', (e) => {
+  if (!doPC || aplicou) return;
+  aplicou = true;
+  const appimage = doPC.jeito === 'appimage' ? process.env['APPIMAGE'] : undefined;
+  if (!doPC.atualizador.pronta() && !reiniciando) return;
+  // os textos já estão trancados (fecharDeVez): o instalador do Windows pode rodar
+  e.preventDefault();
+  void doPC
+    .aoFechar(reiniciando)
+    .then((rodou) => {
+      // no Linux o AppImage novo já está no lugar: reiniciar = abrir o arquivo de novo; no Windows o instalador reabre
+      if (reiniciando && !rodou && doPC.jeito !== 'simulado') app.relaunch(appimage ? { execPath: appimage, args: process.argv.slice(1) } : undefined);
+    })
+    .catch(() => undefined)
+    .finally(() => app.exit(0));
+});
+
 /** Para os testes (`electronApp.evaluate`): o que foi bloqueado e os dados. */
 (globalThis as { ekfraseCasca?: unknown }).ekfraseCasca = { travas };
 
@@ -173,6 +203,10 @@ void app.whenReady().then(async () => {
     atualizacoes.aoMudar((e) => pagina.enviar('at:mudou', e));
     void atualizacoes.iniciar();
   }
+  if (doPC) {
+    doPC.atualizador.aoMudar((e) => pagina.enviar('at:mudou', e));
+    doPC.atualizador.iniciar();
+  }
 
   servirApp({ sessao: sessaoPagina, host: HOST, pasta: join(__dirname, 'app'), base: '/writer/', api: (p, c) => rede.levar(p, c) });
 
@@ -185,7 +219,14 @@ void app.whenReady().then(async () => {
     lembrado: arquivoLembrado(),
     writerOS,
     sistema: sistemaOS,
-    atualizacoes,
+    atualizacoes: motorAt,
+    // "Reiniciar agora" (só no computador): fecha como o X (a página grava o que falta) e o will-quit aplica
+    reiniciarAtualizacao: doPC
+      ? async () => {
+          reiniciando = true;
+          janela?.close();
+        }
+      : null,
     escolherPasta: async () => {
       const teste = env('EKFRASE_CASCA_PASTA');
       if (teste) return teste;
@@ -225,7 +266,7 @@ void app.whenReady().then(async () => {
     titulo: 'Ekfrase Writer',
     icone: join(__dirname, 'app', 'icones', 'icone-512.png'),
     devTools,
-    argumentos: [`--ekfrase-versao=${app.getVersion()}`, ...(writerOS ? ['--ekfrase-os=1'] : []), ...(atualizacoes ? ['--ekfrase-atualizacoes=1'] : [])],
+    argumentos: [`--ekfrase-versao=${app.getVersion()}`, ...(writerOS ? ['--ekfrase-os=1'] : []), ...(motorAt ? ['--ekfrase-atualizacoes=1'] : [])],
     telaCheia: !!writerOS && !sistemaOS?.simulado,
   });
   // no Writer OS o Chromium nunca abre o "Sair desta página?" dele (uma caixa do sistema): quem decide é o app

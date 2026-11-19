@@ -8,7 +8,9 @@
  *   2. Criar: o nome do disco digitado, o download, o lacre, a gravação, a verificação, a EKFRASE-DADOS
  *      (a GPT do arquivo-disco tem as duas partições e a 1 é idêntica à da imagem); ejetar;
  *   3. Atualizar com "Já tenho a imagem" SEM lacre: o aviso vermelho e a frase; os dados ficam;
- *   4. nenhum evento de mouse; prints claro e escuro de cada passo (`--prints <pasta>`).
+ *   4. nenhum evento de mouse; prints claro e escuro de cada passo (`--prints <pasta>`);
+ *   5. (U2) o próprio Gravador se atualiza: o "GitHub" oferece um Gravador maior; automáticas troca o arquivo no lugar,
+ *      a tela ↻ mostra a versão, "Perguntar" fica nos ajustes, Procurar agora e Instalar trocam pela 0.2.2.
  *
  * Opções: `--sem-montar` (usa o dist/ que existe), `--prints <pasta>`.
  */
@@ -72,15 +74,36 @@ const caseira = imagemTeste(fat32(24 * MIB, arquivosTeste('caseira')));
 const arquivoCaseira = join(trab, 'meu-writer-os.img');
 writeFileSync(arquivoCaseira, caseira);
 
+// ---- as versões novas do próprio Gravador (U2): um Release writer-os-v<v> com os dois Gravadores e o manifesto
+const gravadores = new Map<string, Buffer>();
+const ofertasGravador: string[] = [];
+const PAPEL = process.platform === 'linux' ? 'linux' : 'windows';
+const publicarGravador = (v: string) => {
+  const exe = Buffer.from(`Gravador ${v} para Windows ${'x'.repeat(200_000)}`);
+  const app = Buffer.from(`Gravador ${v} para Linux ${'y'.repeat(150_000)}`);
+  gravadores.set(`${v}/Ekfrase-Gravador.exe`, exe);
+  gravadores.set(`${v}/Ekfrase-Gravador.AppImage`, app);
+  const texto = Buffer.from(JSON.stringify({ app: 'ekfrase-gravador', versao: v, canal: 'estavel', arquivos: [{ papel: 'windows', nome: 'Ekfrase-Gravador.exe', tamanho: exe.length, sha256: sha256(exe) }, { papel: 'linux', nome: 'Ekfrase-Gravador.AppImage', tamanho: app.length, sha256: sha256(app) }] }));
+  gravadores.set(`${v}/ekfrase-gravador-${v}.atualizacao.json`, texto);
+  gravadores.set(`${v}/ekfrase-gravador-${v}.atualizacao.json.minisig`, Buffer.from(assinador.assinar(texto, `Ekfrase Gravador ${v} atualizacao`)));
+  ofertasGravador.unshift(v);
+};
+/** O Gravador deste sistema na versão `v` (o que tem de estar no lugar do `.exe` depois de atualizar). */
+const gravadorDe = (v: string) => gravadores.get(`${v}/${PAPEL === 'linux' ? 'Ekfrase-Gravador.AppImage' : 'Ekfrase-Gravador.exe'}`)!;
+
 // ---- o "GitHub"
 const servidor = createServer((q, r) => {
   const base = `http://127.0.0.1:${(servidor.address() as { port: number }).port}`;
   if (q.url?.startsWith('/repos/cyfilho/ekfrase/releases')) {
     r.setHeader('content-type', 'application/json');
     const a = (n: string, size: number) => ({ name: n, browser_download_url: `${base}/d/${n}`, size });
-    r.end(JSON.stringify([{ tag_name: 'writer-os-v0.1.0', assets: [a(`${nomeImg}.xz`, xzBytes.length), a(`${nomeImg}.xz.sha256`, 90), a(`${nomeImg}.xz.minisig`, 300)] }]));
+    // os Releases só com o Gravador (sem imagem) não mudam a imagem que o Gravador grava: ele procura a mais nova COM imagem
+    const doGravador = ofertasGravador.map((v) => ({ tag_name: `writer-os-v${v}`, assets: [...gravadores.keys()].filter((n) => n.startsWith(`${v}/`)).map((n) => a(n, gravadores.get(n)!.length)).map((x) => ({ ...x, name: x.name.slice(v.length + 1) })) }));
+    r.end(JSON.stringify([...doGravador, { tag_name: 'writer-os-v0.1.0', assets: [a(`${nomeImg}.xz`, xzBytes.length), a(`${nomeImg}.xz.sha256`, 90), a(`${nomeImg}.xz.minisig`, 300)] }]));
     return;
   }
+  const g = q.url?.startsWith('/d/') ? gravadores.get(q.url.slice(3)) : undefined;
+  if (g) return void r.end(g);
   if (q.url === `/d/${nomeImg}.xz`) return void r.end(xzBytes);
   if (q.url === `/d/${nomeImg}.xz.sha256`) return void r.end(`${sha256(xzBytes)}  ${nomeImg}.xz\n`);
   if (q.url === `/d/${nomeImg}.xz.minisig`) return void r.end(assinador.assinar(xzBytes, 'Ekfrase Writer OS 0.1.0'));
@@ -104,11 +127,11 @@ gravarDiscos([sistema, pen]);
 const { _electron } = await import('playwright');
 const { ELECTRON_RUN_AS_NODE: _comoNode, ...doSistema } = process.env;
 /** O Gravador com os discos simulados e um computador simulado (`livre`: dá para preparar; `writer`: tem o Writer OS). */
-const abrir = (computador: string): Promise<ElectronApplication> =>
+const abrir = (computador: string, mais: Record<string, string> = {}): Promise<ElectronApplication> =>
   _electron.launch({
     executablePath: electron(),
     args: [GRAVADOR],
-    env: { ...doSistema, EKFRASE_GRAVADOR_DISCOS: arquivoDiscos, EKFRASE_GRAVADOR_API: api, EKFRASE_GRAVADOR_CHAVE: join(trab, 'chave.pub'), EKFRASE_GRAVADOR_CACHE: join(trab, 'cache'), EKFRASE_GRAVADOR_IMAGEM: arquivoCaseira, EKFRASE_GRAVADOR_LOG: '1', EKFRASE_GRAVADOR_COMPUTADOR: computador } as Record<string, string>,
+    env: { ...doSistema, EKFRASE_GRAVADOR_DISCOS: arquivoDiscos, EKFRASE_GRAVADOR_API: api, EKFRASE_GRAVADOR_CHAVE: join(trab, 'chave.pub'), EKFRASE_GRAVADOR_CACHE: join(trab, 'cache'), EKFRASE_GRAVADOR_IMAGEM: arquivoCaseira, EKFRASE_GRAVADOR_LOG: '1', EKFRASE_GRAVADOR_COMPUTADOR: computador, ...mais } as Record<string, string>,
   });
 let app: ElectronApplication = await abrir('livre');
 app.process().stderr?.on('data', (d: Buffer) => process.stdout.write(`   `+d.toString().trim()+`\n`));
@@ -256,6 +279,65 @@ try {
   ok(((await p.textContent('[data-teste="removido-copiado"]').catch(() => '')) ?? '').includes('Ekfrase Writer (Writer OS'), 'diz para onde os textos foram');
   ok(await p.isVisible('[data-teste="removido-devolvido"]'), 'o espaço voltou ao Windows');
   await foto('7-removido');
+
+  // ⑤ o Gravador se atualiza (U2): um "Gravador 0.2.0" no lugar do .exe; o "GitHub" oferece a 0.2.1 e depois a 0.2.2
+  await app.close();
+  const alvo = join(trab, PAPEL === 'linux' ? 'Ekfrase-Gravador.AppImage' : 'Ekfrase-Gravador.exe');
+  writeFileSync(alvo, 'o Gravador 0.2.0');
+  publicarGravador('0.2.1');
+  app = await abrir('livre', { EKFRASE_GRAVADOR_VERSAO: '0.2.0', EKFRASE_GRAVADOR_ATUALIZAR_ALVO: alvo, EKFRASE_GRAVADOR_ATUALIZACOES_ATRASO: '500' });
+  p = await app.firstWindow();
+  await p.waitForSelector('[data-teste="passo-disco"]');
+  await p.evaluate(() => {
+    (window as unknown as { cliques: number }).cliques = 0;
+    for (const ev of ['mousedown', 'pointerdown', 'mouseup']) document.addEventListener(ev, () => ((window as unknown as { cliques: number }).cliques += 1), true);
+  });
+  const aviso = await p.waitForSelector('[data-teste="aviso-atualizacao"]', { timeout: 20_000 }).then(() => true, () => false);
+  ok(aviso, 'automáticas: a 0.2.1 do Gravador baixou, o lacre conferiu, e o aviso aparece embaixo');
+  ok(((await p.textContent('[data-teste="aviso-atualizacao"]').catch(() => '')) ?? '').includes('0.2.1'), 'o aviso diz a versão pronta');
+  ok(readFileSync(alvo).equals(gravadorDe('0.2.1')), 'o Gravador 0.2.1 deste sistema está no lugar do de agora (vale na próxima vez que abrir)');
+  if (PAPEL === 'windows') ok(readFileSync(`${alvo}.velho`, 'utf8') === 'o Gravador 0.2.0', 'o de agora virou .velho (o Windows não apaga um .exe aberto)');
+  ok((await p.textContent('[data-teste="imagem-release"]'))?.includes('0.1.0'), 'a imagem continua a do Release com imagem (0.1.0)');
+  await foto('8-gravador-atualizado');
+  // o ↻ está no topo, antes do título do passo (onde o foco começa): Shift+Tab
+  await p.waitForFunction(() => document.activeElement?.tagName === 'H1', null, { timeout: 5_000 }).catch(() => undefined);
+  let noBotao = false;
+  for (let i = 0; i < 4 && !noBotao; i++) {
+    await p.keyboard.press('Shift+Tab');
+    noBotao = await p.evaluate(() => document.activeElement?.getAttribute('data-teste') === 'ir-atualizacoes');
+  }
+  ok(noBotao, 'Shift+Tab chega no botão das atualizações (↻), no topo');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="passo-atualizacoes"]');
+  await p.waitForFunction(() => document.activeElement?.tagName === 'H1', null, { timeout: 5_000 }).catch(() => undefined);
+  ok(((await p.textContent('[data-teste="atualizacoes-versao"]')) ?? '').includes('0.2.0'), 'a tela das atualizações mostra a versão de agora');
+  ok(!!(await p.$('[data-teste="atualizacoes-situacao-pronta"]')), 'e que a 0.2.1 está pronta');
+  ok(await ate('atualizacoes-modo-automaticas'), 'Tab chega em "Automáticas (recomendado)"');
+  await p.keyboard.press('ArrowDown');
+  await p.waitForTimeout(300);
+  let ajustes: Record<string, unknown> = {};
+  try {
+    ajustes = JSON.parse(readFileSync(join(trab, 'cache', 'ajustes.json'), 'utf8')) as Record<string, unknown>;
+  } catch {
+    // fica vazio
+  }
+  ok(ajustes['atualizacoes'] === 'perguntar', `"Perguntar antes de instalar" fica nos ajustes do Gravador (${String(ajustes['atualizacoes'])})`);
+  publicarGravador('0.2.2');
+  ok(await ate('atualizacoes-procurar'), 'Tab chega em "Procurar agora"');
+  await p.keyboard.press('Enter');
+  ok(await p.waitForSelector('[data-teste="atualizacoes-situacao-disponivel"]', { timeout: 10_000 }).then(() => true, () => false), 'perguntar: acha a 0.2.2 e espera o Instalar');
+  ok(readFileSync(alvo).equals(gravadorDe('0.2.1')), 'perguntar: não troca sozinho');
+  await foto('9-gravador-disponivel');
+  ok(await ate('atualizacoes-instalar'), 'Tab chega em Instalar');
+  await p.keyboard.press('Enter');
+  ok(await p.waitForSelector('[data-teste="atualizacoes-situacao-pronta"]', { timeout: 15_000 }).then(() => true, () => false), 'Instalar: a 0.2.2 baixa, confere e fica pronta');
+  ok(readFileSync(alvo).equals(gravadorDe('0.2.2')), 'o Gravador 0.2.2 está no lugar');
+  // Voltar fica à esquerda do botão principal (antes dele no Tab)
+  await p.keyboard.press('Shift+Tab');
+  ok(await p.evaluate(() => document.activeElement?.getAttribute('data-teste') === 'atualizacoes-voltar'), 'Shift+Tab chega em Voltar');
+  await p.keyboard.press('Enter');
+  ok(await p.waitForSelector('[data-teste="passo-disco"]', { timeout: 5_000 }).then(() => true, () => false), 'Voltar leva ao passo de antes');
+  ok((await p.evaluate(() => (window as unknown as { cliques: number }).cliques)) === 0, 'nenhum evento de mouse (atualizações)');
 } catch (e) {
   falhas.push(String(e));
   console.error(e);
