@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
 # O Ekfrase Writer no computador (sistema/writer-os/casca): quando uma tag writer-v* chega aqui
-# (por exemplo writer-v0.1.0), monta a casca no Windows (instalador NSIS) e no Linux (AppImage),
+# (por exemplo writer-v0.2.0, a versão da casca), monta a casca no Windows (instalador NSIS) e no Linux (AppImage),
 # roda o roteiro da casca e cria o Release com os dois arquivos. A página de download do Writer
-# (ekfrase.com/writer/#/computador) baixa de releases/latest. Sem certificado de assinatura por
+# (ekfrase.com/writer/computador) baixa do Release estável mais novo. Sem certificado de assinatura por
 # enquanto (o Windows mostra o aviso do SmartScreen; a página explica o passo a passo).
+# AS ATUALIZAÇÕES (docs/ATUALIZACOES.md §5, U2): o Release leva o lacre de cada instalador (.minisig) e o manifesto
+# ekfrase-writer-<v>.atualizacao.json, com que o Writer já instalado se atualiza sozinho. Uma tag writer-vX.Y.Z-teste.N
+# vira PRÉ-RELEASE de teste: só o Writer montado de uma tag de teste a vê (a página e o Writer comum, nunca).
 name: Writer no computador
 
 on:
@@ -26,13 +29,26 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: A tag é a versão da casca (ou uma de teste dela, writer-vX.Y.Z-teste.N)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSAO=$(node -p "require('./sistema/writer-os/casca/package.json').version")
+          [[ "$GITHUB_REF_NAME" =~ ^writer-v${VERSAO//./\\.}(-teste\.[0-9]+)?$ ]] || { echo "A tag ($GITHUB_REF_NAME) não é writer-v$VERSAO nem writer-v$VERSAO-teste.N"; exit 1; }
+          # uma de teste com a versão de uma estável que já saiu nunca chegaria (a estável vale mais): suba a versão da casca
+          if [[ "$GITHUB_REF_NAME" == *-teste.* ]] && gh release view "writer-v$VERSAO" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "writer-v$VERSAO já saiu como estável: suba a versão em sistema/writer-os/casca/package.json antes de uma de teste"; exit 1
+          fi
+          # o instalador leva a versão INTEIRA da tag: é com ela que o Writer instalado compara a próxima (e ela diz o canal)
+          echo "EKFRASE_CASCA_VERSAO=${GITHUB_REF_NAME#writer-v}" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm ci
         working-directory: sistema/writer-os/casca
       - name: Electron no Linux (o sandbox do Chromium precisa de namespaces sem privilégio)
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - name: Roteiro da casca (teclado, travas, cifra, espelho)
+      - name: Roteiro da casca (teclado, travas, cifra, espelho, atualizações)
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run teclado -- --so-casca
       - run: npm run casca:instalador
       - uses: actions/upload-artifact@v4
@@ -53,9 +69,48 @@ jobs:
         with:
           path: arquivos
           merge-multiple: true
+      - uses: actions/checkout@v5
+        with:
+          path: fonte
+          sparse-checkout: sistema/writer-os/imagem/minisign.pub
+          sparse-checkout-cone-mode: false
+      - name: O lacre dos instaladores e o manifesto da atualização
+        env:
+          CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
+        run: |
+          test -n "$CHAVE" || { echo "Falta o segredo EKFRASE_MINISIGN_CHAVE."; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          VERSAO="${GITHUB_REF_NAME#writer-v}"
+          CANAL=estavel
+          [[ "$VERSAO" == *-teste.* ]] && CANAL=teste
+          cd arquivos
+          ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
+          for f in Ekfrase-Writer-Setup.exe Ekfrase-Writer.AppImage; do
+            minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$f" -t "Ekfrase Writer $VERSAO" < /dev/null
+          done
+          # o formato de packages/atualizacoes/src/manifesto.ts (o papel é o sistema)
+          arq() { jq -n --arg p "$1" --arg n "$2" --argjson t "$(stat -c %s "$2")" --arg s "$(sha256sum "$2" | cut -d' ' -f1)" '{papel: $p, nome: $n, tamanho: $t, sha256: $s}'; }
+          { arq windows Ekfrase-Writer-Setup.exe; arq linux Ekfrase-Writer.AppImage; } | jq -s . > "$RUNNER_TEMP/arquivos.json"
+          N="ekfrase-writer-$VERSAO"
+          jq -n --arg v "$VERSAO" --arg c "$CANAL" --slurpfile a "$RUNNER_TEMP/arquivos.json" '{app: "ekfrase-writer", versao: $v, canal: $c, arquivos: $a[0]}' > "$N.atualizacao.json"
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Writer $VERSAO atualizacao" < /dev/null
+          rm -f "$RUNNER_TEMP/minisign.key"
+          for f in Ekfrase-Writer-Setup.exe Ekfrase-Writer.AppImage "$N.atualizacao.json"; do
+            minisign -V -p "$GITHUB_WORKSPACE/fonte/sistema/writer-os/imagem/minisign.pub" -m "$f"
+          done
       - name: Criar o Release com os dois instaladores
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           versao="${GITHUB_REF_NAME#writer-v}"
-          gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY"             --title "Ekfrase Writer $versao no computador"             --notes "Windows: Ekfrase-Writer-Setup.exe. Linux: Ekfrase-Writer.AppImage. Na primeira vez, o Windows mostra o aviso do SmartScreen (o instalador ainda não tem certificado): Mais informações, Executar assim mesmo. Passo a passo em https://ekfrase.com/writer/#/computador"
+          if [[ "$GITHUB_REF_NAME" == *-teste.* ]]; then
+            # pré-release: a página ekfrase.com/writer/computador e o Writer comum não a veem
+            gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "Ekfrase Writer $versao no computador (TESTE)" \
+              --notes "Versão de TESTE, para conferir antes de publicar. O Writer instalado DESTA página recebe as próximas versões de teste sozinho; o Writer comum ignora esta versão."
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" \
+            --title "Ekfrase Writer $versao no computador" \
+            --notes "Windows: Ekfrase-Writer-Setup.exe. Linux: Ekfrase-Writer.AppImage. Na primeira vez, o Windows mostra o aviso do SmartScreen (o instalador ainda não tem certificado): Mais informações, Executar assim mesmo. Depois disso, o Writer se atualiza sozinho (ou pergunta antes, se você preferir: Ajustes, Atualizações). O lacre de cada arquivo (.minisig) confere com a chave em sistema/writer-os/imagem/minisign.pub. Passo a passo em https://ekfrase.com/writer/computador"

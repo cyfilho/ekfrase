@@ -7,9 +7,9 @@
  * caminho; a versão que não ligou não volta; sem a partição de dados. O `ekfrase-atualizar.sh` e o GRUB de verdade são
  * conferidos no QEMU (`tests/writer-os/qemu.py`, teste_atualizar e teste_voltar).
  */
-import { baixarArquivo, canalAceita, compararVersoes, conferirManifesto, ErroManifesto, lancamentos, lerManifesto, maisNova, nomeDoManifesto, proximaBusca, type Buscar } from '@ekfrase/atualizacoes';
+import { aindaConfere, Atualizador, baixarArquivo, canalAceita, compararVersoes, conferirManifesto, ErroManifesto, lancamentos, lerManifesto, limparVelho, maisNova, nomeDoManifesto, proximaBusca, trocarNoLugar, type Buscar } from '@ekfrase/atualizacoes';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -306,5 +306,204 @@ describe('o Writer OS se atualiza (atualizacoes-os.ts, sistema simulado, "GitHub
     oferta = [{ versao: '0.3.0', prerelease: true }, { versao: '0.2.1' }];
     const l = await lancamentos(buscar, { prefixo: 'writer-os-v', canal: 'teste', api: base });
     expect(l.map((x) => x.versao)).toEqual(['0.2.1']);
+  });
+});
+
+describe('o Writer no computador e o Gravador se atualizam (Atualizador, U2, "GitHub" local)', () => {
+  const ass = assinadorTeste();
+  let servidor: Server;
+  let base = '';
+  let oferta: { versao: string; prerelease?: boolean }[] = [];
+  const arquivos = new Map<string, Buffer>();
+  const pastas: string[] = [];
+
+  /** Um Release `writer-v<v>` com o instalador de cada sistema e o manifesto; `trocar` = o do Windows muda no caminho. */
+  function publicar(versao: string, o: { trocar?: boolean; semManifesto?: boolean; semLinux?: boolean } = {}): void {
+    const win = randomBytes(150_000);
+    const lin = randomBytes(120_000);
+    arquivos.set(`${versao}/Ekfrase-Writer-Setup.exe`, o.trocar ? randomBytes(win.length) : win);
+    arquivos.set(`${versao}/Ekfrase-Writer.AppImage`, lin);
+    if (o.semManifesto) return;
+    const lista = [{ papel: 'windows', nome: 'Ekfrase-Writer-Setup.exe', tamanho: win.length, sha256: sha(win) }, ...(o.semLinux ? [] : [{ papel: 'linux', nome: 'Ekfrase-Writer.AppImage', tamanho: lin.length, sha256: sha(lin) }])];
+    const texto = JSON.stringify({ app: 'ekfrase-writer', versao, canal: versao.includes('-teste.') ? 'teste' : 'estavel', arquivos: lista });
+    const nome = `ekfrase-writer-${versao}.atualizacao.json`;
+    arquivos.set(`${versao}/${nome}`, Buffer.from(texto));
+    arquivos.set(`${versao}/${nome}.minisig`, Buffer.from(ass.assinar(Buffer.from(texto), `Ekfrase Writer ${versao} atualizacao`)));
+  }
+
+  beforeAll(async () => {
+    servidor = createServer((q, r) => {
+      if (q.url === '/repos/cyfilho/ekfrase/releases?per_page=50') {
+        r.setHeader('content-type', 'application/json');
+        r.end(
+          JSON.stringify(
+            oferta.map((o) => ({
+              tag_name: `writer-v${o.versao}`,
+              prerelease: o.prerelease ?? o.versao.includes('-teste.'),
+              assets: [...arquivos.keys()].filter((n) => n.startsWith(`${o.versao}/`)).map((n) => ({ name: n.slice(o.versao.length + 1), browser_download_url: `${base}/d/${n}`, size: arquivos.get(n)!.length })),
+            })),
+          ),
+        );
+        return;
+      }
+      const b = q.url?.startsWith('/d/') ? arquivos.get(q.url.slice(3)) : undefined;
+      if (!b) {
+        r.statusCode = 404;
+        r.end();
+        return;
+      }
+      r.writeHead(200, { 'content-length': b.length });
+      r.end(b);
+    });
+    await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+    const ad = servidor.address();
+    base = `http://127.0.0.1:${typeof ad === 'object' && ad ? ad.port : 0}`;
+  });
+  afterAll(() => servidor.close());
+  afterEach(() => {
+    for (const p of pastas.splice(0)) rmSync(p, { recursive: true, force: true });
+  });
+
+  function montar(o: { modo?: 'automaticas' | 'perguntar'; versao?: string; papel?: string; falharPreparar?: boolean } = {}) {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-atualizador-'));
+    pastas.push(raiz);
+    let modo = o.modo ?? 'automaticas';
+    const preparadas: { arquivo: string; versao: string; sha256: string }[] = [];
+    const versao = o.versao ?? '0.2.0';
+    const at = new Atualizador({
+      app: 'ekfrase-writer',
+      nome: 'Ekfrase Writer',
+      prefixo: 'writer-v',
+      versao,
+      canal: versao.includes('-teste.') ? 'teste' : 'estavel',
+      papel: o.papel ?? 'windows',
+      pasta: join(raiz, 'atualizacao'),
+      modo: () => modo,
+      gravarModo: (m) => (modo = m),
+      preparar: async (arquivo, v, sha256) => {
+        if (o.falharPreparar) throw new Error('não deu');
+        preparadas.push({ arquivo, versao: v, sha256 });
+      },
+      buscar: (u, i) => fetch(u, i),
+      api: base,
+      chaves: [ass.chave],
+      atrasoInicial: 3_600_000,
+    });
+    return { raiz, at, preparadas, modo: () => modo };
+  }
+
+  it('automáticas: acha a maior, baixa o arquivo deste sistema, confere e deixa pronta', async () => {
+    publicar('0.2.1');
+    publicar('0.1.9');
+    oferta = [{ versao: '0.1.9' }, { versao: '0.2.1' }];
+    const { at, preparadas } = montar();
+    at.iniciar();
+    const e = await at.procurar();
+    at.parar();
+    expect(e).toMatchObject({ situacao: 'pronta', nova: '0.2.1', erro: null, versao: '0.2.0' });
+    expect(preparadas.map((p) => p.versao)).toEqual(['0.2.1']);
+    expect(readFileSync(preparadas[0]!.arquivo)).toEqual(arquivos.get('0.2.1/Ekfrase-Writer-Setup.exe'));
+    expect(at.pronta()).toMatchObject({ versao: '0.2.1', sha256: preparadas[0]!.sha256 });
+    // procurar de novo não baixa outra vez
+    expect((await at.procurar()).situacao).toBe('pronta');
+    expect(preparadas).toHaveLength(1);
+  });
+
+  it('o Linux pega o AppImage; um Release sem o arquivo deste sistema é recusado sem preparar nada', async () => {
+    publicar('0.2.1');
+    oferta = [{ versao: '0.2.1' }];
+    const lin = montar({ papel: 'linux' });
+    await lin.at.procurar();
+    expect(readFileSync(lin.preparadas[0]!.arquivo)).toEqual(arquivos.get('0.2.1/Ekfrase-Writer.AppImage'));
+    publicar('0.2.2', { semLinux: true });
+    oferta = [{ versao: '0.2.2' }];
+    const outro = montar({ papel: 'linux' });
+    expect(await outro.at.procurar()).toMatchObject({ situacao: 'erro', erro: 'lacre' });
+    expect(outro.preparadas).toEqual([]);
+  });
+
+  it('perguntar: achou = "disponível"; só baixa no Instalar; e passar para automáticas instala a que espera', async () => {
+    publicar('0.2.1');
+    oferta = [{ versao: '0.2.1' }];
+    const { at, preparadas, modo } = montar({ modo: 'perguntar' });
+    expect(await at.procurar()).toMatchObject({ situacao: 'disponivel', nova: '0.2.1' });
+    expect(preparadas).toEqual([]);
+    expect(await at.instalar()).toMatchObject({ situacao: 'pronta', nova: '0.2.1' });
+    expect(preparadas).toHaveLength(1);
+    // uma ainda mais nova, e a pessoa volta para automáticas: instala sem perguntar
+    publicar('0.2.2');
+    oferta = [{ versao: '0.2.2' }, { versao: '0.2.1' }];
+    expect(await at.procurar()).toMatchObject({ situacao: 'disponivel', nova: '0.2.2' });
+    at.usarModo('automaticas');
+    expect(modo()).toBe('automaticas');
+    await at.procurar();
+    expect(at.estado()).toMatchObject({ situacao: 'pronta', nova: '0.2.2' });
+    expect(at.pronta()?.versao).toBe('0.2.2');
+  });
+
+  it('um instalador trocado no caminho: o SHA-256 não bate e nada fica pronto', async () => {
+    publicar('0.2.1', { trocar: true });
+    oferta = [{ versao: '0.2.1' }];
+    const { at, preparadas, raiz } = montar();
+    expect(await at.procurar()).toMatchObject({ situacao: 'erro', erro: 'lacre' });
+    expect(preparadas).toEqual([]);
+    expect(at.pronta()).toBeNull();
+    expect(existsSync(join(raiz, 'atualizacao', '0.2.1'))).toBe(false);
+  });
+
+  it('nunca para trás; um Release sem manifesto (de antes da U2) não serve; o estável não vê as de teste', async () => {
+    publicar('0.1.9');
+    publicar('0.2.5', { semManifesto: true });
+    publicar('0.3.0-teste.1');
+    oferta = [{ versao: '0.1.9' }, { versao: '0.2.5' }, { versao: '0.3.0-teste.1' }];
+    const estavel = montar();
+    expect(await estavel.at.procurar()).toMatchObject({ situacao: 'em-dia', nova: null });
+    const teste = montar({ versao: '0.2.0-teste.3' });
+    expect(await teste.at.procurar()).toMatchObject({ situacao: 'pronta', nova: '0.3.0-teste.1', canal: 'teste' });
+  });
+
+  it('o preparar falhou (o disco cheio, sem permissão): erro "falhou", nada pronto', async () => {
+    publicar('0.2.1');
+    oferta = [{ versao: '0.2.1' }];
+    const { at } = montar({ falharPreparar: true });
+    expect(await at.procurar()).toMatchObject({ situacao: 'erro', erro: 'falhou' });
+    expect(at.pronta()).toBeNull();
+  });
+
+  it('ao abrir, tira o que ficou de versões que já não são maiores que a de agora', () => {
+    const { at, raiz } = montar();
+    for (const v of ['0.1.0', '0.2.0', '0.2.1', 'lixo']) mkdirSync(join(raiz, 'atualizacao', v), { recursive: true });
+    at.iniciar();
+    at.parar();
+    expect(readdirSync(join(raiz, 'atualizacao')).sort()).toEqual(['0.2.1']);
+  });
+
+  it('trocar no lugar: o novo confere, o de agora vira .velho (Windows) e volta ao lugar se a troca falhar', async () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-trocar-'));
+    pastas.push(raiz);
+    const alvo = join(raiz, 'Ekfrase-Gravador.exe');
+    const novo = join(raiz, 'baixado.exe');
+    writeFileSync(alvo, 'velho');
+    writeFileSync(novo, 'novo');
+    await expect(trocarNoLugar(novo, alvo, { sha256: sha(Buffer.from('outro')) })).rejects.toThrow();
+    expect(readFileSync(alvo, 'utf8')).toBe('velho');
+    expect(existsSync(`${alvo}.novo`)).toBe(false);
+    await trocarNoLugar(novo, alvo, { sha256: sha(Buffer.from('novo')), guardarVelho: true });
+    expect(readFileSync(alvo, 'utf8')).toBe('novo');
+    expect(readFileSync(`${alvo}.velho`, 'utf8')).toBe('velho');
+    limparVelho(alvo);
+    expect(existsSync(`${alvo}.velho`)).toBe(false);
+    // o Linux: sem guardar o velho, por cima
+    writeFileSync(novo, 'mais novo');
+    await trocarNoLugar(novo, alvo, { sha256: sha(Buffer.from('mais novo')), executavel: true });
+    expect(readFileSync(alvo, 'utf8')).toBe('mais novo');
+    expect(await aindaConfere(alvo, { sha256: sha(Buffer.from('mais novo')), tamanho: 9 })).toBe(true);
+    expect(await aindaConfere(alvo, { sha256: sha(Buffer.from('mais novo')), tamanho: 8 })).toBe(false);
+  });
+
+  it('o manifesto aceita os nomes dos instaladores (com maiúsculas), mas nunca barra nem ponto no começo', () => {
+    const base = { app: 'ekfrase-writer', versao: '0.2.1', canal: 'estavel', arquivos: [{ papel: 'windows', nome: 'Ekfrase-Writer-Setup.exe', tamanho: 1, sha256: 'a'.repeat(64) }] };
+    expect(lerManifesto(JSON.stringify(base)).arquivos[0]!.nome).toBe('Ekfrase-Writer-Setup.exe');
+    for (const nome of ['../Ekfrase.exe', '.Ekfrase.exe', 'pasta/Ekfrase.exe']) expect(() => lerManifesto(JSON.stringify({ ...base, arquivos: [{ ...base.arquivos[0], nome }] }))).toThrow(ErroManifesto);
   });
 });

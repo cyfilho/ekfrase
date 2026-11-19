@@ -10,13 +10,18 @@
  *
  * Segunda vez: pede a senha (a errada é recusada), abre e o texto está lá.
  *
+ * Terceira e quarta vez (U2): as atualizações, contra um "GitHub" local (`percorrerAtualizacoes`).
+ *
  * Não é teste do Vitest: roda por `npm run teclado` (scripts/teclado.ts), depois do roteiro da web,
  * quando o Electron da casca está instalado (`npm ci` em sistema/writer-os/casca).
  */
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ElectronApplication, Page } from 'playwright';
+import { assinadorTeste } from './gravador/imagem-teste.ts';
 import { Roteiro, type Resultado } from './teclado.spec.ts';
 
 const SENHA = 'senha dos testes';
@@ -225,7 +230,140 @@ export async function percorrerCasca(abrir: Abrir, falar: (linha: string) => voi
   } finally {
     somar(r);
     await fechar(app);
+  }
+
+  // ================= terceira e quarta vez: as atualizações (U2) =================
+  try {
+    await percorrerAtualizacoes(abrir, env, base, falar, somar);
+  } finally {
     rmSync(base, { recursive: true, force: true });
   }
   return { passos, falhas };
+}
+
+/**
+ * AS ATUALIZAÇÕES DO WRITER NO COMPUTADOR (docs/ATUALIZACOES.md §5, U2): um "GitHub" local oferece a 0.2.1 (assinada
+ * com uma chave de teste em que a casca confia por `EKFRASE_CASCA_ATUALIZACOES_CHAVE`). Automáticas: logo depois de
+ * abrir, baixa e confere; o aviso do canto diz "pronta". Nos Ajustes (Ctrl+,), só pelo teclado: a versão, o ajuste,
+ * "Perguntar" (fica no `casca.json`), a 0.2.2 achada e instalada. Ao fechar, a casca roda o instalador em silêncio (o
+ * simulado escreve no relato o que teria rodado). Na quarta vez, "Reiniciar agora": fecha e roda o instalador que reabre.
+ */
+async function percorrerAtualizacoes(abrir: Abrir, envBase: Record<string, string>, base: string, falar: (l: string) => void, somar: (r: Roteiro) => void): Promise<void> {
+  const ass = assinadorTeste();
+  const arquivos = new Map<string, Buffer>();
+  const ofertas: string[] = [];
+  const publicar = (v: string) => {
+    const win = randomBytes(300_000);
+    const lin = randomBytes(200_000);
+    arquivos.set(`${v}/Ekfrase-Writer-Setup.exe`, win);
+    arquivos.set(`${v}/Ekfrase-Writer.AppImage`, lin);
+    const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+    const texto = Buffer.from(JSON.stringify({ app: 'ekfrase-writer', versao: v, canal: 'estavel', arquivos: [{ papel: 'windows', nome: 'Ekfrase-Writer-Setup.exe', tamanho: win.length, sha256: sha(win) }, { papel: 'linux', nome: 'Ekfrase-Writer.AppImage', tamanho: lin.length, sha256: sha(lin) }] }));
+    arquivos.set(`${v}/ekfrase-writer-${v}.atualizacao.json`, texto);
+    arquivos.set(`${v}/ekfrase-writer-${v}.atualizacao.json.minisig`, Buffer.from(ass.assinar(texto, `Ekfrase Writer ${v} atualizacao`)));
+    ofertas.unshift(v);
+  };
+  let endereco = '';
+  const servidor = createServer((q, s) => {
+    if (q.url === '/repos/cyfilho/ekfrase/releases?per_page=50') {
+      s.setHeader('content-type', 'application/json');
+      s.end(JSON.stringify(ofertas.map((v) => ({ tag_name: `writer-v${v}`, assets: [...arquivos.keys()].filter((n) => n.startsWith(`${v}/`)).map((n) => ({ name: n.slice(v.length + 1), browser_download_url: `${endereco}/d/${n}`, size: arquivos.get(n)!.length })) }))));
+      return;
+    }
+    const b = q.url?.startsWith('/d/') ? arquivos.get(q.url.slice(3)) : undefined;
+    s.writeHead(b ? 200 : 404, b ? { 'content-length': b.length } : {});
+    s.end(b);
+  });
+  await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+  const ad = servidor.address();
+  endereco = `http://127.0.0.1:${typeof ad === 'object' && ad ? ad.port : 0}`;
+  const chave = join(base, 'chave-teste.pub');
+  writeFileSync(chave, ass.chave);
+  const relato = join(base, 'relato-atualizacoes.txt');
+  const lerRelato = () => (existsSync(relato) ? readFileSync(relato, 'utf8') : '');
+  const env = { ...envBase, EKFRASE_CASCA_ATUALIZACOES_API: endereco, EKFRASE_CASCA_ATUALIZACOES_CHAVE: chave, EKFRASE_CASCA_ATUALIZACOES_ATRASO: '500', EKFRASE_CASCA_VERSAO: '0.2.0', EKFRASE_CASCA_ATUALIZACOES_RELATO: relato };
+  const casca = join(envBase['EKFRASE_CASCA_PERFIL']!, 'casca.json');
+  /** Abre, entra com a senha e espera a estante. */
+  const entrar = async () => {
+    const app = await abrir(env);
+    const p = await janela(app);
+    const r = new Roteiro(p, falar);
+    r.ok(await r.esperar('casca-abrir'), 'a casca pede a senha');
+    await p.keyboard.type(SENHA);
+    await r.tecla('Enter');
+    r.ok(await r.esperar('tela-estante'), 'abre na estante');
+    return { app, p, r };
+  };
+  try {
+    publicar('0.2.1');
+    falar('— as atualizações do Writer no computador: automáticas, o aviso, os Ajustes, perguntar, fechar e instalar');
+    let { app, p, r } = await entrar();
+    try {
+      r.ok(await r.esperar('aviso-atualizacao', 20000), 'automáticas: a 0.2.1 baixou, o lacre conferiu, e o aviso aparece no canto');
+      r.ok(((await p.textContent('[data-teste="aviso-atualizacao"]')) ?? '').includes('0.2.1'), 'o aviso diz a versão pronta');
+      r.ok(/pronta 0\.2\.1 /.test(lerRelato()), 'a casca preparou a 0.2.1 (o relato do simulado)');
+      r.ok(!(await r.focoEm('aviso-atualizacao-entendi')) && !(await r.focoEm('aviso-atualizacao-reiniciar')), 'o aviso não pega o foco');
+      r.ok(!!(await p.$('[data-teste="aviso-atualizacao-reiniciar"]')), 'o aviso oferece "Reiniciar agora"');
+      await r.tecla('Control+,');
+      if (await r.esperar('ajustes-casca', 5000)) {
+        r.ok(await r.esperar('os-painel-atualizacoes', 3000), 'os Ajustes têm a parte "Atualizações"');
+        r.ok(((await p.textContent('[data-teste="atualizacoes-versao"]')) ?? '').includes('0.2.0'), 'mostra a versão de agora');
+        r.ok(!!(await p.$('[data-teste="atualizacoes-situacao-pronta"]')), 'mostra que a 0.2.1 está pronta');
+        r.ok(!(await r.focoEm('atualizacoes-modo-automaticas')), 'abrir os Ajustes não leva o foco para as atualizações');
+        if (await r.tabAte('atualizacoes-modo-automaticas')) {
+          await r.passo('o ajuste das atualizações');
+          await r.tecla('ArrowDown');
+          await p.waitForTimeout(300);
+        }
+        let lembrado: Record<string, unknown> = {};
+        try {
+          lembrado = JSON.parse(readFileSync(casca, 'utf8')) as Record<string, unknown>;
+        } catch {
+          // fica vazio
+        }
+        r.ok(lembrado['atualizacoes'] === 'perguntar', `"Perguntar antes de instalar" fica no casca.json (${String(lembrado['atualizacoes'])})`);
+        publicar('0.2.2');
+        if (await r.tabAte('atualizacoes-procurar')) await r.tecla('Enter');
+        r.ok(await r.esperar('atualizacoes-situacao-disponivel', 8000), 'perguntar: "Procurar agora" acha a 0.2.2 e espera o Instalar');
+        r.ok(!/pronta 0\.2\.2 /.test(lerRelato()), 'perguntar: não baixa sozinho');
+        if (await r.tabAte('atualizacoes-instalar')) await r.tecla('Enter');
+        r.ok(await r.esperar('atualizacoes-situacao-pronta', 15000), 'Instalar: a 0.2.2 baixa, confere e fica pronta');
+        r.ok(await r.focoEm('atualizacoes-procurar'), 'depois do Instalar, o foco continua no mesmo botão');
+        await r.tecla('Escape');
+      } else r.ok(false, 'Ctrl+, abre os Ajustes');
+      r.ok((await r.mouse()) === 0, 'nenhum evento de mouse (atualizações)');
+    } finally {
+      await fechar(app);
+    }
+    const instalou = /instalar 0\.2\.2 (.+) abrir=nao/.exec(lerRelato());
+    r.ok(!!instalou, 'fechar a janela roda o instalador da 0.2.2 em silêncio (sem abrir de novo)');
+    r.ok(!!instalou && readFileSync(instalou[1]!.trim()).equals(arquivos.get('0.2.2/Ekfrase-Writer-Setup.exe')!), 'é o instalador publicado, conferido');
+    r.ok(!/instalar 0\.2\.1 /.test(lerRelato()), 'a 0.2.1 (substituída pela 0.2.2) não roda');
+    somar(r);
+
+    // ---- quarta vez: "Reiniciar agora" (o modo ficou em perguntar: a busca ao abrir acha a 0.2.3 e espera)
+    publicar('0.2.3');
+    ({ app, p, r } = await entrar());
+    try {
+      await r.tecla('Control+,');
+      if (await r.esperar('ajustes-casca', 5000)) {
+        r.ok(await r.esperar('atualizacoes-situacao-disponivel', 15000), 'o modo "perguntar" foi lembrado: a 0.2.3 espera o Instalar');
+        if (await r.tabAte('atualizacoes-instalar')) await r.tecla('Enter');
+        r.ok(await r.esperar('atualizacoes-reiniciar', 15000), 'pronta: aparece "Reiniciar agora"');
+        const saiu = new Promise<boolean>((ok) => {
+          app.once('close', () => ok(true));
+          setTimeout(() => ok(false), 20000);
+        });
+        // o Enter fecha a janela antes de o Playwright terminar de apertar: o erro dele aqui é o esperado
+        if (await r.tabAte('atualizacoes-reiniciar')) await p.keyboard.press('Enter').catch(() => undefined);
+        r.ok(await saiu, '"Reiniciar agora" fecha o Writer');
+        r.ok(/instalar 0\.2\.3 .+ abrir=sim/.test(lerRelato()), 'e roda o instalador da 0.2.3, que abre o Writer de novo no fim');
+      } else r.ok(false, 'Ctrl+, abre os Ajustes (quarta vez)');
+    } finally {
+      somar(r);
+      await fechar(app).catch(() => undefined);
+    }
+  } finally {
+    servidor.close();
+  }
 }
