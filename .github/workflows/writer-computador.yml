@@ -48,6 +48,8 @@ jobs:
       - name: Electron no Linux (o sandbox do Chromium precisa de namespaces sem privilégio)
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: O WebKit do Playwright (o roteiro do Writer OS sem o Electron, que o --so-casca também roda)
+        run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps ' || '' }}webkit
       - name: Roteiro da casca (teclado, travas, cifra, espelho, atualizações)
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run teclado -- --so-casca
       - run: npm run casca:instalador
