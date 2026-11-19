@@ -122,7 +122,9 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
         if (!r.body) throw new Error('sem corpo');
         passo('ler');
         for await (const pedaco of r.body as unknown as AsyncIterable<Uint8Array>) {
-          vivo();
+          // o relógio do silêncio PARA enquanto grava (19/11, noite): um disco lento (o datasync num pendrive ruim, o
+          // Windows do GitHub) não é a rede muda; contado, derrubava a conexão à toa no meio da gravação
+          clearTimeout(silencio);
           passo('gravar');
           await fh.write(pedaco, 0, pedaco.length, pos);
           pos += pedaco.length;
@@ -133,6 +135,7 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
             await fh.datasync();
           }
           o.aoBaixar?.(pos, total);
+          vivo();
           passo('ler');
         }
         passo('sync');

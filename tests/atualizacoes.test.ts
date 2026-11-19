@@ -128,6 +128,43 @@ describe('o download que fica mudo no meio', () => {
     }
     // 20 s: o datasync a cada 64 KB é lento no disco do Windows do GitHub (o teste estourou os 5 s no PR #31 do público)
   }, 20_000);
+
+  it('gravar devagar no disco não é silêncio da rede (a conexão não cai)', async () => {
+    const conteudo = randomBytes(300_000);
+    let pedidos = 0;
+    const servidor = createServer((_q, r) => {
+      pedidos++;
+      r.writeHead(200, { 'content-length': conteudo.length });
+      r.end(conteudo);
+    });
+    await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+    const ad = servidor.address();
+    const pasta = mkdtempSync(join(tmpdir(), 'ekfrase-lento-'));
+    try {
+      const destino = join(pasta, 'arquivo.bin');
+      const tentativas: unknown[] = [];
+      let primeira = true;
+      await baixarArquivo((u, i) => fetch(u, i), `http://127.0.0.1:${typeof ad === 'object' && ad ? ad.port : 0}/a`, destino, {
+        tamanho: conteudo.length,
+        parado: 300,
+        aoTentarDeNovo: (...a) => tentativas.push(a),
+        // o disco lento: a primeira gravação leva 400 ms, mais que o silêncio permitido (como o PR #32 do público viu)
+        aoPasso: (p) => {
+          if (p !== 'gravar' || !primeira) return;
+          primeira = false;
+          const ate = Date.now() + 400;
+          while (Date.now() < ate);
+        },
+      });
+      expect(tentativas).toEqual([]);
+      expect(pedidos).toBe(1);
+      expect(sha(readFileSync(destino))).toBe(sha(conteudo));
+    } finally {
+      servidor.closeAllConnections();
+      servidor.close();
+      rmSync(pasta, { recursive: true, force: true });
+    }
+  }, 20_000);
 });
 
 describe('o que o ekfrase-atualizar.sh responde', () => {
