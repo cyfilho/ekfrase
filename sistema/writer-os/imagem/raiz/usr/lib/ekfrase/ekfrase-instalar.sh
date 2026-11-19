@@ -177,12 +177,25 @@ pela_partuuid() {
   return 1
 }
 
+# O lado do sistema que está ligado (docs/ATUALIZACOES.md §4): live/ (A) ou live-b/ (B), o live-media-path do GRUB.
+LADO=$(tr ' ' '\n' </proc/cmdline | sed -n 's|^live-media-path=/||p' | head -1)
+case "$LADO" in live | live-b) ;; *) LADO=live ;; esac
+
+# O que vai para o disco: a partição de boot do pendrive SEM a outra cópia do sistema (a de reserva, ou uma pela
+# metade, *.novo) e sem o grubenv (o disco nasce com um novo, só com o lado de agora). Um caminho por linha.
+arquivos_boot() {
+  (cd "$MEDIO_DIR" && find . -type f | grep -Ev '^\./(live|live-b)(\.novo)?/|^\./boot/grub/grubenv(\.novo)?$|\.novo$' && find "./$LADO" -type f)
+}
+pastas_boot() {
+  (cd "$MEDIO_DIR" && find . -mindepth 1 -type d | grep -Ev '^\./(live|live-b)(\.novo)?(/|$)' && echo "./$LADO")
+}
+
 # Copia a partição de boot do pendrive, contando os bytes (o squashfs, de ~500 MB, em pedaços de 64 MB).
 copiar_boot() {
-  local total feito=0 f tam k parte
-  total=$(du -sb "$MEDIO_DIR" | cut -f1)
+  local total=0 feito=0 f tam k parte
+  while IFS= read -r f; do total=$((total + $(stat -c %s "$MEDIO_DIR/$f"))); done < <(arquivos_boot)
   dizer passo copiar 0 "$total"
-  (cd "$MEDIO_DIR" && find . -mindepth 1 -type d) | while IFS= read -r f; do mkdir -p "$NOVO/boot/$f" || exit 1; done || return 1
+  pastas_boot | while IFS= read -r f; do mkdir -p "$NOVO/boot/$f" || exit 1; done || return 1
   while IFS= read -r f; do
     tam=$(stat -c %s "$MEDIO_DIR/$f") || return 1
     if [ "$tam" -gt 67108864 ]; then
@@ -200,7 +213,13 @@ copiar_boot() {
     fi
     feito=$((feito + tam))
     dizer passo copiar "$feito" "$total"
-  done < <(cd "$MEDIO_DIR" && find . -type f)
+  done < <(arquivos_boot)
+}
+
+# O grubenv do disco (o formato do grub-editenv, 1024 bytes): só o lado que foi copiado.
+grubenv_novo() {
+  { printf '# GRUB Environment Block\nekfrase_atual=%s\n' "$LADO"; head -c 1024 /dev/zero | tr '\0' '#'; } | head -c 1024 >"$NOVO/boot/boot/grub/grubenv" || return 1
+  [ "$(stat -c %s "$NOVO/boot/boot/grub/grubenv")" = 1024 ]
 }
 
 # Nada segura o disco: nenhuma partição dele aberta por LVM, RAID ou criptografia (um holder no /sys).
@@ -312,14 +331,16 @@ instalar() {
 
   dizer passo conferir
   trab=$(mktemp -d) || falhar copia
-  (cd "$MEDIO_DIR" && find . -type f -print0 | sort -z | xargs -0 sha256sum) >"$trab/somas" || falhar copia
+  (cd "$MEDIO_DIR" && arquivos_boot | sort | tr '\n' '\0' | xargs -0 sha256sum) >"$trab/somas" || falhar copia
   sync
   echo 3 >/proc/sys/vm/drop_caches
   (cd "$NOVO/boot" && sha256sum --quiet --strict -c "$trab/somas") >/dev/null 2>&1 || falhar copia
-  # o GRUB do disco acha a partição de dados pelo PARTUUID (o live-media ele já tira da partição de onde ligou)
+  grubenv_novo || falhar copia
+  # o GRUB do disco acha a partição de dados pelo PARTUUID (o live-media ele já tira da partição de onde ligou); a linha
+  # do kernel é a do grub.cfg.modelo ("  linux /$ekfrase_lado/vmlinuz …"; o ekfrase-atualizar.sh mantém o fim dela)
   for c in EFI/BOOT/grub.cfg EFI/debian/grub.cfg boot/grub/grub.cfg; do
     [ -f "$NOVO/boot/$c" ] || falhar copia
-    sed -i "s|^\(  linux /live/vmlinuz .*\)\$|\1 ekfrase.dados=$pu2|" "$NOVO/boot/$c" || falhar copia
+    sed -i "s|^\(  linux /[\$]ekfrase_lado/vmlinuz .*\)\$|\1 ekfrase.dados=$pu2|" "$NOVO/boot/$c" || falhar copia
     grep -q " ekfrase.dados=$pu2\$" "$NOVO/boot/$c" || falhar copia
   done
   [ ! -e "$NOVO/boot/EFI/BOOT/fbx64.efi" ] || falhar copia
@@ -335,8 +356,8 @@ instalar() {
     origem="/run/ekfrase/ram/Ekfrase Writer"
   fi
   if [ "$levar" = levar ] && [ -n "$origem" ]; then
-    # a casca já gravou e fechou os bancos (o WAL entrou no arquivo); os diagnósticos do pendrive ficam nele
-    (cd "$origem" && find . -mindepth 1 -maxdepth 1 ! -name .diagnostico -print0 | xargs -0 -r cp -rP --no-preserve=all -t "$NOVO/dados/Ekfrase Writer/") || falhar textos
+    # a casca já gravou e fechou os bancos (o WAL entrou no arquivo); os diagnósticos e as atualizações baixadas ficam no pendrive
+    (cd "$origem" && find . -mindepth 1 -maxdepth 1 ! -name .diagnostico ! -name .atualizacao -print0 | xargs -0 -r cp -rP --no-preserve=all -t "$NOVO/dados/Ekfrase Writer/") || falhar textos
   else
     # só o idioma, o teclado e o fuso do primeiro uso
     for sj in "$origem/sistema.json" /run/ekfrase/sistema.json; do

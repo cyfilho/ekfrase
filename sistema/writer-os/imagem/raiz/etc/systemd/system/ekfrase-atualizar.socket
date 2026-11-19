@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# O Writer OS se atualiza (docs/ATUALIZACOES.md §4): o pedido chega por este socket, que só o grupo writer abre.
+# Um ekfrase-atualizar@.service (root) por conexão; ele lê uma linha e só aceita "estado", "aplicar <versão>" e "confirmar".
+[Unit]
+Description=Ekfrase Writer OS: o pedido de atualizar
+
+[Socket]
+ListenStream=/run/ekfrase/atualizar.sock
+SocketUser=root
+SocketGroup=writer
+SocketMode=0660
+Accept=yes
+MaxConnections=4
+
+[Install]
+WantedBy=sockets.target

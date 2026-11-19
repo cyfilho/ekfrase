@@ -25,7 +25,7 @@ import { lerGpt, NOME_BOOT, NOME_DADOS } from '../../sistema/writer-os/gravador/
 import { executar, type Ambiente } from '../../sistema/writer-os/gravador/src/nucleo/gravar.ts';
 import { Fluxo, lerCabecaImagem, MIB } from '../../sistema/writer-os/gravador/src/nucleo/imagem.ts';
 import { imagemDoArquivo } from '../../sistema/writer-os/gravador/src/nucleo/origem.ts';
-import { sha256DoArquivo } from '../../sistema/writer-os/gravador/src/nucleo/minisign.ts';
+import { sha256DoArquivo } from '@ekfrase/atualizacoes';
 
 const args = process.argv.slice(2);
 const arg = (n: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
