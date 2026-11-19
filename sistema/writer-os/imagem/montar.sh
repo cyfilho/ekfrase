@@ -13,16 +13,25 @@
 #
 # Entra: a casca já montada para o OS (`node sistema/writer-os/casca/scripts/montar.ts --os`, em
 # sistema/writer-os/casca/instalador/linux-unpacked). Sai: sistema/writer-os/imagem/saida/.
-# Variáveis: VERSAO (a da casca), DONO (uid:gid dos arquivos de saída), TRAB (a pasta de trabalho).
+# Variáveis: VERSAO (a da tag: X.Y.Z ou X.Y.Z-teste.N), CANAL (estavel|teste; o padrão sai da VERSAO), DONO (uid:gid
+# dos arquivos de saída), TRAB (a pasta de trabalho).
+#
+# A ATUALIZAÇÃO (docs/ATUALIZACOES.md §4, U1): além das imagens, sai/ recebe os arquivos que o Release leva para os
+# pendrives se atualizarem sozinhos (ekfrase-writer-os-<v>.squashfs, .vmlinuz, .initrd e .grub.cfg, este com o @HASH@
+# no lugar da senha) e a chave de TESTE das atualizações (teste-atualizacao.key, sorteada a cada montagem, sem senha;
+# só a imagem de teste confia nela, e ela nunca vai ao Release).
 set -euo pipefail
 
 AQUI=$(cd "$(dirname "$0")" && pwd)
 CASCA=${CASCA:-$AQUI/../casca/instalador/linux-unpacked}
 SAIDA=${SAIDA:-$AQUI/saida}
 VERSAO=${VERSAO:-0.1.0}
+case "$VERSAO" in *-teste.*) CANAL=${CANAL:-teste} ;; *) CANAL=${CANAL:-estavel} ;; esac
+[[ $VERSAO =~ ^[0-9]+\.[0-9]+\.[0-9]+(-teste\.[0-9]+)?$ ]] || { echo "VERSAO inválida: $VERSAO"; exit 1; }
+[ "$CANAL" = estavel ] || [ "$CANAL" = teste ] || { echo "CANAL inválido: $CANAL"; exit 1; }
 TRAB=${TRAB:-/tmp/ekfrase-os}
 LOGO=$AQUI/../../../apps/writer/src/img/logo-writer.png
-export AQUI CASCA VERSAO LOGO
+export AQUI CASCA VERSAO CANAL LOGO
 
 [ -x "$CASCA/ekfrase-writer" ] || { echo "Falta a casca do OS em $CASCA (montar.ts --os)."; exit 1; }
 [ -f "$LOGO" ] || { echo "Falta a logo do Writer ($LOGO)."; exit 1; }
@@ -30,7 +39,7 @@ export AQUI CASCA VERSAO LOGO
 echo "== ferramentas da montagem"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common ca-certificates gcc libc6-dev linux-libc-dev >/dev/null
+apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfstools mtools gdisk grub-common minisign ca-certificates gcc libc6-dev linux-libc-dev >/dev/null
 
 rm -rf "$TRAB"
 mkdir -p "$TRAB" "$SAIDA"
@@ -66,9 +75,15 @@ mksquashfs "$RAIZ" "$TRAB/filesystem.squashfs" -comp zstd -Xcompression-level 19
 # descomprime o initrd inteiro antes de começar: cada MB é tempo de boot)
 echo "  medida squashfs $(du -m "$TRAB/filesystem.squashfs" | cut -f1) MB · raiz $(du -sm "$RAIZ" | cut -f1) MB · casca $(du -sm "$RAIZ/opt/ekfrase-writer" | cut -f1) MB · initrd $(du -m "$TRAB/initrd.img" | cut -f1) MB"
 
+echo "$VERSAO" > "$TRAB/versao"
+
 echo "== o squashfs do teste (só na imagem de teste)"
 TESTE=$TRAB/teste
 cp -a "$AQUI/teste" "$TESTE"
+# a chave de TESTE das atualizações (o qemu.py assina com ela uma atualização "maior"; a imagem de entrega nunca confia)
+rm -f "$SAIDA/teste-atualizacao.key"
+mkdir -p "$TESTE/usr/share/ekfrase"
+minisign -G -W -f -p "$TESTE/usr/share/ekfrase/atualizacao-teste.pub" -s "$SAIDA/teste-atualizacao.key" >/dev/null
 chmod 0755 "$TESTE"/usr/lib/ekfrase/teste/*.sh
 mkdir -p "$TESTE/etc/systemd/system/multi-user.target.wants"
 ln -s ../ekfrase-teste.service "$TESTE/etc/systemd/system/multi-user.target.wants/ekfrase-teste.service"
@@ -93,6 +108,13 @@ echo "== as imagens"
 NOME=ekfrase-writer-os-$VERSAO
 bash "$AQUI/montar-img.sh" "$TRAB" "$SAIDA/$NOME.img"
 bash "$AQUI/montar-img.sh" "$TRAB" "$SAIDA/$NOME-teste.img" "$TRAB/zz-teste.squashfs"
+
+echo "== os arquivos da atualização (o Release os leva; o manifesto e o lacre saem no CI)"
+cp "$TRAB/filesystem.squashfs" "$SAIDA/$NOME.squashfs"
+cp "$TRAB/vmlinuz" "$SAIDA/$NOME.vmlinuz"
+cp "$TRAB/initrd.img" "$SAIDA/$NOME.initrd"
+sed "s|@VERSAO@|$VERSAO|" "$AQUI/grub.cfg.modelo" > "$SAIDA/$NOME.grub.cfg"
+grep -q '@HASH@' "$SAIDA/$NOME.grub.cfg" || { echo "o grub.cfg da atualização perdeu o @HASH@"; exit 1; }
 
 if [ -n "${DONO:-}" ]; then chown -R "$DONO" "$SAIDA"; fi
 ls -la "$SAIDA"

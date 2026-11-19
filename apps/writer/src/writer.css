@@ -1130,6 +1130,43 @@ a.linha-titulo:hover {
   font-weight: 700;
 }
 
+/* as atualizações (DEC-P072): o aviso discreto no canto, acima do relógio; nunca pega o foco */
+.aviso-atualizacao {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 2.6rem;
+  z-index: 59;
+  max-width: min(22rem, calc(100vw - 1rem));
+  padding: 0.5rem 0.75rem;
+  background: var(--papel-forte);
+  color: var(--tinta);
+  border: var(--px) solid var(--borda);
+  box-shadow: 2px 2px 0 var(--sombra);
+  font-size: 0.9rem;
+}
+
+.aviso-atualizacao p {
+  margin: 0 0 0.4rem;
+}
+
+.escolha-atualizacoes {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: var(--px) solid var(--borda);
+}
+
+.opcao-atualizacoes {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.opcao-atualizacoes span {
+  display: grid;
+}
+
 /* o que mora no pé da tela não fica embaixo do relógio */
 .no-os .folha-rodape,
 .no-os .ekf-rodape,

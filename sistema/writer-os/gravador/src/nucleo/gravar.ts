@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { mesmoDisco, type Disco } from './discos.ts';
 import { lerGpt, ErroGpt } from './gpt.ts';
 import { Fluxo, lerCabecaImagem, ErroImagem } from './imagem.ts';
-import { sha256DoArquivo } from './minisign.ts';
+import { sha256DoArquivo } from '@ekfrase/atualizacoes';
 import { escritas, planejar, ErroPlano, type Modo, type Plano, type SistemaDados } from './plano.ts';
 
 export interface Tarefa {

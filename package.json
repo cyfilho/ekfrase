@@ -24,7 +24,7 @@
     "gravador:roteiro": "node sistema/writer-os/gravador/scripts/roteiro.ts",
     "chave": "node scripts/chave.ts",
     "arte": "node scripts/arte/gerar.mjs",
-    "typecheck": "tsc -p packages/nucleo --noEmit && tsc -p packages/interface --noEmit && tsc -p packages/arquivo --noEmit && tsc -p packages/maker-core --noEmit && tsc -p packages/maker-doc --noEmit && tsc -p packages/maker-gen --noEmit && tsc -p packages/maker-render --noEmit && tsc -p packages/writer-nucleo --noEmit && tsc -p apps/maker --noEmit && tsc -p apps/biblioteca --noEmit && tsc -p apps/vernakula --noEmit && tsc -p apps/writer --noEmit && tsc -p tsconfig.tests.json --noEmit",
+    "typecheck": "tsc -p packages/nucleo --noEmit && tsc -p packages/interface --noEmit && tsc -p packages/arquivo --noEmit && tsc -p packages/maker-core --noEmit && tsc -p packages/maker-doc --noEmit && tsc -p packages/maker-gen --noEmit && tsc -p packages/maker-render --noEmit && tsc -p packages/writer-nucleo --noEmit && tsc -p packages/atualizacoes --noEmit && tsc -p apps/maker --noEmit && tsc -p apps/biblioteca --noEmit && tsc -p apps/vernakula --noEmit && tsc -p apps/writer --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
     "build": "npm run build -w @ekfrase/maker && npm run build -w @ekfrase/biblioteca && npm run build -w @ekfrase/vernakula && npm run build -w @ekfrase/writer",
     "conferir": "npm run typecheck && npm test && npm run build"

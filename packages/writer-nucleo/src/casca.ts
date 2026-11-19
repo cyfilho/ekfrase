@@ -100,6 +100,56 @@ export interface PonteCasca {
 
   /** Só no Writer OS (o pendrive): o sistema (Wi-Fi, teclado, pendrives, desligar…). */
   readonly os?: PonteSistema;
+
+  /** As atualizações do app (DEC-P072, docs/ATUALIZACOES.md): no Writer OS desde a U1; no computador, a U2. */
+  readonly atualizacoes?: PonteAtualizacoes;
+}
+
+// ---------- as atualizações (DEC-P072, docs/ATUALIZACOES.md) ----------
+
+/** "Automáticas (recomendado)", o padrão, ou "Perguntar antes de instalar". */
+export type ModoAtualizacoes = 'automaticas' | 'perguntar';
+
+/**
+ * Onde a atualização está: `parado` (ainda não procurou), `procurando`, `em-dia`, `disponivel` (achou uma nova e o modo
+ * é perguntar), `baixando`, `aplicando` (gravando a cópia de reserva), `pronta` (vale na próxima vez que ligar) ou `erro`.
+ */
+export type SituacaoAtualizacao = 'parado' | 'procurando' | 'em-dia' | 'disponivel' | 'baixando' | 'aplicando' | 'pronta' | 'erro';
+
+/**
+ * `sem-rede` (sem internet ou o GitHub não respondeu), `lacre` (arquivo sem o lacre da Ekfrase ou trocado no caminho),
+ * `sem-espaco`, `sem-dados` (o Writer OS sem a partição de dados: não há onde baixar), `pendente` (a última ainda não
+ * ligou: reinicie antes), `falhou` (outra coisa).
+ */
+export type ErroAtualizacao = 'sem-rede' | 'lacre' | 'sem-espaco' | 'sem-dados' | 'pendente' | 'falhou';
+
+export interface EstadoAtualizacoes {
+  modo: ModoAtualizacoes;
+  /** A versão que está rodando. */
+  versao: string;
+  canal: 'estavel' | 'teste';
+  situacao: SituacaoAtualizacao;
+  /** A versão nova (achada, baixando ou pronta). */
+  nova: string | null;
+  /** O andamento de `baixando` e `aplicando`, em bytes. */
+  feito: number;
+  total: number;
+  erro: ErroAtualizacao | null;
+  /** Quando procurou pela última vez (ms desde 1970). */
+  ultimaBusca: number | null;
+  /** A última atualização não ligou e o sistema voltou para a anterior (Writer OS, A/B). */
+  voltou: { de: string; para: string } | null;
+}
+
+export interface PonteAtualizacoes {
+  estado(): Promise<EstadoAtualizacoes>;
+  /** "Procurar agora" (no modo automáticas, achou = já baixa e deixa pronta). */
+  procurar(): Promise<EstadoAtualizacoes>;
+  /** "Instalar" (no modo perguntar, depois de achar). */
+  instalar(): Promise<EstadoAtualizacoes>;
+  usarModo(modo: ModoAtualizacoes): Promise<EstadoAtualizacoes>;
+  /** Cada mudança (o andamento, pronta, erro). Devolve o "parar de ouvir". */
+  aoMudar(f: (e: EstadoAtualizacoes) => void): () => void;
 }
 
 // ---------- o Writer OS (fase 3): o painel do sistema e o primeiro uso ----------
