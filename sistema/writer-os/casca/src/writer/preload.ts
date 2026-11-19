@@ -25,7 +25,8 @@ contextBridge.exposeInMainWorld(
     plataforma: process.platform,
     // o Writer OS (o pendrive): só quando a casca abriu com `--modo-os` dentro da imagem (ou o simulado)
     os: process.argv.includes('--ekfrase-os=1'),
-    // as atualizações (DEC-P072): no Writer OS desde a U1 (o Writer OS sem o Electron, parado, não tem)
+    // as atualizações (DEC-P072): no Writer OS desde a U1 e no computador desde a U2 (o Writer OS sem o Electron, parado,
+    // não tem; nem o computador sem um jeito de aplicar: o `npm run casca` sem o simulado)
     atualizacoes: process.argv.includes('--ekfrase-atualizacoes=1'),
   }),
 );

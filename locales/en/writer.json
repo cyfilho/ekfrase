@@ -665,5 +665,11 @@
   "atualizacoes.erro.pendente": "An update is still waiting to start: restart before installing another one.",
   "atualizacoes.erro.falhou": "Something went wrong. Nothing was installed, and your texts are as they were.",
   "atualizacoes.voltou": "Version {de} did not start properly, so I went back to {para}. Your texts were not touched.",
-  "atualizacoes.aviso": "Updates"
+  "atualizacoes.aviso": "Updates",
+  "atualizacoes.situacao.parado.pc": "Has not checked since it was opened.",
+  "atualizacoes.situacao.aplicando.pc": "Preparing version {nova}… {pct}%",
+  "atualizacoes.situacao.pronta.pc": "Update ready: version {nova} takes effect the next time you open Writer.",
+  "atualizacoes.modo.automaticas.dica.pc": "Downloads on its own, checks the Ekfrase seal and takes effect the next time you open Writer. It never closes while you write.",
+  "atualizacoes.erro.sem-espaco.pc": "There is not enough space on this computer for the new version.",
+  "atualizacoes.reiniciar": "Restart now"
 }

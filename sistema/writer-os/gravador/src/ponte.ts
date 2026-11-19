@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /** O contrato entre a página do Gravador e o processo principal (o preload põe em `window.gravador`). */
+import type { EstadoDoAtualizador, ModoAtualizacoes } from '@ekfrase/atualizacoes';
 import type { InfoComputador } from './nucleo/computador-regras.ts';
+
+export type { EstadoDoAtualizador, ModoAtualizacoes };
 import type { Recusa } from './nucleo/discos.ts';
 
 export type { InfoComputador };
@@ -67,6 +70,16 @@ export interface PonteGravador {
   ejetar(disco: string): Promise<{ ok: boolean; erro?: string }>;
   aoProgresso(f: (p: Progresso) => void): () => void;
   aoTentarFechar(f: () => void): () => void;
+  /** As atualizações do próprio Gravador (U2): `null` = este Gravador não se atualiza (o `npm run gravador`). */
+  atualizacoes: AtualizacoesDoGravador;
+}
+
+export interface AtualizacoesDoGravador {
+  estado(): Promise<EstadoDoAtualizador | null>;
+  procurar(): Promise<EstadoDoAtualizador | null>;
+  instalar(): Promise<EstadoDoAtualizador | null>;
+  usarModo(m: ModoAtualizacoes): Promise<EstadoDoAtualizador | null>;
+  aoMudar(f: (e: EstadoDoAtualizador) => void): () => void;
 }
 
 /** O nome do disco como a pessoa digita: sem diferença de maiúsculas e espaços. */

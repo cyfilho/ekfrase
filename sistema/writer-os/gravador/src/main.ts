@@ -11,18 +11,20 @@
  * Variáveis (só fora do pacote, para os testes e o desenvolvimento): EKFRASE_GRAVADOR_DISCOS (discos
  * simulados: um JSON de `Disco[]`, cada um um arquivo), EKFRASE_GRAVADOR_API (outro "GitHub"),
  * EKFRASE_GRAVADOR_CHAVE (outra chave pública), EKFRASE_GRAVADOR_CACHE (outra pasta de cache),
- * EKFRASE_GRAVADOR_IMAGEM ("Já tenho a imagem" sem a janela de escolher arquivo).
+ * EKFRASE_GRAVADOR_IMAGEM ("Já tenho a imagem" sem a janela de escolher arquivo). As atualizações do próprio Gravador
+ * (U2): EKFRASE_GRAVADOR_VERSAO (a versão "de agora"), EKFRASE_GRAVADOR_ATUALIZAR_ALVO (o arquivo trocado no lugar do
+ * `.exe`) e EKFRASE_GRAVADOR_ATUALIZACOES_ATRASO (ms até a primeira busca).
  */
 import { app, dialog, ipcMain, net, session, type BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { criarJanela, registrarEsquema, servirApp, travarApp, travarPermissoes } from '../../casca/src/motor/janela.ts';
 import { gravarElevado } from './elevar.ts';
 import { ambienteSimulado } from './nucleo/ambientes.ts';
-import { CHAVE_EKFRASE } from '@ekfrase/atualizacoes';
+import { Atualizador, CHAVE_EKFRASE, ehVersao, lerModo, limparVelho, trocarNoLugar, type ModoAtualizacoes } from '@ekfrase/atualizacoes';
 import { computadorSimulado, GB, infoDoComputador, recusaDoPreparar, TAMANHOS_GB, type InfoComputador, type Removido, type TarefaComputador } from './nucleo/computador.ts';
 import { listarDiscos, resumoDoConteudo, type Disco } from './nucleo/discos.ts';
 declare const __EKFRASE_CANAL__: string;
@@ -55,6 +57,8 @@ function iniciar(): void {
   const CANAL: Canal = (amb('EKFRASE_GRAVADOR_CANAL') ?? __EKFRASE_CANAL__) === 'teste' ? 'teste' : 'estavel';
   const CHAVE = amb('EKFRASE_GRAVADOR_CHAVE') ? readFileSync(amb('EKFRASE_GRAVADOR_CHAVE')!, 'utf8') : CHAVE_EKFRASE;
   const CACHE = amb('EKFRASE_GRAVADOR_CACHE') ?? pastaCache();
+  /** A versão: a da tag `writer-os-vX.Y.Z[-teste.N]` que o montou (scripts/montar.ts); nos testes, EKFRASE_GRAVADOR_VERSAO. */
+  const VERSAO = amb('EKFRASE_GRAVADOR_VERSAO') ?? app.getVersion();
   const DIST = __dirname;
   /** Só fora do pacote, com EKFRASE_GRAVADOR_LOG=1: os passos no stderr (o roteiro mostra). */
   const registro = (...a: unknown[]) => {
@@ -96,7 +100,53 @@ function iniciar(): void {
     return f(...a);
   };
 
-  ipcMain.handle('gravador:estado', tratar(async () => ({ versao: app.getVersion(), plataforma: process.platform, simulado: !!SIMULADO })));
+  ipcMain.handle('gravador:estado', tratar(async () => ({ versao: VERSAO, plataforma: process.platform, simulado: !!SIMULADO })));
+
+  // ---- o Gravador se atualiza (U2, docs/ATUALIZACOES.md §5): o `.exe` portátil (ou o AppImage) trocado no lugar.
+  // Vale na próxima vez que abrir; nunca no meio de uma gravação. Só com um arquivo para trocar (o pacote; nos testes,
+  // EKFRASE_GRAVADOR_ATUALIZAR_ALVO): o `npm run gravador` sem ele não se atualiza.
+  const arquivoAjustes = join(CACHE, 'ajustes.json');
+  const lerAjustes = (): { atualizacoes?: unknown } => {
+    try {
+      return JSON.parse(readFileSync(arquivoAjustes, 'utf8')) as { atualizacoes?: unknown };
+    } catch {
+      return {};
+    }
+  };
+  const alvo = amb('EKFRASE_GRAVADOR_ATUALIZAR_ALVO') ?? (app.isPackaged ? (process.env['PORTABLE_EXECUTABLE_FILE'] ?? process.env['APPIMAGE']) : undefined);
+  if (alvo) limparVelho(alvo);
+  const atrasoAt = Number(amb('EKFRASE_GRAVADOR_ATUALIZACOES_ATRASO') ?? '');
+  const atualizador =
+    alvo && ehVersao(VERSAO)
+      ? new Atualizador({
+          app: 'ekfrase-gravador',
+          nome: 'Ekfrase Gravador',
+          prefixo: 'writer-os-v',
+          versao: VERSAO,
+          canal: CANAL,
+          papel: process.platform === 'linux' ? 'linux' : 'windows',
+          pasta: join(CACHE, 'atualizacao'),
+          modo: () => lerModo(lerAjustes().atualizacoes),
+          gravarModo: (m: ModoAtualizacoes) => {
+            mkdirSync(CACHE, { recursive: true });
+            writeFileSync(arquivoAjustes, `${JSON.stringify({ ...lerAjustes(), atualizacoes: m }, null, 2)}\n`);
+          },
+          // o `.exe` aberto não pode ser apagado no Windows, mas muda de nome (vira `.velho`, apagado na próxima vez)
+          preparar: (arquivo, _v, sha256) => trocarNoLugar(arquivo, alvo, { sha256, guardarVelho: process.platform === 'win32', executavel: process.platform !== 'win32' }),
+          podeAgora: () => !ocupado,
+          buscar,
+          api: API,
+          chaves: [CHAVE],
+          agente: 'Ekfrase-Gravador',
+          ...(Number.isFinite(atrasoAt) && atrasoAt > 0 ? { atrasoInicial: atrasoAt } : {}),
+        })
+      : null;
+  atualizador?.aoMudar((e) => janela?.webContents.send('gravador:at-mudou', e));
+  ipcMain.handle('gravador:at-estado', tratar(async () => atualizador?.estado() ?? null));
+  ipcMain.handle('gravador:at-procurar', tratar(async () => atualizador?.procurar() ?? null));
+  // nunca no meio de uma gravação: o botão também espera
+  ipcMain.handle('gravador:at-instalar', tratar(async () => (ocupado ? (atualizador?.estado() ?? null) : (atualizador?.instalar() ?? null))));
+  ipcMain.handle('gravador:at-modo', tratar(async (m: string) => atualizador?.usarModo(m === 'perguntar' ? 'perguntar' : 'automaticas') ?? null));
 
   // ---- o disco deste computador (PLANO §8c): preparar para instalar e remover o Writer OS
   const lerComputador = (): Promise<InfoComputador> => (SIMULADO ? Promise.resolve(computadorSimulado(PC_SIMULADO)) : infoDoComputador());
@@ -283,7 +333,8 @@ function iniciar(): void {
     const sessao = session.fromPartition('gravador');
     travarPermissoes(sessao);
     servirApp({ sessao, host: 'gravador', pasta: join(DIST, 'pagina') });
-    janela = criarJanela({ sessao, host: 'gravador', preload: join(DIST, 'preload.cjs'), titulo: 'Ekfrase Gravador', largura: 520, altura: 620, devTools: dev && process.env['EKFRASE_GRAVADOR_DEVTOOLS'] === '1', argumentos: [`--ekfrase-gravador-versao=${app.getVersion()}`] });
+    janela = criarJanela({ sessao, host: 'gravador', preload: join(DIST, 'preload.cjs'), titulo: 'Ekfrase Gravador', largura: 520, altura: 620, devTools: dev && process.env['EKFRASE_GRAVADOR_DEVTOOLS'] === '1', argumentos: [`--ekfrase-gravador-versao=${VERSAO}`] });
+    atualizador?.iniciar();
     janela.on('close', (e) => {
       if (ocupado) {
         e.preventDefault();

@@ -391,3 +391,21 @@ input[type='number'] {
   align-items: center;
   cursor: pointer;
 }
+
+/* as atualizações do próprio Gravador (U2): o aviso discreto embaixo, no fluxo da página (nunca por cima de um botão) */
+.aviso-atualizacao {
+  margin-top: 1.25rem;
+  padding: 0.5rem 0.75rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+  border-left: calc(var(--px) * 3) solid var(--frio);
+  background: var(--papel-forte);
+  font-size: 0.9rem;
+}
+
+.aviso-atualizacao p {
+  margin: 0;
+}
+
+.aviso-atualizacao .acoes {
+  margin-top: 0.5rem;
+}

@@ -3,7 +3,7 @@
 /**
  * AS ATUALIZAÇÕES na tela (DEC-P072, docs/ATUALIZACOES.md §1; no Writer OS desde a U1, no computador na U2):
  *
- * - `ParteAtualizacoes`: a parte "Atualizações" do menu do sistema. A versão, o ajuste ("Automáticas (recomendado)" ou
+ * - `ParteAtualizacoes`: a parte "Atualizações" do menu do sistema (no computador, dentro dos Ajustes). A versão, o ajuste ("Automáticas (recomendado)" ou
  *   "Perguntar antes de instalar"), "Procurar agora", o andamento, e o que aconteceu (pronta, erro, a que não ligou).
  * - `AvisoDeAtualizacao`: o aviso discreto no canto, em todas as telas: "Há uma versão nova", com Instalar e Agora não
  *   (modo perguntar); "Atualização pronta: vale na próxima vez que você ligar"; "a versão X não ligou, voltei para a Y".
@@ -14,7 +14,7 @@
 import type { EstadoAtualizacoes, ModoAtualizacoes, PonteAtualizacoes } from '@ekfrase/writer-nucleo';
 import { useEffect, useState } from 'preact/hooks';
 import { diaEHora, t } from '../textos.ts';
-import { casca } from './casca.ts';
+import { casca, noOS } from './casca.ts';
 
 export const atualizacoesDaCasca: PonteAtualizacoes | null = casca?.atualizacoes ?? null;
 
@@ -40,13 +40,21 @@ export function useAtualizacoes(): EstadoAtualizacoes | null {
 
 const pct = (e: EstadoAtualizacoes): number => (e.total > 0 ? Math.min(100, Math.floor((e.feito / e.total) * 100)) : 0);
 
+/** As frases que mudam no computador (U2): ele não "liga", abre; e o que falta é espaço no computador, não no pendrive. */
+const DO_PC = new Set(['situacao.parado', 'situacao.aplicando', 'situacao.pronta', 'modo.automaticas.dica', 'erro.sem-espaco']);
+const chave = (k: string): string => (!noOS && DO_PC.has(k) ? `writer.atualizacoes.${k}.pc` : `writer.atualizacoes.${k}`);
+
 /** A frase da situação (com o motivo, se é erro). */
 function situacao(e: EstadoAtualizacoes): string {
-  const base = t(`writer.atualizacoes.situacao.${e.situacao}`, { nova: e.nova ?? '', pct: pct(e) });
-  return e.situacao === 'erro' && e.erro ? `${base} ${t(`writer.atualizacoes.erro.${e.erro}`)}` : base;
+  const base = t(chave(`situacao.${e.situacao}`), { nova: e.nova ?? '', pct: pct(e) });
+  return e.situacao === 'erro' && e.erro ? `${base} ${t(chave(`erro.${e.erro}`))}` : base;
 }
 
-export function ParteAtualizacoes() {
+/**
+ * A parte "Atualizações": no Writer OS, dentro do menu do sistema (o foco começa no ajuste de agora); no computador
+ * (U2), dentro dos Ajustes (`focoInicial={false}`: o foco dos Ajustes continua onde estava).
+ */
+export function ParteAtualizacoes({ focoInicial = true }: { focoInicial?: boolean }) {
   const e = useAtualizacoes();
   const a = atualizacoesDaCasca;
   if (!a || !e) return <p aria-busy="true">…</p>;
@@ -55,6 +63,7 @@ export function ParteAtualizacoes() {
   const escolher = (m: ModoAtualizacoes) => void a.usarModo(m).then(mudar);
   return (
     <section class="secao-os atualizacoes" data-teste="os-painel-atualizacoes" aria-label={t('writer.atualizacoes.titulo')}>
+      {!noOS && <h3 class="titulo-atualizacoes">{t('writer.atualizacoes.titulo')}</h3>}
       <p data-teste="atualizacoes-versao">{t(e.canal === 'teste' ? 'writer.atualizacoes.versao.teste' : 'writer.atualizacoes.versao', { versao: e.versao })}</p>
       {e.voltou && (
         <p class="ekf-erro" role="alert" data-teste="atualizacoes-voltou">
@@ -65,10 +74,10 @@ export function ParteAtualizacoes() {
         <legend>{t('writer.atualizacoes.modo.rotulo')}</legend>
         {(['automaticas', 'perguntar'] as const).map((m) => (
           <label class="opcao-atualizacoes" key={m}>
-            <input type="radio" name="modo-atualizacoes" value={m} checked={e.modo === m} onChange={() => escolher(m)} {...(e.modo === m ? { 'data-foco-inicial': true } : {})} data-teste={`atualizacoes-modo-${m}`} />
+            <input type="radio" name="modo-atualizacoes" value={m} checked={e.modo === m} onChange={() => escolher(m)} {...(focoInicial && e.modo === m ? { 'data-foco-inicial': true } : {})} data-teste={`atualizacoes-modo-${m}`} />
             <span>
               <strong>{t(`writer.atualizacoes.modo.${m}`)}</strong>
-              <small class="dica">{t(`writer.atualizacoes.modo.${m}.dica`)}</small>
+              <small class="dica">{t(chave(`modo.${m}.dica`))}</small>
             </span>
           </label>
         ))}
@@ -91,6 +100,12 @@ export function ParteAtualizacoes() {
         >
           {t(disponivel ? 'writer.atualizacoes.instalar' : 'writer.atualizacoes.procurar')}
         </button>
+        {/* no computador, a pronta vale ao fechar; "Reiniciar agora" fecha (gravando tudo), aplica e abre de novo */}
+        {a.reiniciar && e.situacao === 'pronta' && (
+          <button type="button" class="botao" onClick={() => void a.reiniciar?.()} data-teste="atualizacoes-reiniciar">
+            {t('writer.atualizacoes.reiniciar')}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -125,9 +140,16 @@ export function AvisoDeAtualizacao() {
             </button>
           </>
         ) : (
-          <button type="button" class="botao pequeno" onClick={dispensar} data-teste="aviso-atualizacao-entendi">
-            {t('writer.atualizacoes.entendi')}
-          </button>
+          <>
+            {!e.voltou && e.situacao === 'pronta' && a.reiniciar && (
+              <button type="button" class="botao pequeno" onClick={() => void a.reiniciar?.()} data-teste="aviso-atualizacao-reiniciar">
+                {t('writer.atualizacoes.reiniciar')}
+              </button>
+            )}
+            <button type="button" class="botao pequeno" onClick={dispensar} data-teste="aviso-atualizacao-entendi">
+              {t('writer.atualizacoes.entendi')}
+            </button>
+          </>
         )}
       </div>
     </aside>

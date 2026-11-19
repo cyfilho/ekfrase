@@ -58,6 +58,9 @@ export interface OpcoesAtualizacoesOS {
   naoConfirmar?: boolean;
 }
 
+/** A cada quantos bytes o download desce ao disco (`baixarArquivo`, `gravarACada`). */
+export const GRAVAR_A_CADA = 16 << 20;
+
 const vazio = (): EstadoAtualizacoes => ({ modo: 'automaticas', versao: '?', canal: 'estavel', situacao: 'parado', nova: null, feito: 0, total: 0, erro: null, ultimaBusca: null, voltou: null });
 
 export class AtualizacoesOS {
@@ -266,26 +269,58 @@ export class AtualizacoesOS {
         if (!pronto) {
           rmSync(destino, { force: true });
           let ultimo = 0;
-          await baixarArquivo(buscar, url, destino, {
-            tamanho: a.tamanho,
-            agente: 'Ekfrase-Writer-OS',
-            aoBaixar: (feito) => {
-              // o andamento vai à página a cada 4 MB (não a cada pedaço)
-              if (feito - ultimo >= 4 << 20 || feito === a.tamanho) {
-                ultimo = feito;
-                this.mudar({ feito: antes + feito });
-              }
-            },
-          });
-          if ((await sha256DoArquivo(destino)) !== a.sha256) {
+          const inicio = Date.now();
+          this.relatar(`baixar inicio ${a.nome} ${a.tamanho}`);
+          // a vigia do download (U2, parte 3): parado 10 s no mesmo passo, diz qual (se nem isto sai, o processo inteiro parou)
+          let passo = 'pedir';
+          let desde = Date.now();
+          let feitoAgora = 0;
+          const vigia = setInterval(() => {
+            const s = Math.round((Date.now() - desde) / 1000);
+            if (s >= 10) this.relatar(`baixar parado ${a.nome} ${passo} ${s}s ${feitoAgora}`);
+          }, 10_000);
+          (vigia as { unref?: () => void }).unref?.();
+          let soma = '';
+          try {
+            await baixarArquivo(buscar, url, destino, {
+              tamanho: a.tamanho,
+              agente: 'Ekfrase-Writer-OS',
+              // o que veio desce ao disco a cada 16 MB: os ~560 MB não ficam na memória para descer de uma vez no fim,
+              // com o banco dos textos (no mesmo disco) esperando junto (a trava da writer-os-v0.2.0-teste.7)
+              gravarACada: GRAVAR_A_CADA,
+              aoTentarDeNovo: (n, feito, motivo) => this.relatar(`baixar de-novo ${a.nome} ${n} ${feito} ${motivo.replace(/\s+/g, '_').slice(0, 80)}`),
+              aoPasso: (p) => {
+                if (p !== passo) desde = Date.now();
+                passo = p;
+              },
+              aoBaixar: (feito) => {
+                feitoAgora = feito;
+                desde = Date.now();
+                // o andamento vai à página a cada 4 MB (não a cada pedaço)
+                if (feito - ultimo >= 4 << 20 || feito === a.tamanho) {
+                  ultimo = feito;
+                  this.mudar({ feito: antes + feito });
+                }
+              },
+            });
+            this.relatar(`baixar fim ${a.nome} ${statSync(destino).size} ${Date.now() - inicio}ms`);
+            passo = 'conferir';
+            desde = Date.now();
+            soma = await sha256DoArquivo(destino);
+          } finally {
+            clearInterval(vigia);
+          }
+          if (soma !== a.sha256) {
             rmSync(destino, { force: true });
             throw new ErroManifesto('lacre', a.nome);
           }
-        }
+          this.relatar(`baixar conferido ${a.nome}`);
+        } else this.relatar(`baixar ja-estava ${a.nome}`);
         antes += a.tamanho;
         this.mudar({ feito: antes });
       }
     } catch (e) {
+      this.relatar(`baixar erro ${e instanceof ErroBaixar ? e.codigo : e instanceof ErroManifesto ? e.motivo : ((e as NodeJS.ErrnoException).code ?? '-')} ${String((e as Error).message ?? e).replace(/\s+/g, '_').slice(0, 120)}`);
       if (e instanceof ErroManifesto) {
         rmSync(pasta, { recursive: true, force: true });
         return this.falhar('lacre');

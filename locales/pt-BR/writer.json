@@ -665,5 +665,11 @@
   "atualizacoes.erro.pendente": "Uma atualização ainda espera ligar: reinicie antes de instalar outra.",
   "atualizacoes.erro.falhou": "Algo deu errado. Nada foi instalado, e os textos continuam como estavam.",
   "atualizacoes.voltou": "A versão {de} não ligou direito, então voltei para a {para}. Seus textos não foram tocados.",
-  "atualizacoes.aviso": "Atualizações"
+  "atualizacoes.aviso": "Atualizações",
+  "atualizacoes.situacao.parado.pc": "Ainda não procurou desde que abriu.",
+  "atualizacoes.situacao.aplicando.pc": "Preparando a versão {nova}… {pct}%",
+  "atualizacoes.situacao.pronta.pc": "Atualização pronta: a versão {nova} vale na próxima vez que você abrir o Writer.",
+  "atualizacoes.modo.automaticas.dica.pc": "Baixa sozinha, confere o lacre da Ekfrase e vale na próxima vez que você abrir o Writer. Nunca fecha no meio da escrita.",
+  "atualizacoes.erro.sem-espaco.pc": "Falta espaço neste computador para a versão nova.",
+  "atualizacoes.reiniciar": "Reiniciar agora"
 }
