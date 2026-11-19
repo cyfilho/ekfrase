@@ -16,10 +16,17 @@
  * O Writer OS (o pendrive, fase 3): `--modo-os`, que só vale no Linux da imagem (com
  * `/etc/ekfrase/writer-os`). Fora dela, para os testes e os prints, `EKFRASE_CASCA_OS=simulado` (com
  * `EKFRASE_CASCA_OS_RAIZ=<pasta>`, `EKFRASE_CASCA_OS_DADOS=pendrive|sem-dados`, `EKFRASE_CASCA_OS_TESTE=1`).
+ *
+ * As atualizações do Writer OS (docs/ATUALIZACOES.md §4): `atualizacoes-os.ts`. Simulado: `EKFRASE_CASCA_ATUALIZACOES_API`
+ * (o "GitHub" do teste), `EKFRASE_CASCA_ATUALIZACOES_CHAVE` (um arquivo com mais uma chave pública em que confiar),
+ * `EKFRASE_CASCA_ATUALIZACOES_ATRASO` (ms até a primeira busca), `EKFRASE_CASCA_OS_VERSAO`, `EKFRASE_CASCA_OS_CANAL`,
+ * `EKFRASE_CASCA_OS_VOLTOU`. Na imagem de TESTE: o endereço vem de `/run/ekfrase/teste/atualizacoes` e a chave de teste
+ * de `/usr/share/ekfrase/atualizacao-teste.pub` (as duas só existem nela).
  */
 import { app, BrowserWindow, dialog, ipcMain, session, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { CHAVE_EKFRASE } from '@ekfrase/atualizacoes';
 import { baseDoServidor, type Mudanca } from '@ekfrase/writer-nucleo';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { anotar, criarJanela, ehDoApp, registrarEsquema, servirApp, travarApp, travarPermissoes, travas } from '../motor/janela.ts';
@@ -27,6 +34,7 @@ import { lerLembrado } from '../motor/pastas.ts';
 import { Rede } from '../motor/rede.ts';
 import { SistemaLinux, SistemaSimulado, type Sistema } from '../motor/sistema.ts';
 import { ligarAgente } from './agente-teste.ts';
+import { AtualizacoesOS } from './atualizacoes-os.ts';
 import { chamarCanal, criarCanais } from './canais.ts';
 import { DadosDoWriter } from './dados.ts';
 import { dadosSimulados, passoDaTecla, WriterOS } from './os.ts';
@@ -65,6 +73,36 @@ function sistemaDoOS(): Sistema | null {
 }
 const sistemaOS = sistemaDoOS();
 const writerOS = sistemaOS ? new WriterOS(sistemaOS) : null;
+
+/** Um arquivo de texto pequeno, se existe. */
+const lerSeHa = (f: string | undefined): string | null => {
+  try {
+    return f ? readFileSync(f, 'utf8').slice(0, 4096) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** As atualizações do Writer OS: o "GitHub" e as chaves do teste só na imagem de teste ou no simulado. */
+function atualizacoesDoOS(): AtualizacoesOS | null {
+  if (!writerOS || !sistemaOS) return null;
+  const w = writerOS;
+  const teste = sistemaOS.caminhos.teste;
+  const api = sistemaOS.simulado ? env('EKFRASE_CASCA_ATUALIZACOES_API') : teste ? lerSeHa(join(teste, 'atualizacoes'))?.trim() || undefined : undefined;
+  const extra = sistemaOS.simulado ? lerSeHa(env('EKFRASE_CASCA_ATUALIZACOES_CHAVE')) : teste ? lerSeHa('/usr/share/ekfrase/atualizacao-teste.pub') : null;
+  const atraso = Number(env('EKFRASE_CASCA_ATUALIZACOES_ATRASO') ?? '');
+  return new AtualizacoesOS({
+    sistema: sistemaOS,
+    pasta: () => w.pastaDasAtualizacoes(),
+    modo: () => w.modoAtualizacoes(),
+    gravarModo: (m) => w.usarModoAtualizacoes(m),
+    chaves: extra ? [CHAVE_EKFRASE, extra] : [CHAVE_EKFRASE],
+    ...(api ? { api } : {}),
+    ...(Number.isFinite(atraso) && atraso > 0 ? { atrasoInicial: atraso } : {}),
+    naoConfirmar: !!teste && existsSync(join(teste, 'nao-confirmar')),
+  });
+}
+const atualizacoes = atualizacoesDoOS();
 if (writerOS) {
   // o idioma escolhido no primeiro uso; antes da escolha, o português (a lista começa nele)
   app.commandLine.appendSwitch('lang', writerOS.idiomaGuardado() ?? 'pt-BR');
@@ -129,7 +167,11 @@ void app.whenReady().then(async () => {
     // o que a página guarda (escrever sem conta, idioma, tema) vai cifrado para o cofre de tempos em tempos
     setInterval(() => void writerOS.salvarPagina(), 20000);
     writerOS.ouvirInstalacao((passo, feito, total) => pagina.enviar('os:instalar-passo', passo, feito, total));
-    if (sistemaOS?.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistemaOS.caminhos.teste, 'relato'), pagina, dados, sistema: sistemaOS, os: writerOS });
+    if (sistemaOS?.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistemaOS.caminhos.teste, 'relato'), pagina, dados, sistema: sistemaOS, os: writerOS, ...(atualizacoes ? { atualizacoes } : {}) });
+  }
+  if (atualizacoes) {
+    atualizacoes.aoMudar((e) => pagina.enviar('at:mudou', e));
+    void atualizacoes.iniciar();
   }
 
   servirApp({ sessao: sessaoPagina, host: HOST, pasta: join(__dirname, 'app'), base: '/writer/', api: (p, c) => rede.levar(p, c) });
@@ -143,6 +185,7 @@ void app.whenReady().then(async () => {
     lembrado: arquivoLembrado(),
     writerOS,
     sistema: sistemaOS,
+    atualizacoes,
     escolherPasta: async () => {
       const teste = env('EKFRASE_CASCA_PASTA');
       if (teste) return teste;
@@ -182,7 +225,7 @@ void app.whenReady().then(async () => {
     titulo: 'Ekfrase Writer',
     icone: join(__dirname, 'app', 'icones', 'icone-512.png'),
     devTools,
-    argumentos: [`--ekfrase-versao=${app.getVersion()}`, ...(writerOS ? ['--ekfrase-os=1'] : [])],
+    argumentos: [`--ekfrase-versao=${app.getVersion()}`, ...(writerOS ? ['--ekfrase-os=1'] : []), ...(atualizacoes ? ['--ekfrase-atualizacoes=1'] : [])],
     telaCheia: !!writerOS && !sistemaOS?.simulado,
   });
   // no Writer OS o Chromium nunca abre o "Sair desta página?" dele (uma caixa do sistema): quem decide é o app
@@ -190,7 +233,11 @@ void app.whenReady().then(async () => {
   if (writerOS) {
     const w = writerOS;
     // a janela apareceu: o Cage já abriu, e o sistema liga o Num Lock (ekfrase-numlock.path)
-    janela.once('ready-to-show', () => w.sessaoPronta());
+    janela.once('ready-to-show', () => {
+      w.sessaoPronta();
+      // a janela abriu: se ligou por uma cópia nova do sistema, ela passa a valer (docs/ATUALIZACOES.md §4)
+      if (atualizacoes) setTimeout(() => void atualizacoes.confirmar(), 8000);
+    });
     // as teclas de brilho do notebook (no Cage não há quem as atenda): o recado sai na página
     janela.webContents.on('before-input-event', (_e, i) => {
       const passo = passoDaTecla(i);

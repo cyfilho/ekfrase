@@ -4,7 +4,7 @@
 # SÓ na imagem de teste. Escreve na serial (ttyS0) linhas "EKFRASE <evento>" que o
 # tests/writer-os/qemu.py confere:
 #   boot · dados {…} · particao ok <fs> | particao falta · sobrou <programa> · suid <arquivo> ·
-#   binarios conferidos · grupos <…> · shell-root <…> · root <L|P|NP> · secureboot <1|0|?>
+#   binarios conferidos · grupos <…> · shell-root <…> · root <L|P|NP> · secureboot <1|0|?> · lado <live|live-b> <versão>
 # e depois, uma por uma, as linhas do agente de teste da casca (tela …, texto ok, gravado N…).
 set -u
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -35,6 +35,9 @@ dizer "secureboot ${SB:-?}"
 MIDIA=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^live-media=//p')
 MONTADA=$(findmnt -no SOURCE /run/live/medium 2>/dev/null)
 if [ -n "$MIDIA" ] && [ "$(readlink -f "$MIDIA")" = "$(readlink -f "$MONTADA")" ]; then dizer "midia $MIDIA = $MONTADA"; else dizer "midia ${MIDIA:-nenhum} != ${MONTADA:-nada}"; fi
+# a cópia do sistema que ligou (A = live, B = live-b; docs/ATUALIZACOES.md §4) e a versão dela
+LADO=$(tr ' ' '\n' < /proc/cmdline | sed -n 's|^live-media-path=/||p')
+dizer "lado ${LADO:-?} $(cat "/run/live/medium/${LADO:-live}/versao" 2>/dev/null || echo '?')"
 dizer "medida squashfs-montado $(dmesg | sed -n 's/^\[ *\([0-9.]*\)\] loop0: detected capacity.*/\1/p' | head -1)"
 
 # O tempo do boot (só informa; o qemu.py mostra no log do CI): "tempo …" = o systemd-analyze, as 10
@@ -104,7 +107,7 @@ medir_memoria() {
     # a janela não apareceu: o que a sessão (o Cage, o serviço do Writer, o Cog) escreveu vai para a serial
     journalctl -b _UID=1000 --no-pager -o cat 2>/dev/null | grep -v "^agente" | tail -n 70 | while IFS= read -r l; do dizer "diario $l"; done
   fi
-  dizer "medida disco $(du -sm /opt/ekfrase-writer 2>/dev/null | cut -f1) squashfs $(du -m /run/live/medium/live/filesystem.squashfs 2>/dev/null | cut -f1)"
+  dizer "medida disco $(du -sm /opt/ekfrase-writer 2>/dev/null | cut -f1) squashfs $(du -m "/run/live/medium/${LADO:-live}/filesystem.squashfs" 2>/dev/null | cut -f1)"
   sleep 30; medir_memoria 30s
   sleep 120; medir_memoria 150s
 ) &
