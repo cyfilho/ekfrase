@@ -9,7 +9,8 @@
  * - Wi-Fi: `nmcli` (NetworkManager: `network-control`, `wifi.scan`, `settings.modify.own`; as conexões
  *   são do `writer`, `connection.permissions user:writer`);
  * - instalar no computador (PLANO §8c): o socket do `ekfrase-instalar.socket` (só o grupo `writer` abre), que aceita
- *   só `consultar` e `instalar <disco> <levar|nao-levar>`; quem mexe no disco é o serviço (root), nunca a casca;
+ *   só `consultar`, `instalar <disco> <levar|nao-levar>` e `apagar-tudo <disco> <bytes> <levar|nao-levar>` (W3f);
+ *   quem mexe no disco é o serviço (root), nunca a casca;
  * - discos: `lsblk` (ler) e `udisksctl` (montar, desmontar, desligar), **só no barramento USB**
  *   (§6.1b: pendrive, SSD portátil e HD externo; o disco interno nem aparece para o udisks2);
  * - brilho, desligar, reiniciar: `busctl` (logind); fuso: `timedatectl`; bateria: `/sys`.
@@ -86,8 +87,13 @@ export interface Sistema {
   montarInterno(): Promise<'negado' | 'montou' | 'sem-disco'>;
   /** O que há no computador para instalar o Writer OS (PLANO §8c); `null` se o serviço não respondeu. */
   consultarInstalacao(): Promise<InfoInstalacao | null>;
-  /** Instala no disco interno `disco` (o serviço confere tudo de novo). */
-  instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }>;
+  /**
+   * Instala no disco interno `disco` (o serviço confere tudo de novo). Com `apagar` (o tamanho do disco em bytes, o que
+   * a tela mostrou): APAGA o disco inteiro e instala nele (W3f; o nome digitado a `WriterOS.instalar` já conferiu).
+   */
+  instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void, apagar?: number): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }>;
+  /** O fabricante do computador, como o firmware diz (`/sys/class/dmi/id/sys_vendor`; vazio se não diz). */
+  fabricante(): string;
   desligar(): Promise<void>;
   reiniciar(): Promise<void>;
   versao(): string;
@@ -102,8 +108,8 @@ export const temWriter = (montado: string | null): boolean => !!montado && exist
 // instalar no computador: o que o ekfrase-instalar.sh responde (linhas com TAB)
 // ======================================================================================
 
-const PASSOS: readonly PassoInstalar[] = ['particoes', 'copiar', 'conferir', 'textos', 'entrada'];
-const ERROS_INSTALAR: readonly ErroInstalar[] = ['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'falhou'];
+const PASSOS: readonly PassoInstalar[] = ['apagar', 'particoes', 'copiar', 'conferir', 'textos', 'entrada'];
+const ERROS_INSTALAR: readonly ErroInstalar[] = ['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'confirmacao', 'falhou'];
 const numero = (s: string | undefined): number => (s && /^[0-9]+$/.test(s) ? Number(s) : 0);
 
 /** Lê a resposta do `consultar` (`null` se ela não chegou ao `fim`). */
@@ -392,13 +398,15 @@ export class SistemaLinux implements Sistema {
     return ok ? lerConsulta(texto) : null;
   }
 
-  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
+  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void, apagar?: number): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
     if (!/^(nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)$/.test(disco)) return { ok: false, erro: 'disco' };
+    if (apagar !== undefined && !(Number.isSafeInteger(apagar) && apagar > 0)) return { ok: false, erro: 'disco' };
     let fim: { ok: true } | { ok: false; erro: ErroInstalar } = { ok: false, erro: 'falhou' };
+    const como = levar ? 'levar' : 'nao-levar';
     // a cópia e a conferência levam minutos num pendrive USB 2; 30 min é o limite de quem esperaria
     await pedirAoInstalador(
       join(this.caminhos.run, 'instalar.sock'),
-      `instalar ${disco} ${levar ? 'levar' : 'nao-levar'}`,
+      apagar === undefined ? `instalar ${disco} ${como}` : `apagar-tudo ${disco} ${apagar} ${como}`,
       (l) => {
         const r = lerLinhaInstalar(l);
         if (!r) return;
@@ -433,6 +441,14 @@ export class SistemaLinux implements Sistema {
 
   kernel(): string {
     return release();
+  }
+
+  fabricante(): string {
+    try {
+      return readFileSync('/sys/class/dmi/id/sys_vendor', 'utf8').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 80);
+    } catch {
+      return '';
+    }
   }
 
   secureBoot(): 'ligado' | 'desligado' | 'desconhecido' {
@@ -476,16 +492,20 @@ export class SistemaSimulado implements Sistema {
   // como a imagem: a tela começa sempre em 50% (ekfrase-brilho.sh)
   private luz = 50;
   private outroMontado = false;
-  /** O disco interno simulado (`EKFRASE_CASCA_OS_INTERNO`): 16 GB livres (o padrão), sem espaço, nenhum disco, ou já instalado. */
-  private interno: 'livre16' | 'sem-espaco' | 'nenhum' | 'instalado';
+  /**
+   * O disco interno simulado (`EKFRASE_CASCA_OS_INTERNO`): com o Windows e 16 GB livres (o padrão), sem espaço, nenhum
+   * disco, já instalado; e os do computador sem Windows (W3f): `vazio` (sem tabela nenhuma) e `linux` (um Linux ocupando
+   * o disco todo). `todo` = instalado apagando o disco (o simulado chega nele pelo "Apagar o disco inteiro").
+   */
+  private interno: 'livre16' | 'sem-espaco' | 'nenhum' | 'instalado' | 'vazio' | 'linux' | 'todo';
   saiu: 'desligar' | 'reiniciar' | null = null;
-  /** Para os testes: o último pedido de instalar. */
-  instalou: { disco: string; levar: boolean } | null = null;
+  /** Para os testes: o último pedido de instalar (`apagar` = os bytes do disco, no "Apagar o disco inteiro"). */
+  instalou: { disco: string; levar: boolean; apagar?: number } | null = null;
 
   constructor(raiz: string, teste: boolean) {
     this.raiz = raiz;
     const i = process.env['EKFRASE_CASCA_OS_INTERNO'];
-    this.interno = i === 'sem-espaco' || i === 'nenhum' || i === 'instalado' ? i : 'livre16';
+    this.interno = i === 'sem-espaco' || i === 'nenhum' || i === 'instalado' || i === 'vazio' || i === 'linux' ? i : 'livre16';
     this.caminhos = { run: join(raiz, 'run'), dados: join(raiz, 'dados'), ram: join(raiz, 'ram'), teste: teste ? join(raiz, 'run', 'teste') : null };
     for (const c of [this.caminhos.run, this.caminhos.ram]) mkdirSync(c, { recursive: true });
   }
@@ -557,6 +577,21 @@ export class SistemaSimulado implements Sistema {
     if (this.interno === 'nenhum') return { uefi: true, discos: [] };
     const G = 1024 ** 3;
     const M = 1024 ** 2;
+    if (this.interno === 'vazio') return { uefi: true, discos: [{ id: 'sda', modelo: 'Disco Simulado', tamanho: 120 * G, livreInicio: 0, livre: 0, tabela: 'nenhuma', writer: false, partes: [] }] };
+    if (this.interno === 'linux' || this.interno === 'todo') {
+      const partes =
+        this.interno === 'todo'
+          ? [
+              { inicio: M, tamanho: 1400 * M, fs: 'vfat', nome: 'EKFRASE-BOOT', rotulo: 'EKFR-BOOT' },
+              { inicio: 1401 * M, tamanho: 238 * G - 1402 * M, fs: 'exfat', nome: 'EKFRASE-DADOS', rotulo: 'EKFR-DADOS' },
+            ]
+          : [
+              { inicio: M, tamanho: 512 * M, fs: 'vfat', nome: 'EFI System Partition', rotulo: '' },
+              { inicio: 513 * M, tamanho: 229 * G, fs: 'ext4', nome: '', rotulo: 'ubuntu' },
+              { inicio: 229 * G + 513 * M, tamanho: 8 * G, fs: 'swap', nome: '', rotulo: '' },
+            ];
+      return { uefi: true, discos: [{ id: 'nvme0n1', modelo: 'SSD Linux Simulado', tamanho: 238 * G, livreInicio: 238 * G - 200 * M, livre: this.interno === 'todo' ? 0 : 100 * M, tabela: 'gpt', writer: this.interno === 'todo', partes }] };
+    }
     const partes = [
       { inicio: M, tamanho: 100 * M, fs: 'vfat', nome: 'EFI system partition', rotulo: 'SYSTEM' },
       { inicio: 117 * M, tamanho: 220 * G, fs: 'ntfs', nome: 'Basic data partition', rotulo: 'Windows' },
@@ -568,12 +603,19 @@ export class SistemaSimulado implements Sistema {
     return { uefi: true, discos: [disco] };
   }
 
-  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
+  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void, apagar?: number): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
     const d = (await this.consultarInstalacao())?.discos.find((x) => x.id === disco);
     if (!d) return { ok: false, erro: 'disco' };
-    if (d.writer) return { ok: false, erro: 'ja-instalado' };
-    if (d.livre < 8 * 1024 ** 3) return { ok: false, erro: 'sem-espaco' };
     const espera = () => new Promise((ok) => setTimeout(ok, 120));
+    if (apagar !== undefined) {
+      // como o ekfrase-instalar.sh: o tamanho tem de ser o do disco que a tela mostrou
+      if (apagar !== d.tamanho) return { ok: false, erro: 'disco' };
+      aoPasso('apagar', 0, 0);
+      await espera();
+    } else {
+      if (d.writer) return { ok: false, erro: 'ja-instalado' };
+      if (d.livre < 8 * 1024 ** 3) return { ok: false, erro: 'sem-espaco' };
+    }
     const total = 600 * 1024 ** 2;
     aoPasso('particoes', 0, 0);
     await espera();
@@ -585,8 +627,8 @@ export class SistemaSimulado implements Sistema {
       aoPasso(p, 0, 0);
       await espera();
     }
-    this.instalou = { disco, levar };
-    this.interno = 'instalado';
+    this.instalou = apagar === undefined ? { disco, levar } : { disco, levar, apagar };
+    this.interno = apagar === undefined ? 'instalado' : 'todo';
     return { ok: true };
   }
 
@@ -604,6 +646,10 @@ export class SistemaSimulado implements Sistema {
 
   kernel(): string {
     return 'simulado';
+  }
+
+  fabricante(): string {
+    return process.env['EKFRASE_CASCA_OS_MARCA'] ?? 'LENOVO';
   }
 
   secureBoot(): 'desconhecido' {

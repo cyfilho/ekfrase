@@ -1,26 +1,33 @@
 #!/bin/bash
 # SPDX-License-Identifier: MPL-2.0
 #
-# INSTALAR O WRITER OS NO COMPUTADOR, ao lado do Windows (PLANO §8c, fase 3d). Roda como root, um pedido por
-# conexão (ekfrase-instalar.socket, Accept=yes: a entrada e a saída são o próprio socket, que só o grupo writer
-# abre), sem shell para ninguém. Lê UMA linha e só aceita, por expressão exata:
+# INSTALAR O WRITER OS NO COMPUTADOR (PLANO §8c, fases 3d e 3f). Roda como root, um pedido por conexão
+# (ekfrase-instalar.socket, Accept=yes: a entrada e a saída são o próprio socket, que só o grupo writer abre), sem shell
+# para ninguém. Lê UMA linha e só aceita, por expressão exata:
 #
-#   consultar                            o que há no computador
-#   instalar <disco> <levar|nao-levar>   instala no maior espaço livre do disco interno, contando o progresso
+#   consultar                                            o que há no computador
+#   instalar <disco> <levar|nao-levar>                   ao lado do Windows, no maior espaço livre do disco interno
+#   apagar-tudo <disco> <bytes> <levar|nao-levar>        APAGA o disco inteiro e instala nele (computador sem Windows)
 #
 # <disco> é o nome do kernel (nvme0n1, sda, vda, mmcblk0) e é conferido de novo aqui: fora do USB, não é o disco de
-# onde o sistema ligou, não é removível nem só leitura, nada dele montado, GPT, num computador UEFI, sem o Writer OS.
+# onde o sistema ligou, não é removível nem só leitura, nada dele montado, num computador UEFI, e nenhum OUTRO disco
+# interno com o Writer OS (a entrada de boot dele sairia). No apagar-tudo, <bytes> é o tamanho do disco que a tela
+# mostrou (a pessoa digitou o nome dele; a casca conferiu): se não bate, é outro disco, e nada muda.
 #
-# NUNCA apaga, move nem muda uma partição que existe: só cria duas no espaço livre (EKFRASE-BOOT, FAT32 tipo ESP de
-# 1400 MiB, cópia conferida da partição de boot do pendrive; e EKFRASE-DADOS, exFAT tipo Linux, que o Windows não
-# monta) e acrescenta a entrada "Ekfrase Writer OS" no FIM da ordem de boot (o Windows continua o primeiro, e o
-# BitLocker não estranha nada). Se algo falha no meio, as duas partições novas e a entrada saem.
+# instalar: NUNCA apaga, move nem muda uma partição que existe: só cria duas no espaço livre (EKFRASE-BOOT, FAT32
+# tipo ESP de 1400 MiB, cópia conferida da partição de boot do pendrive; e EKFRASE-DADOS, exFAT tipo Linux, que o
+# Windows não monta) e acrescenta a entrada "Ekfrase Writer OS" no FIM da ordem de boot (o Windows continua o
+# primeiro, e o BitLocker não estranha nada).
+# apagar-tudo: apaga as assinaturas de cada partição e a tabela, cria uma GPT nova com as mesmas duas partições no
+# disco todo e põe a entrada em PRIMEIRO na ordem de boot (não há outro sistema para ligar).
+# Se algo falha no meio, as duas partições novas e a entrada saem (no apagar-tudo, o que havia já não volta: a tela
+# sabe e diz).
 #
 # Saída: uma linha por vez, campos separados por TAB (a casca lê: casca/src/motor/sistema.ts, lerConsulta).
 #   consultar  boot <usb|computador|outro> · uefi <sim|nao>
 #              · disco <nome> <bytes> <início do livre> <bytes livres> <tabela> <writer sim|nao> <modelo>
 #              · parte <disco> <início> <bytes> <sistema de arquivos> <nome GPT> <rótulo>   (em bytes) · fim
-#   instalar   passo <particoes|copiar|conferir|textos|entrada> [feito total] … · ok | erro <código>
+#   instalar   passo <apagar|particoes|copiar|conferir|textos|entrada> [feito total] … · ok | erro <código>
 set -u
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export LC_ALL=C
@@ -124,6 +131,7 @@ D=
 N1=
 N2=
 CRIOU=0
+APAGOU=0
 NOVA=
 ORDEM=
 
@@ -195,8 +203,37 @@ copiar_boot() {
   done < <(cd "$MEDIO_DIR" && find . -type f)
 }
 
+# Nada segura o disco: nenhuma partição dele aberta por LVM, RAID ou criptografia (um holder no /sys).
+livre_de_holders() {
+  local h
+  for h in /sys/block/$1/holders /sys/block/$1/$1*/holders; do
+    [ -d "$h" ] || continue
+    [ -z "$(ls -A "$h" 2>/dev/null)" ] || return 1
+  done
+  return 0
+}
+
+# APAGAR O DISCO INTEIRO (só o apagar-tudo): as assinaturas de cada partição (o NTFS, o ext4, o BitLocker não ficam
+# para trás), as do disco e as duas cópias da GPT; depois uma GPT nova, vazia, e o kernel relê.
+apagar_disco() {
+  local p
+  dizer passo apagar
+  APAGOU=1
+  diario "apagando $D inteiro ($(lsblk -bdno SIZE "$D" | tr -d ' ') bytes)"
+  for p in $(lsblk -nrpo NAME,TYPE "$D" | awk '$2 == "part" { print $1 }'); do
+    wipefs -a -q "$p" >/dev/null 2>&1
+  done
+  wipefs -a -q "$D" >/dev/null 2>&1
+  sgdisk -Z "$D" >/dev/null 2>&1
+  sgdisk -o "$D" >/dev/null || return 1
+  blockdev --rereadpt "$D" 2>/dev/null || partx -u "$D" 2>/dev/null
+  udevadm settle -t 10 2>/dev/null
+  [ "$(lsblk -nro TYPE "$D" | grep -c part)" = 0 ] || return 1
+  [ "$(blkid -p -o value -s PTTYPE "$D" 2>/dev/null)" = gpt ]
+}
+
 instalar() {
-  local n=$1 levar=$2 i f s alinha boot_s minimo maximo b_fim d_ini d_fim antes usados k pu1 pu2 p1 p2 trab origem sj c
+  local n=$1 levar=$2 modo=$3 bytes=${4:-} i f s alinha boot_s minimo maximo b_fim d_ini d_fim antes usados k pu1 pu2 p1 p2 trab origem sj c outro
   exec 9>/run/ekfrase/instalar.trava
   flock -n 9 || erro ocupado
   [ "$(lugar)" = usb ] || erro nao-usb
@@ -205,20 +242,35 @@ instalar() {
   D=/dev/$n
   [ -b "$D" ] || erro disco
   [ "$(lsblk -dno RO "$D" | tr -d ' ')" = 0 ] || erro disco
-  [ "$(lsblk -dno PTTYPE "$D" | tr -d ' ')" = gpt ] || erro nao-gpt
-  ! tem_writer "$D" || erro ja-instalado
-  # o Writer OS nunca monta o disco interno; se algo dele estiver montado, não é hora de mexer
+  # o Writer OS nunca monta o disco interno; se algo dele estiver montado (ou é swap ativo), não é hora de mexer
   ! lsblk -nro MOUNTPOINT "$D" | grep -q . || erro disco
+  # o Writer OS em outro disco: a entrada de boot dele sairia (só há uma "Ekfrase Writer OS")
+  for outro in $(internos); do
+    [ "$outro" = "$n" ] || ! tem_writer "/dev/$outro" || erro ja-instalado
+  done
+  minimo=$((MINIMO_GIB * 1073741824))
+
+  if [ "$modo" = disco-todo ]; then
+    # o tamanho que a tela mostrou: outro disco (trocado no meio) não bate
+    [ "$(lsblk -bdno SIZE "$D" | tr -d ' ')" = "$bytes" ] || erro disco
+    [ "$bytes" -ge $((minimo + BOOT_MIB * 1048576)) ] || erro sem-espaco
+    livre_de_holders "$n" || erro disco
+    apagar_disco || erro disco
+  else
+    [ "$(lsblk -dno PTTYPE "$D" | tr -d ' ')" = gpt ] || erro nao-gpt
+    ! tem_writer "$D" || erro ja-instalado
+  fi
 
   read -r i f s <<<"$(livre "$n")"
   [ -n "${i:-}" ] || erro sem-espaco
   alinha=$((1048576 / s))
   i=$(((i + alinha - 1) / alinha * alinha))
   boot_s=$((BOOT_MIB * 1048576 / s))
-  minimo=$((MINIMO_GIB * 1073741824 / s))
+  minimo=$((minimo / s))
   maximo=$((MAXIMO_GIB * 1073741824 / s))
   [ $((f - i + 1)) -ge "$minimo" ] || erro sem-espaco
-  [ $((f - i + 1)) -le "$maximo" ] || f=$((i + maximo - 1))
+  # ao lado do Windows, até 32 GiB; no disco todo, a partição de dados fica com tudo o que sobra
+  [ "$modo" = disco-todo ] || [ $((f - i + 1)) -le "$maximo" ] || f=$((i + maximo - 1))
   b_fim=$((i + boot_s - 1))
   d_ini=$((b_fim + 1))
   d_fim=$(((f + 1) / alinha * alinha - 1))
@@ -305,10 +357,16 @@ instalar() {
   efibootmgr -q -c -d "$D" -p "$N1" -L "$NOME_ENTRADA" -l '\EFI\BOOT\BOOTX64.EFI' >/dev/null 2>&1 || falhar entrada
   NOVA=$(entradas_writer | head -1)
   [ -n "$NOVA" ] || falhar entrada
-  # o efibootmgr põe a nova em primeiro; volta a ordem de antes, com a nova no fim (aparece no menu do F12)
-  efibootmgr -q -o "${ORDEM:+$ORDEM,}$NOVA" >/dev/null 2>&1 || falhar entrada
-  [ "$(ordem_atual)" = "${ORDEM:+$ORDEM,}$NOVA" ] || falhar entrada
-  diario "instalado em $D (partições $N1 e $N2; entrada Boot$NOVA no fim de ${ORDEM:-nada})"
+  if [ "$modo" = disco-todo ]; then
+    # não há outro sistema neste disco: o Writer OS liga primeiro (o resto da ordem fica atrás, como estava)
+    c="$NOVA${ORDEM:+,$ORDEM}"
+  else
+    # o efibootmgr põe a nova em primeiro; volta a ordem de antes, com a nova no fim (aparece no menu do F12)
+    c="${ORDEM:+$ORDEM,}$NOVA"
+  fi
+  efibootmgr -q -o "$c" >/dev/null 2>&1 || falhar entrada
+  [ "$(ordem_atual)" = "$c" ] || falhar entrada
+  diario "instalado em $D ($modo; partições $N1 e $N2; entrada Boot$NOVA, ordem $c)"
   dizer ok
 }
 
@@ -318,7 +376,10 @@ if [ "$LINHA" = consultar ]; then
   consultar
 elif [[ $LINHA =~ ^instalar\ (nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)\ (levar|nao-levar)$ ]]; then
   diario "pedido: $LINHA"
-  instalar "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  instalar "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" ao-lado
+elif [[ $LINHA =~ ^apagar-tudo\ (nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)\ ([1-9][0-9]{0,19})\ (levar|nao-levar)$ ]]; then
+  diario "pedido: $LINHA"
+  instalar "${BASH_REMATCH[1]}" "${BASH_REMATCH[3]}" disco-todo "${BASH_REMATCH[2]}"
 else
   erro pedido
 fi

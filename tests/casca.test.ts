@@ -5,7 +5,7 @@
  * que nunca chegam ao Chromium. A janela, a rede e as travas de navegação rodam no Electron e são
  * conferidas por `npm run teclado` (tests/casca.spec.ts).
  */
-import { DONO_LOCAL, Escrita, servirArmazem } from '@ekfrase/writer-nucleo';
+import { DONO_LOCAL, Escrita, marcaDoComputador, nomeConfere, nomeDoDisco, servirArmazem, tipoDaParte } from '@ekfrase/writer-nucleo';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -416,5 +416,93 @@ describe('Writer OS: instalar no computador (PLANO §8c, fase 3d)', () => {
     writeFileSync(join(pasta, `Boot0003-00000000-0000-0000-0000-000000000000`), opcao('Ekfrase Writer OS'));
     expect(lerEfi(pasta)).toEqual({ ordem: '0001,0000,0003', writer: ['0003'] });
     expect(lerEfi(join(pasta, 'nao-existe'))).toEqual({ ordem: null, writer: [] });
+  });
+});
+
+describe('Writer OS: apagar o disco inteiro e a marca do computador (W3f)', () => {
+  const comInterno = (interno: string, marca?: string) => {
+    const antes = { i: process.env['EKFRASE_CASCA_OS_INTERNO'], m: process.env['EKFRASE_CASCA_OS_MARCA'] };
+    process.env['EKFRASE_CASCA_OS_INTERNO'] = interno;
+    if (marca === undefined) delete process.env['EKFRASE_CASCA_OS_MARCA'];
+    else process.env['EKFRASE_CASCA_OS_MARCA'] = marca;
+    const raiz = temp();
+    const sistema = new SistemaSimulado(raiz, false);
+    if (antes.i === undefined) delete process.env['EKFRASE_CASCA_OS_INTERNO'];
+    else process.env['EKFRASE_CASCA_OS_INTERNO'] = antes.i;
+    mkdirSync(sistema.caminhos.dados, { recursive: true });
+    writeFileSync(join(sistema.caminhos.run, 'dados.json'), JSON.stringify({ modo: 'pendrive', motivo: '', lugar: 'usb' }));
+    const os = new WriterOS(sistema);
+    // a marca é lida a cada estado(): a variável fica até o fim do teste
+    return { sistema, os, fim: () => (antes.m === undefined ? delete process.env['EKFRASE_CASCA_OS_MARCA'] : (process.env['EKFRASE_CASCA_OS_MARCA'] = antes.m)) };
+  };
+
+  it('o passo "apagar" e o erro "confirmacao" do serviço', () => {
+    expect(lerLinhaInstalar('passo\tapagar')).toEqual({ passo: 'apagar', feito: 0, total: 0 });
+    expect(lerLinhaInstalar('erro\tconfirmacao')).toEqual({ ok: false, erro: 'confirmacao' });
+  });
+
+  it('a marca pelo sys_vendor do firmware', () => {
+    expect(marcaDoComputador('LENOVO')).toBe('lenovo');
+    expect(marcaDoComputador('Dell Inc.')).toBe('dell');
+    expect(marcaDoComputador('HP')).toBe('hp');
+    expect(marcaDoComputador('Hewlett-Packard')).toBe('hp');
+    expect(marcaDoComputador('ASUSTeK COMPUTER INC.')).toBe('asus');
+    expect(marcaDoComputador('Micro-Star International Co., Ltd.')).toBe('msi');
+    expect(marcaDoComputador('SAMSUNG ELECTRONICS CO., LTD.')).toBe('samsung');
+    expect(marcaDoComputador('Positivo Tecnologia SA')).toBe('positivo');
+    expect(marcaDoComputador('Acer')).toBe('acer');
+    expect(marcaDoComputador('QEMU')).toBe('outra');
+    expect(marcaDoComputador('')).toBe('outra');
+    expect(marcaDoComputador('HPE-ish')).toBe('outra');
+  });
+
+  it('o nome digitado (a regra do Gravador) e o que é cada partição', () => {
+    const d = { modelo: '  Samsung  SSD 980 ', id: 'nvme0n1' };
+    expect(nomeDoDisco(d)).toBe('Samsung  SSD 980');
+    expect(nomeConfere(d, 'samsung ssd 980')).toBe(true);
+    expect(nomeConfere(d, ' SAMSUNG SSD   980 ')).toBe(true);
+    expect(nomeConfere(d, 'samsung')).toBe(false);
+    expect(nomeConfere(d, '')).toBe(false);
+    expect(nomeConfere({ modelo: '', id: 'vda' }, 'vda')).toBe(true);
+    const p = (fs: string, nome = '', rotulo = '', tamanho = 100 * 1024 ** 3) => ({ inicio: 0, tamanho, fs, nome, rotulo });
+    expect(tipoDaParte(p('ntfs', 'Basic data partition', 'Windows'))).toBe('windows');
+    expect(tipoDaParte(p('BitLocker'))).toBe('windows');
+    expect(tipoDaParte(p('', 'Microsoft reserved partition', '', 16 * 1024 ** 2))).toBe('windows');
+    expect(tipoDaParte(p('ntfs', 'Basic data partition', 'Recovery', 750 * 1024 ** 2))).toBe('recuperacao');
+    expect(tipoDaParte(p('vfat', 'EFI system partition', 'SYSTEM', 100 * 1024 ** 2))).toBe('efi');
+    expect(tipoDaParte(p('ext4', '', 'ubuntu'))).toBe('linux');
+    expect(tipoDaParte(p('swap'))).toBe('linux');
+    expect(tipoDaParte(p('vfat', 'EKFRASE-BOOT', 'EKFR-BOOT'))).toBe('writer');
+    expect(tipoDaParte(p('vfat', '', 'FOTOS', 64 * 1024 ** 3))).toBe('outra');
+  });
+
+  it('apagar: o nome errado não tranca nada nem chega ao serviço; o certo apaga, e o estado diz "disco todo"', async () => {
+    const { os, sistema, fim } = comInterno('linux', 'Dell Inc.');
+    try {
+      expect(os.estado()).toMatchObject({ marca: 'dell', discoTodo: false });
+      expect(await os.instalar('nvme0n1', false, 'outro disco')).toEqual({ ok: false, erro: 'confirmacao' });
+      expect(await os.instalar('sda', false, 'SSD Linux Simulado')).toEqual({ ok: false, erro: 'disco' });
+      expect(sistema.instalou).toBeNull();
+      const passos: string[] = [];
+      os.ouvirInstalacao((p) => passos.push(p));
+      const r = await os.instalar('nvme0n1', true, 'ssd linux simulado');
+      expect(r.ok && r.estado).toMatchObject({ instalado: true, discoTodo: true, marca: 'dell' });
+      expect(passos[0]).toBe('apagar');
+      expect(sistema.instalou).toEqual({ disco: 'nvme0n1', levar: true, apagar: 238 * 1024 ** 3 });
+    } finally {
+      fim();
+    }
+  });
+
+  it('o simulado diz o tamanho do disco ao serviço: outro tamanho é outro disco', async () => {
+    const { sistema, fim } = comInterno('vazio');
+    try {
+      const info = await sistema.consultarInstalacao();
+      expect(info?.discos[0]).toMatchObject({ id: 'sda', tabela: 'nenhuma', partes: [] });
+      expect(await sistema.instalar('sda', false, () => undefined, 1)).toEqual({ ok: false, erro: 'disco' });
+      expect((await sistema.instalar('sda', false, () => undefined, info!.discos[0]!.tamanho)).ok).toBe(true);
+    } finally {
+      fim();
+    }
   });
 });

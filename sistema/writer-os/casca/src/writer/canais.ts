@@ -106,7 +106,7 @@ export function criarCanais(o: OpcoesCanais): Canais {
       'os:passar-wifi': () => writerOS.passarWifi(),
       'os:passar-uso': () => writerOS.passarUso(),
       'os:instalacao': () => writerOS.instalacao(),
-      'os:instalar': (disco: string, levar: boolean) => writerOS.instalar(texto(disco), levar === true),
+      'os:instalar': (disco: string, levar: boolean, apagar?: string | null) => writerOS.instalar(texto(disco), levar === true, typeof apagar === 'string' ? apagar : undefined),
       'os:redes': () => s.redes(),
       'os:conectar': (ssid: string, senha: string | null) => writerOS.conectar(texto(ssid), senha === null ? null : texto(senha)),
       'os:esquecer': (ssid: string) => writerOS.esquecer(texto(ssid)),

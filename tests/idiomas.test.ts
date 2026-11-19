@@ -105,9 +105,12 @@ describe('idiomas', () => {
       ...['ligado', 'desligado', 'desconhecido'].map((s) => `os.sobre.secure-boot.${s}`),
       ...['senha', 'falhou', 'negado'].flatMap((e) => [`os.wifi.erro.${e}`, `os.discos.erro.${e}`]),
       // instalar no computador (PLANO §8c): os passos e os erros do ekfrase-instalar.sh e os motivos da tela
-      ...['particoes', 'copiar', 'conferir', 'textos', 'entrada'].map((p) => `os.instalar.passo.${p}`),
-      ...['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'falhou'].map((e) => `os.instalar.erro.${e}`),
-      ...['nao-uefi', 'sem-disco', 'ja-instalado', 'nao-gpt', 'sem-espaco'].map((m) => `os.instalar.motivo.${m}`),
+      ...['apagar', 'particoes', 'copiar', 'conferir', 'textos', 'entrada'].map((p) => `os.instalar.passo.${p}`),
+      ...['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'confirmacao', 'falhou'].map((e) => `os.instalar.erro.${e}`),
+      ...['nao-uefi', 'sem-disco', 'ja-instalado', 'vazio', 'nao-gpt', 'sem-espaco'].map((m) => `os.instalar.motivo.${m}`),
+      // "Apagar o disco inteiro" (W3f): o que é cada partição; o tutorial: a tecla e a configuração de cada marca
+      ...['windows', 'recuperacao', 'efi', 'linux', 'writer', 'outra'].map((p) => `os.instalar.parte.${p}`),
+      ...['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'positivo', 'outra'].flatMap((m) => [`os.tutorial.tecla.${m}`, `os.tutorial.config.${m}`]),
       ...['senha', 'senha-curta', 'pasta', 'nao-abre', 'fechada', 'ja-tem', 'diferentes'].map((e) => `computador.erro.${e}`),
     ];
     for (const k of montadas) if (!tem(k)) faltando.push(k);

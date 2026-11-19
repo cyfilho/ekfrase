@@ -53,6 +53,10 @@ class Qemu:
         bus = os.environ.get('EKFRASE_QEMU_BARRAMENTO', 'nvme' if self.setor == 4096 else 'usb')
         # ligar pelo disco do computador (o Writer OS instalado): o pendrive continua na porta, mas em segundo
         indice = 2 if self.boot_interno else 1
+        if self.pela_ordem:
+            # sem bootindex em nenhum disco, o OVMF não reordena: liga pelo BootOrder da NVRAM (o que o instalador gravou)
+            alvo = {'nvme': 'nvme,drive=boot,serial=ekfrase', 'virtio': 'virtio-blk-pci,drive=boot'}.get(bus, 'usb-storage,bus=xhci.0,drive=boot,id=pendrive')
+            return alvo + tam
         if bus == 'nvme':
             return f'nvme,drive=boot,serial=ekfrase,bootindex={indice}' + tam
         if bus == 'virtio':
@@ -64,12 +68,18 @@ class Qemu:
         instalar, um NVMe com GPT, a ESP e o NTFS do "Windows" e espaço livre (preparar_interno)."""
         if not self.interno_gpt:
             return ['-drive', f'file={self.interno},if=virtio,format=raw']
-        indice = ',bootindex=1' if self.boot_interno else ''
-        return ['-blockdev', f'driver=file,filename={self.interno},node-name=interno-arquivo',
-                '-blockdev', 'driver=raw,file=interno-arquivo,node-name=interno',
-                '-device', f'nvme,drive=interno,serial=computador{indice}']
+        indice = ',bootindex=1' if self.boot_interno and not self.pela_ordem else ''
+        disco = ['-blockdev', f'driver=file,filename={self.interno},node-name=interno-arquivo',
+                 '-blockdev', 'driver=raw,file=interno-arquivo,node-name=interno',
+                 '-device', f'nvme,drive=interno,serial=computador{indice}']
+        if self.linux:
+            # o 2º disco (W3f): SATA, no AHCI que a q35 já tem, com um modelo que dá para digitar ("Linux Teste")
+            disco += ['-blockdev', f'driver=file,filename={self.linux},node-name=linux-arquivo',
+                      '-blockdev', 'driver=raw,file=linux-arquivo,node-name=linux',
+                      '-device', f'ide-hd,drive=linux,bus=ide.2,model={MODELO_LINUX},serial=linux']
+        return disco
 
-    def __init__(self, imagem, pasta, secure, nome, disco_pronto=None, setor=512, gpu=False, interno_gpt=False):
+    def __init__(self, imagem, pasta, secure, nome, disco_pronto=None, setor=512, gpu=False, interno_gpt=False, segundo_linux=False):
         self.pasta = pasta
         self.nome = nome
         self.secure = secure
@@ -77,6 +87,7 @@ class Qemu:
         self.gpu = gpu
         self.interno_gpt = interno_gpt
         self.boot_interno = False
+        self.pela_ordem = False
         os.makedirs(pasta, exist_ok=True)
         self.trab = tempfile.mkdtemp(prefix=f'ekfrase-qemu-{nome}-')
         if disco_pronto:
@@ -90,6 +101,9 @@ class Qemu:
         self.outro = os.path.join(self.trab, 'outro.img')
         self.interno = os.path.join(self.trab, 'interno.img')
         subprocess.run(['mkfs.vfat', '-C', '-n', 'OUTRO', self.outro, '65536'], check=True, stdout=subprocess.DEVNULL)
+        self.linux = os.path.join(self.trab, 'linux.img') if segundo_linux else None
+        if self.linux:
+            preparar_linux(self.linux, self.trab)
         if interno_gpt:
             preparar_interno(self.interno, self.trab)
         else:
@@ -302,6 +316,29 @@ def preparar_interno(caminho, trab):
             f.write(os.urandom(4 * M))
 
 
+MODELO_LINUX = 'Linux Teste'
+
+
+def preparar_linux(caminho, trab):
+    """O 2º disco do teste de apagar (W3f): 12 GiB, um computador "sem Windows" com o Linux no disco TODO (GPT com a ESP
+    de 256 MiB e um ext4 até o fim, sem espaço livre). O teste o apaga inteiro e liga por ele."""
+    with open(caminho, 'wb') as f:
+        f.truncate(12 * G)
+    subprocess.run(['sgdisk', '-o', '-n', '1:2048:+256M', '-t', '1:EF00', '-c', '1:EFI System Partition',
+                    '-n', '2:0:0', '-t', '2:8300', '-c', '2:linux', caminho], check=True, stdout=subprocess.DEVNULL)
+    partes = particoes(caminho)
+    esp = os.path.join(trab, 'esp-linux.img')
+    subprocess.run(['mkfs.vfat', '-C', '-F', '32', '-n', 'LINUXESP', esp, str(256 * 1024)], check=True, stdout=subprocess.DEVNULL)
+    escrever_em(caminho, partes[1][0], esp)
+    os.remove(esp)
+    raiz = os.path.join(trab, 'ext4.img')
+    with open(raiz, 'wb') as f:
+        f.truncate(256 * M)
+    subprocess.run(['mkfs.ext4', '-q', '-F', '-L', 'ubuntu', raiz], check=True, stdout=subprocess.DEVNULL)
+    escrever_em(caminho, partes[2][0], raiz)
+    os.remove(raiz)
+
+
 def particoes(caminho):
     """{número: (início, fim) em bytes} pela GPT do arquivo (o sgdisk lê arquivo também)."""
     saida = subprocess.run(['sgdisk', '-p', caminho], check=True, capture_output=True, text=True).stdout
@@ -311,6 +348,12 @@ def particoes(caminho):
         if m:
             partes[int(m.group(1))] = (int(m.group(2)) * 512, (int(m.group(3)) + 1) * 512)
     return partes
+
+
+def partuuid(caminho, n):
+    saida = subprocess.run(['sgdisk', '-i', str(n), caminho], check=True, capture_output=True, text=True).stdout
+    m = re.search(r'^Partition unique GUID: (\S+)', saida, re.M)
+    return m.group(1).lower() if m else '?'
 
 
 def nomes_das_particoes(caminho):
@@ -573,6 +616,111 @@ def teste_instalar(imagem, pasta):
         q.desligar()
 
 
+def teste_apagar(imagem, pasta):
+    """APAGAR O DISCO INTEIRO (W3f, PLANO §8c item 3). O "computador" tem o NVMe do "Windows" (com espaço livre) e um 2º
+    disco SATA só com Linux, sem espaço. Pelo pendrive: o primeiro uso, a senha, o texto de teste; Ctrl+Alt+S → End →
+    "Instalar neste computador" → Tab até "Outras opções" → o 1º disco da lista (os sem Windows vêm antes) → o nome
+    digitado → Enter. Confere: o NVMe do Windows igual byte a byte; o 2º disco só com EKFRASE-BOOT e EKFRASE-DADOS; o
+    BootOrder com a entrada nova em PRIMEIRO. Depois liga SEM bootindex (o firmware segue o BootOrder, com o pendrive
+    na porta) e exige ter ligado por ele (lugar computador, o PARTUUID do 2º disco) com o texto levado."""
+    q = Qemu(imagem, pasta, secure=True, nome='apagar', interno_gpt=True, segundo_linux=True)
+    antes_partes = particoes(q.interno)
+    antes = somas(q.interno, antes_partes)
+    q.ligar()
+    try:
+        b = q.boot()
+        ok(q.esperar('lugar usb', b, 180) is not None, 'apagar: ligou pelo pendrive (lugar usb)')
+        for teste in ['os-idioma', 'os-uso', 'os-teclado', 'os-fuso']:
+            if q.tela(teste, b, 240) is None:
+                q.foto(f'sem-{teste}')
+                return
+            q.tecla('ret')
+        if q.tela('casca-criar-senha', b, 60) is None:
+            return
+        q.digitar(SENHA)
+        q.tecla('tab')
+        q.digitar(SENHA)
+        q.tecla('ret')
+        for teste in ['casca-espelho', 'os-wifi']:
+            if q.tela(teste, b, 60) is not None:
+                q.tecla('ret')
+        ok(q.esperar('gravado 5', b, 90) is not None, 'apagar: o texto de teste foi escrito no pendrive')
+        time.sleep(2)
+        q.tecla('ctrl', 'alt', 's')
+        time.sleep(2)
+        q.tecla('end')
+        time.sleep(0.5)
+        q.tecla('ret')
+        if q.tela('os-instalar', b, 30) is None:
+            q.foto('sem-instalar')
+            return
+        time.sleep(4)  # o consultar do serviço e o foco em "Instalar"
+        # "Outras opções" vem logo depois de "Instalar"; aberto, o primeiro disco é o sem Windows
+        q.tecla('tab')
+        q.tecla('ret')
+        time.sleep(1)
+        q.tecla('tab')
+        q.tecla('ret')
+        time.sleep(1.5)
+        q.foto('apagar-escolhido')
+        q.digitar(MODELO_LINUX.lower())
+        time.sleep(0.5)
+        q.foto('apagar-nome')
+        q.tecla('ret')
+        i = q.esperar(re.compile(r'^instalar '), b, 900)
+        resultado = q.linhas()[i] if i is not None else 'instalar: sem resposta'
+        q.foto('depois-de-apagar')
+        if not ok(resultado == 'instalar ok', f'apagar: o serviço apagou o 2º disco e instalou ({resultado})'):
+            for l in q.linhas()[b:]:
+                if l.startswith('diario ') or l.startswith('erro'):
+                    print('   ' + l, flush=True)
+            return
+        ok(q.tela('os-instalado', b, 30) is not None, 'apagar: a tela final abriu')
+        i = q.esperar(re.compile(r'^bootorder '), i, 30)
+        ordem = q.linhas()[i].split(' ', 1)[1] if i is not None else '?'
+        j = q.esperar(re.compile(r'^entrada-writer '), i or b, 10)
+        entrada = q.linhas()[j].split(' ', 1)[1] if j is not None else '?'
+        print(f'   BootOrder depois: {ordem} (a entrada do Writer OS: Boot{entrada})', flush=True)
+        primeira = ordem.split(',')[0]
+        ok(re.fullmatch(r'[0-9A-F]{4}', primeira) is not None and entrada in ('?', primeira),
+           f'apagar: a entrada do Writer OS ficou em PRIMEIRO no BootOrder ({ordem})')
+        time.sleep(2)
+        q.foto('apagou')
+        q.parar()
+
+        # ---------- o NVMe do "Windows" intacto; o 2º disco só com o Writer OS ----------
+        depois = somas(q.interno, antes_partes)
+        ok(all(antes[n] == depois[n] for n in antes) and particoes(q.interno) == antes_partes,
+           'apagar: o disco do Windows ficou igual, byte a byte, e sem partição nova')
+        nomes = nomes_das_particoes(q.linux)
+        partes = particoes(q.linux)
+        print(f'   o 2º disco depois: {nomes} {partes}', flush=True)
+        ok(nomes == {1: 'EKFRASE-BOOT', 2: 'EKFRASE-DADOS'}, 'apagar: o 2º disco tem só EKFRASE-BOOT e EKFRASE-DADOS')
+        ok(2 in partes and partes[2][1] >= 12 * G - 2 * M, 'apagar: a EKFRASE-DADOS vai até o fim do disco')
+        boot_linux = partuuid(q.linux, 1)
+
+        # ---------- ligar pelo BootOrder (sem bootindex), com o pendrive na porta ----------
+        q.pela_ordem = True
+        os.rename(q.serial, q.serial.replace('.log', '-pendrive.log'))
+        q.ligar()
+        b = q.boot(0)
+        ok(q.esperar('lugar computador', b, 120) is not None, 'pelo BootOrder: ligou pelo 2º disco, não pelo pendrive (lugar computador)')
+        i = q.esperar(re.compile(r'^midia '), b, 30)
+        midia = q.linhas()[i] if i is not None else 'midia: sem resposta'
+        print(f'   {midia} (o 2º disco: {boot_linux})', flush=True)
+        ok(boot_linux in midia.lower(), 'pelo BootOrder: o sistema veio da EKFRASE-BOOT do 2º disco')
+        if q.tela('casca-abrir', b, 240) is None:
+            q.foto('sem-abrir-pelo-2o-disco')
+            return
+        q.digitar(SENHA)
+        q.tecla('ret')
+        ok(q.esperar('texto ok', b, 60) is not None, 'pelo 2º disco: a senha de antes abre e o texto levado está lá')
+        time.sleep(3)
+        q.foto('estante-pelo-2o-disco')
+    finally:
+        q.desligar()
+
+
 def teste_sem_secure_boot(imagem, pasta):
     q = Qemu(imagem, pasta, secure=False, nome='sb-desligado')
     q.ligar()
@@ -637,6 +785,7 @@ def main():
     a.add_argument('--disco-4k', help='só o boot de um disco de setor 4096 já gravado pelo Gravador')
     a.add_argument('--gpu', action='store_true', help='só o teste da placa de vídeo (virtio-vga-gl; rodar com xvfb-run)')
     a.add_argument('--so-instalar', action='store_true', help='só o teste de instalar no computador (PLANO §8c)')
+    a.add_argument('--so-apagar', action='store_true', help='só o teste de apagar o 2º disco inteiro e ligar por ele (W3f)')
     args = a.parse_args()
     if args.gpu:
         teste_gpu(args.imagem, args.prints)
@@ -644,9 +793,12 @@ def main():
         teste_disco_4k(args.disco_4k, args.prints)
     elif args.so_instalar:
         teste_instalar(args.imagem, args.prints)
+    elif args.so_apagar:
+        teste_apagar(args.imagem, args.prints)
     else:
         teste_completo(args.imagem, args.prints)
         teste_instalar(args.imagem, args.prints)
+        teste_apagar(args.imagem, args.prints)
         teste_sem_secure_boot(args.imagem, args.prints)
     print()
     if falhas:
