@@ -104,8 +104,9 @@ if (executavel) {
   falhas += o.falhas.length;
   console.log(o.falhas.length ? `\n${o.falhas.length} de ${o.passos} passos do Writer OS falharam.` : `\nWriter OS: ${o.passos} passos, tudo certo.`);
 }
-// o Writer OS SEM o Electron (P3): o serviço no Node e o WebKit do Playwright no lugar do Cog (o mesmo motor do WPE)
-if (soOS || executavel) {
+// o Writer OS SEM o Electron (P3): o serviço no Node e o WebKit do Playwright no lugar do Cog (o mesmo motor do WPE).
+// --sem-cog pula (o caminho está parado, DEC-P071, e falha uns passos de vez em quando: o CI da tag writer-v* não o usa)
+if ((soOS || executavel) && !args.includes('--sem-cog')) {
   console.log('\nWriter OS sem o Electron (o serviço + WebKit, simulado)…');
   await montarOS({ semWriter: true });
   const { webkit } = await import('playwright');
