@@ -6,6 +6,7 @@
 # ekfrase.com/writer/os/ oferece o Gravador. Sem certificado de assinatura por enquanto.
 # AS ATUALIZAÇÕES (docs/ATUALIZACOES.md §4, U1): o Release leva também o que os pendrives baixam para se atualizar
 # sozinhos: ekfrase-writer-os-<v>.squashfs, .vmlinuz, .initrd, .grub.cfg e o manifesto .atualizacao.json com o lacre.
+# E o Gravador se atualiza sozinho (U2, §5): ekfrase-gravador-<v>.atualizacao.json + o .minisig de cada Gravador.
 name: Writer OS e Gravador
 
 on:
@@ -136,6 +137,9 @@ jobs:
       - name: Preparar e remover o Writer OS do computador (num VHD)
         if: runner.os == 'Windows'
         run: node tests/gravador/computador-vhd.ts
+      # a versão do Gravador é a da tag (U2: é com ela que ele se atualiza sozinho)
+      - run: echo "EKFRASE_GRAVADOR_VERSAO=${GITHUB_REF_NAME#writer-os-v}" >> "$GITHUB_ENV"
+        shell: bash
       - run: npm run gravador:pacote
         env:
           # o Gravador de uma tag de teste vê as pré-releases de teste (src/nucleo/origem.ts); o do público, nunca
@@ -164,6 +168,37 @@ jobs:
           pattern: gravador-*
           path: arquivos
           merge-multiple: true
+      - uses: actions/checkout@v5
+        with:
+          path: fonte
+          sparse-checkout: sistema/writer-os/imagem/minisign.pub
+          sparse-checkout-cone-mode: false
+      # o Gravador se atualiza sozinho (U2, docs/ATUALIZACOES.md §5): o manifesto ekfrase-gravador-<v>.atualizacao.json (o
+      # formato de packages/atualizacoes/src/manifesto.ts) com o lacre, e um .minisig de cada Gravador
+      - name: O lacre dos Gravadores e o manifesto da atualização deles
+        env:
+          CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
+        run: |
+          test -n "$CHAVE" || { echo "Falta o segredo EKFRASE_MINISIGN_CHAVE."; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          VERSAO="${GITHUB_REF_NAME#writer-os-v}"
+          CANAL=estavel
+          [[ "$VERSAO" == *-teste.* ]] && CANAL=teste
+          cd arquivos
+          ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
+          for g in Ekfrase-Gravador.exe Ekfrase-Gravador.AppImage; do
+            minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$g" -t "Ekfrase Gravador $VERSAO" < /dev/null
+          done
+          arq() { jq -n --arg p "$1" --arg n "$2" --argjson t "$(stat -c %s "$2")" --arg s "$(sha256sum "$2" | cut -d' ' -f1)" '{papel: $p, nome: $n, tamanho: $t, sha256: $s}'; }
+          { arq windows Ekfrase-Gravador.exe; arq linux Ekfrase-Gravador.AppImage; } | jq -s . > "$RUNNER_TEMP/gravadores.json"
+          N="ekfrase-gravador-$VERSAO"
+          jq -n --arg v "$VERSAO" --arg c "$CANAL" --slurpfile a "$RUNNER_TEMP/gravadores.json" '{app: "ekfrase-gravador", versao: $v, canal: $c, arquivos: $a[0]}' > "$N.atualizacao.json"
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Gravador $VERSAO atualizacao" < /dev/null
+          rm -f "$RUNNER_TEMP/minisign.key"
+          for f in Ekfrase-Gravador.exe Ekfrase-Gravador.AppImage "$N.atualizacao.json"; do
+            minisign -V -p "$GITHUB_WORKSPACE/fonte/sistema/writer-os/imagem/minisign.pub" -m "$f"
+          done
       - name: Criar o Release (a imagem com o lacre e o Gravador)
         env:
           GH_TOKEN: ${{ github.token }}

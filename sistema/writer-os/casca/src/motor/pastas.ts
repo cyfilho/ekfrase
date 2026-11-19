@@ -87,12 +87,15 @@ export interface Lembrado {
   pasta: string | null;
   /** A base da API do servidor escolhido (`null` = o padrão). */
   servidor: string | null;
+  /** As atualizações do Writer no computador (U2): "Automáticas" (o padrão, quando falta) ou "Perguntar". */
+  atualizacoes?: 'automaticas' | 'perguntar';
 }
 
 export function lerLembrado(arquivo: string): Lembrado {
   try {
     const l = JSON.parse(readFileSync(arquivo, 'utf8')) as Partial<Lembrado>;
-    return { pasta: typeof l.pasta === 'string' ? l.pasta : null, servidor: typeof l.servidor === 'string' ? l.servidor : null };
+    const at = l.atualizacoes === 'automaticas' || l.atualizacoes === 'perguntar' ? { atualizacoes: l.atualizacoes } : {};
+    return { pasta: typeof l.pasta === 'string' ? l.pasta : null, servidor: typeof l.servidor === 'string' ? l.servidor : null, ...at };
   } catch {
     return { pasta: null, servidor: null };
   }

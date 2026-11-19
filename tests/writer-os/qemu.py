@@ -640,6 +640,8 @@ def teste_instalar(imagem, pasta, srv=None):
         ok(q.esperar('integridade ok', b, 60) is not None, 'pelo disco: o banco está íntegro')
         _, l = linha_de(q, re.compile(r'^lado '), b, 30)
         ok(l.startswith('lado live '), f'pelo disco: o instalar copiou a cópia A, a que estava ligada ({l})')
+        _, l = linha_de(q, re.compile(r'^escrita '), b, 10)
+        ok(l == 'escrita 67108864 16777216', f'pelo disco: no máximo 64 MB esperam na memória para ir ao disco ({l})')
         time.sleep(3)
         q.foto('estante-pelo-disco')
         if not srv or not esperar_pronta(q, srv, b, 'pelo disco'):
@@ -822,6 +824,9 @@ class ServidorAtualizacao:
         self.trab = tempfile.mkdtemp(prefix='ekfrase-atualizacao-')
         self.arquivos = {}
         self.pedidos = []
+        # cada download: o arquivo, de onde, quanto foi e como acabou (ok, caiu, enviando = ainda aberto)
+        self.contas = []
+        self.enviados = 0
         chave = os.path.join(pasta, 'teste-atualizacao.key')
         lista = []
         for papel in ('squashfs', 'vmlinuz', 'initrd', 'grub.cfg'):
@@ -864,11 +869,31 @@ class ServidorAtualizacao:
                     self.send_header('content-length', '0')
                     self.end_headers()
                     return
-                self.send_response(200)
-                self.send_header('content-length', str(os.path.getsize(caminho)))
+                # o pedaço que falta (Range: bytes=N-), como o GitHub: a casca retoma de onde parou
+                tamanho = os.path.getsize(caminho)
+                m = re.match(r'^bytes=(\d+)-$', self.headers.get('range') or '')
+                inicio = int(m[1]) if m and int(m[1]) < tamanho else 0
+                conta = {'pedido': self.path[3:], 'de': inicio, 'enviados': 0, 'total': tamanho - inicio, 'fim': 'enviando'}
+                servidor.contas.append(conta)
+                if inicio:
+                    self.send_response(206)
+                    self.send_header('content-range', f'bytes {inicio}-{tamanho - 1}/{tamanho}')
+                else:
+                    self.send_response(200)
+                self.send_header('content-length', str(tamanho - inicio))
                 self.end_headers()
-                with open(caminho, 'rb') as f:
-                    shutil.copyfileobj(f, self.wfile, 4 * M)
+                try:
+                    with open(caminho, 'rb') as f:
+                        f.seek(inicio)
+                        while bloco := f.read(1 * M):
+                            self.wfile.write(bloco)
+                            conta['enviados'] += len(bloco)
+                            servidor.enviados += len(bloco)
+                    self.wfile.flush()
+                    conta['fim'] = 'ok'
+                except OSError as e:
+                    # a conexão caiu do lado da máquina virtual (ou do repassador)
+                    conta['fim'] = f'caiu ({type(e).__name__})'
 
         # o repassador do guestfwd: a entrada e a saída padrão (a conexão da máquina virtual) ligadas ao servidor local
         self.repassador = os.path.join(self.trab, 'repassar.py')
@@ -889,20 +914,46 @@ def linha_de(q, alvo, desde, tempo):
 
 
 def contar_atualizacao(q, desde):
-    """O que a casca e o serviço contaram (para o log do CI quando algo falha)."""
+    """O que a casca, o serviço e a vigia da imagem de teste contaram (para o log do CI quando algo falha)."""
     for l in q.linhas()[desde:]:
-        if l.startswith('atualizacao') or l.startswith('lado ') or l.startswith('diario ') or l.startswith('erro'):
+        if l.startswith(('atualizacao', 'baixar ', 'lado ', 'diario ', 'erro', 'escrita ', 'kernel ', 'vigia ')):
             print('   ' + l, flush=True)
 
 
-def esperar_pronta(q, srv, b, nome):
-    """A casca procura sozinha (automáticas) uns 20 s depois de abrir, baixa ~560 MB, confere e o serviço grava a B."""
-    _, l = linha_de(q, re.compile(r'^atualizacao (pronta|erro) '), b, 900)
+def esperar_pronta(q, srv, b, nome, parado=240, maximo=1500):
+    """A casca procura sozinha (automáticas) uns 20 s depois de abrir, baixa ~560 MB, confere e o serviço grava a B.
+    Espera ENQUANTO anda (uma linha nova na serial ou um byte novo saindo do "GitHub" do teste): parada por `parado` s,
+    falha e conta o que houve; no máximo `maximo` s."""
+    alvo = re.compile(r'^atualizacao (pronta|erro) ')
+    inicio = ultimo = time.time()
+    marca = (len(q.linhas()), srv.enviados)
+    l = 'sem resposta'
+    while True:
+        ls = q.linhas()
+        achou = next((x for x in ls[b:] if alvo.search(x)), None)
+        if achou:
+            l = achou
+            break
+        agora = (len(ls), srv.enviados)
+        if agora != marca:
+            marca, ultimo = agora, time.time()
+        if q.proc.poll() is not None:
+            l = 'o QEMU saiu'
+            break
+        if time.time() - ultimo > parado:
+            l = f'sem resposta: nada andou por {parado} s'
+            break
+        if time.time() - inicio > maximo:
+            l = f'sem resposta em {maximo} s'
+            break
+        time.sleep(2)
     livre = shutil.disk_usage(q.trab).free // G
-    print(f'   o disco do computador que roda o QEMU tem {livre} GB livres', flush=True)
+    print(f'   o disco do computador que roda o QEMU tem {livre} GB livres; {int(time.time() - inicio)} s esperando', flush=True)
+    for c in srv.contas[-8:]:
+        print(f'   download {c["pedido"]} de {c["de"]}: {c["enviados"] // 1024} de {c["total"] // 1024} KB ({c["fim"]})', flush=True)
     if not ok(l == f'atualizacao pronta {srv.versao} -', f'{nome}: a casca baixou a {srv.versao}, conferiu o lacre e o serviço gravou na cópia de reserva ({l})'):
         contar_atualizacao(q, b)
-        print(f'   pedidos ao "GitHub": {srv.pedidos[-6:]}', flush=True)
+        print(f'   pedidos ao "GitHub": {srv.pedidos[-8:]}', flush=True)
         return False
     return True
 

@@ -9,7 +9,7 @@
  *   aberta, menos quando a resposta foi "sempre nesta pasta").
  * - `EscolhaServidor`: "Servidor: ekfrase.com / Outro…" acima do formulário de entrar (na casca não
  *   há CORS: quem confere é o processo principal).
- * - `AjustesDaCasca`: a pasta, o espelho e "fechar os textos" dentro dos Ajustes (Ctrl+,).
+ * - `AjustesDaCasca`: a pasta, o espelho, "fechar os textos" e as atualizações (U2) dentro dos Ajustes (Ctrl+,).
  * - `Baixar`: a página de download (`/writer/computador`), com o passo a passo do aviso do SmartScreen
  *   (sem certificado de assinatura, DEC-P064).
  */
@@ -18,6 +18,7 @@ import { SENHA_MINIMA, type ErroCasca, type EscolhaEspelho, type InfoServidor, t
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import logo from '../img/logo-writer.png';
+import { atualizacoesDaCasca, ParteAtualizacoes } from './Atualizacoes.tsx';
 import { enderecoDe, useRelease } from './releases.ts';
 import { t, tr } from '../textos.ts';
 import { casca as pontePossivel, mudarEstado, naCasca, trancar, useEstadoCasca } from './casca.ts';
@@ -343,6 +344,8 @@ export function AjustesDaCasca({ fechar }: { fechar: () => void }) {
           {t('writer.computador.ajustes.trancar')}
         </button>
       </div>
+      {/* as atualizações (U2): só quando a casca sabe aplicar (o instalador do Windows, o AppImage) */}
+      {atualizacoesDaCasca && <ParteAtualizacoes focoInicial={false} />}
     </fieldset>
   );
 }

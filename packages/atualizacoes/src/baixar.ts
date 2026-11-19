@@ -64,7 +64,19 @@ export interface OpcoesBaixar {
   agente?: string;
   /** Quanto tempo sem receber nada até a conexão cair e ser retomada (padrão 60 s). */
   parado?: number;
+  /**
+   * A cada quantos bytes o que veio vai de fato ao disco (`datasync`; U2, 19/11). Sem isto, centenas de MB ficam na
+   * memória esperando e descem de uma vez no fim: num pendrive, tudo o que grava no mesmo disco (o banco dos textos)
+   * espera junto. Padrão: só no fim.
+   */
+  gravarACada?: number;
+  /** Cada nova tentativa (para o diário: a tentativa, quanto já veio e o porquê). */
+  aoTentarDeNovo?: ((tentativa: number, feito: number, motivo: string) => void) | undefined;
+  /** O que está esperando agora (para o diário: quem trava, quando trava). */
+  aoPasso?: ((passo: PassoBaixar) => void) | undefined;
 }
+
+export type PassoBaixar = 'pedir' | 'ler' | 'gravar' | 'datasync' | 'sync' | 'fechar' | 'nome' | 'esperar';
 
 export async function baixarArquivo(buscar: Buscar, url: string, destino: string, o: OpcoesBaixar = {}): Promise<void> {
   const parte = `${destino}.parte`;
@@ -88,7 +100,9 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
       clearTimeout(silencio);
       silencio = setTimeout(() => parar.abort(), o.parado ?? 60_000);
     };
+    const passo = o.aoPasso ?? (() => undefined);
     try {
+      passo('pedir');
       const r = await buscar(url, { headers: { 'user-agent': o.agente ?? AGENTE, ...(inicio ? { range: `bytes=${inicio}-` } : {}) }, signal: parar.signal });
       vivo();
       if (r.status === 416 && total && inicio === total) break;
@@ -99,19 +113,32 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
       if (r.status === 200) inicio = 0; // o servidor mandou o arquivo inteiro
       const comprimento = Number(r.headers.get('content-length') ?? 0);
       if (!total && comprimento) total = inicio + comprimento;
+      passo('fechar');
       const fh = await open(parte, inicio ? 'r+' : 'w');
       try {
         if (!inicio) await fh.truncate(0);
         let pos = inicio;
+        let desde = 0;
         if (!r.body) throw new Error('sem corpo');
+        passo('ler');
         for await (const pedaco of r.body as unknown as AsyncIterable<Uint8Array>) {
           vivo();
+          passo('gravar');
           await fh.write(pedaco, 0, pedaco.length, pos);
           pos += pedaco.length;
+          desde += pedaco.length;
+          if (o.gravarACada && desde >= o.gravarACada) {
+            desde = 0;
+            passo('datasync');
+            await fh.datasync();
+          }
           o.aoBaixar?.(pos, total);
+          passo('ler');
         }
+        passo('sync');
         await fh.sync();
       } finally {
+        passo('fechar');
         await fh.close();
       }
       const agora = statSync(parte).size;
@@ -122,11 +149,14 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
       if (o.sinal?.aborted) throw new ErroBaixar('cancelado');
       if ((e as NodeJS.ErrnoException).code === 'ENOSPC') throw new ErroBaixar('sem-espaco');
       if (i + 1 >= tentativas) throw new ErroBaixar('sem-rede', (e as Error).message);
+      o.aoTentarDeNovo?.(i + 2, existsSync(parte) ? statSync(parte).size : 0, parar.signal.aborted ? 'silencio' : (e as Error).message);
+      passo('esperar');
       await esperar(Math.min(15_000, 1000 * 2 ** i), o.sinal);
     } finally {
       clearTimeout(silencio);
       o.sinal?.removeEventListener('abort', repassar);
     }
   }
+  o.aoPasso?.('nome');
   await rename(parte, destino);
 }

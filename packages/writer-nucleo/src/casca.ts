@@ -148,6 +148,11 @@ export interface PonteAtualizacoes {
   /** "Instalar" (no modo perguntar, depois de achar). */
   instalar(): Promise<EstadoAtualizacoes>;
   usarModo(modo: ModoAtualizacoes): Promise<EstadoAtualizacoes>;
+  /**
+   * "Reiniciar agora" (só o Writer no computador, U2): grava, fecha, aplica a versão pronta e abre de novo. No Writer OS
+   * não existe (a nova vale ao ligar de novo, e o menu já tem o Reiniciar).
+   */
+  reiniciar?(): Promise<void>;
   /** Cada mudança (o andamento, pronta, erro). Devolve o "parar de ouvir". */
   aoMudar(f: (e: EstadoAtualizacoes) => void): () => void;
 }

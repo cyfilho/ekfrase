@@ -68,9 +68,13 @@ export function App() {
     );
   }
   return (
-    <PortaoDaCasca>
-      <AppDoWriter />
-    </PortaoDaCasca>
+    <>
+      <PortaoDaCasca>
+        <AppDoWriter />
+      </PortaoDaCasca>
+      {/* no computador (U2): o mesmo aviso discreto das atualizações (fora da casca, nada aparece) */}
+      <AvisoDeAtualizacao />
+    </>
   );
 }
 

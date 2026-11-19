@@ -4,7 +4,8 @@
 # SÓ na imagem de teste. Escreve na serial (ttyS0) linhas "EKFRASE <evento>" que o
 # tests/writer-os/qemu.py confere:
 #   boot · dados {…} · particao ok <fs> | particao falta · sobrou <programa> · suid <arquivo> ·
-#   binarios conferidos · grupos <…> · shell-root <…> · root <L|P|NP> · secureboot <1|0|?> · lado <live|live-b> <versão>
+#   binarios conferidos · grupos <…> · shell-root <…> · root <L|P|NP> · secureboot <1|0|?> · escrita <bytes> <bytes> ·
+#   lado <live|live-b> <versão>
 # e depois, uma por uma, as linhas do agente de teste da casca (tela …, texto ok, gravado N…).
 set -u
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -28,6 +29,8 @@ dizer "shell-root $(getent passwd root | cut -d: -f7)"
 dizer "root $(passwd -S root 2>/dev/null | awk '{print $2}')"
 SB=$(od -An -t u1 -j4 -N1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c 2>/dev/null | tr -d ' ')
 dizer "secureboot ${SB:-?}"
+# o limite do que espera na memória para ir ao disco (raiz/etc/sysctl.d/90-ekfrase.conf): escrita <dirty_bytes> <dirty_background_bytes>
+dizer "escrita $(cat /proc/sys/vm/dirty_bytes) $(cat /proc/sys/vm/dirty_background_bytes)"
 
 # O live-boot (P3b): o live-media que o GRUB passou e a partição montada em /run/live/medium (têm de ser a mesma:
 # "midia <live-media> = <partição> | midia <live-media> != <partição>"), e o segundo em que o squashfs do sistema
@@ -110,6 +113,62 @@ medir_memoria() {
   dizer "medida disco $(du -sm /opt/ekfrase-writer 2>/dev/null | cut -f1) squashfs $(du -m "/run/live/medium/${LADO:-live}/filesystem.squashfs" 2>/dev/null | cut -f1)"
   sleep 30; medir_memoria 30s
   sleep 120; medir_memoria 150s
+) &
+
+# A VIGIA (U2, parte 3: a writer-os-v0.2.0-teste.7 parou a casca inteira no meio do download, sem nada na serial):
+#   kernel <linha>: o que o kernel avisou (warn ou pior) depois que a janela abriu
+#   vigia D <pid>/<tid> <comm> <wchan> · vigia pilha <função do kernel> · vigia memoria Dirty <kB> Writeback <kB>: quem
+#   ficou preso esperando (o estado D) em duas olhadas seguidas, 10 s uma da outra, com a pilha do kernel
+# O kernel também conta as tarefas presas há mais de 30 s (hung_task), em vez de 120.
+(
+  echo 30 > /proc/sys/kernel/hung_task_timeout_secs 2>/dev/null
+  for _ in $(seq 1 150); do [ -e /run/ekfrase/sessao/pronta ] && break; sleep 1; done
+  nivel=emerg,alert,crit,err,warn
+  visto=$(dmesg -l "$nivel" 2>/dev/null | wc -l)
+  declare -A antes=() contado=()
+  ditas=0
+  while sleep 10; do
+    k=$(dmesg -l "$nivel" 2>/dev/null | wc -l)
+    if [ "$k" -gt "$visto" ] && [ "$ditas" -lt 400 ]; then
+      while IFS= read -r l; do dizer "kernel $l"; ditas=$((ditas + 1)); done < <(dmesg -l "$nivel" 2>/dev/null | tail -n +"$((visto + 1))" | head -n 40)
+      visto=$k
+    fi
+    declare -A agora=()
+    while IFS= read -r st; do
+      t=${st%/status}
+      agora[$t]=1
+      if [ -n "${antes[$t]:-}" ] && [ -z "${contado[$t]:-}" ] && [ "$ditas" -lt 400 ]; then
+        contado[$t]=1
+        p=${t#/proc/}; p=${p%%/*}
+        dizer "vigia D $p/${t##*/} $(tr ' ' '_' < "$t/comm" 2>/dev/null) $(cat "$t/wchan" 2>/dev/null)"
+        while IFS= read -r f; do dizer "vigia pilha ${f#*] }"; done < <(head -n 16 "$t/stack" 2>/dev/null)
+        dizer "vigia memoria $(awk '/^(Dirty|Writeback):/{printf "%s %s ", $1, $2}' /proc/meminfo)"
+        ditas=$((ditas + 18))
+      fi
+    done < <(grep -l '^State:[[:space:]]*D' /proc/[0-9]*/task/[0-9]*/status 2>/dev/null)
+    antes=()
+    for t in "${!agora[@]}"; do antes[$t]=1; done
+    unset agora
+    # o relato calado 40 s no meio de um download (a teste.8: nenhum D, e a casca não disse mais nada): cada fio do
+    # processo principal da casca (o ekfrase-writer cujo pai não é outro ekfrase-writer), com o estado, onde espera e a
+    # CPU gasta (utime+stime, em tiques; duas fotos 10 s uma da outra dizem se está girando), e a pilha do fio principal
+    #   vigia calado <s> · vigia fio <tid> <comm> <estado> <wchan> <cpu> · vigia pilha-principal <função>
+    n=$(wc -l < /run/ekfrase/teste/relato 2>/dev/null || echo 0)
+    if [ "$n" != "${linhas:-}" ]; then linhas=$n; calado=0; else calado=$((calado + 10)); fi
+    if [ "$calado" -ge 40 ] && [ "${fotos:-0}" -lt 3 ] && tail -n 1 /run/ekfrase/teste/relato | grep -qE '^(baixar |atualizacao (baixando|aplicando))'; then
+      fotos=$((${fotos:-0} + 1))
+      dizer "vigia calado ${calado}s"
+      for d in /proc/[0-9]*; do
+        [ "$(cat "$d/comm" 2>/dev/null)" = ekfrase-writer ] || continue
+        pai=$(awk '/^PPid:/{print $2}' "$d/status" 2>/dev/null)
+        [ "$(cat "/proc/$pai/comm" 2>/dev/null)" = ekfrase-writer ] && continue
+        for t in "$d"/task/[0-9]*; do
+          dizer "vigia fio ${t##*/} $(tr ' ' '_' < "$t/comm" 2>/dev/null) $(awk '/^State:/{print $2}' "$t/status" 2>/dev/null) $(cat "$t/wchan" 2>/dev/null) $(sed 's/.*) //' "$t/stat" 2>/dev/null | awk '{print $12 + $13}')"
+        done
+        while IFS= read -r f; do dizer "vigia pilha-principal ${f#*] }"; done < <(head -n 16 "$d/stack" 2>/dev/null)
+      done
+    fi
+  done
 ) &
 
 tail -n +1 -F /run/ekfrase/teste/relato 2>/dev/null | while IFS= read -r l; do dizer "$l"; done
