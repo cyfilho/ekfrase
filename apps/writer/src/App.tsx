@@ -36,13 +36,15 @@ import { t, tr, textoDoErro } from './textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, camadaAberta, focarTela } from './ui.tsx';
 import { naCasca, noOS } from './computador/casca.ts';
 import { PendriveOS } from './computador/PendriveOS.tsx';
-import { BotaoSistema, EntrarOS, MenuSistema, PortaoOS, SistemaForaDoApp, useAvisoDeBrilho } from './computador/SistemaOS.tsx';
+import { BotaoSistema, EntrarOS, MenuSistema, PortaoOS, RelogioOS, SistemaForaDoApp, useAvisoDeBrilho } from './computador/SistemaOS.tsx';
 import { BaixarOS } from './computador/BaixarOS.tsx';
 import { Baixar, PortaoDaCasca } from './computador/Telas.tsx';
 import { Hall } from './Hall.tsx';
 
 // No Writer OS nada leva para fora do app (PLANO §6.5): as peças comuns (rodapé, marca, menu da conta) tiram os links do site
 definirAmbienteFechado(noOS);
+// o CSS do Writer OS (o espaço do relógio no pé das telas)
+if (noOS) document.documentElement.classList.add('no-os');
 
 /** O Writer no computador tem o botão do modo jogo; o castelo só chega lá com o Motor (até lá, o botão avisa). */
 const passeioDoComputador = () => avisar(t('writer.passeio.casca'));
@@ -53,10 +55,14 @@ const passeioDoComputador = () => avisar(t('writer.passeio.casca'));
  */
 export function App() {
   if (noOS) {
+    // a data e a hora em TODAS as telas do Writer OS, do primeiro uso à folha (pedido do Alcy em 18/11)
     return (
-      <PortaoOS>
-        <AppDoWriter />
-      </PortaoOS>
+      <>
+        <PortaoOS>
+          <AppDoWriter />
+        </PortaoOS>
+        <RelogioOS />
+      </>
     );
   }
   return (

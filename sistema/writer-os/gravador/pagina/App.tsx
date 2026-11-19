@@ -10,7 +10,8 @@
 import { aplicarTema, temaEfetivo } from '@ekfrase/nucleo';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import logo from '../../../../apps/writer/src/img/logo-writer.png';
-import { nomeNormalizado, type DiscoNaTela, type ImagemEscolhida, type InfoLancamento, type PonteGravador, type Progresso } from '../src/ponte.ts';
+import { GB, recusaDoPreparar, TAMANHO_PADRAO_GB, TAMANHOS_GB, tamanhosQueCabem } from '../src/nucleo/computador-regras.ts';
+import { nomeNormalizado, type DiscoNaTela, type ImagemEscolhida, type InfoComputador, type InfoLancamento, type PonteGravador, type Progresso, type ResultadoPreparar, type ResultadoRemover } from '../src/ponte.ts';
 import { t, tamanho, textoDoErro } from './textos.ts';
 
 declare global {
@@ -20,7 +21,7 @@ declare global {
 }
 
 const ponte = window.gravador!;
-type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro';
+type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro' | 'remover' | 'removendo' | 'removido';
 type Modo = 'criar' | 'atualizar';
 const MARCAS = ['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'outra'] as const;
 
@@ -64,6 +65,7 @@ function textoConteudo(d: DiscoNaTela): string {
 
 function textoProgresso(p: Progresso | null): string {
   if (!p) return t('gravador.fase.conferir');
+  if (p.fase === 'computador') return t(`gravador.pc.etapa.${p.etapa === 'preparar' || p.etapa === 'copiar' || p.etapa === 'entrada' || p.etapa === 'remover' || p.etapa === 'devolver' ? p.etapa : 'preparar'}`);
   const pct = p.total ? Math.floor(((p.feito ?? 0) / p.total) * 100) : null;
   if (p.fase === 'baixar' && p.total) return t('gravador.fase.baixar-quanto', { feito: tamanho(p.feito ?? 0), total: tamanho(p.total) });
   if ((p.fase === 'gravar' || p.fase === 'verificar') && pct != null) return t(`gravador.fase.${p.fase}-quanto`, { pct });
@@ -89,7 +91,22 @@ export function App() {
   const [dadosCriados, setDadosCriados] = useState<string | null>(null);
   const [ejetado, setEjetado] = useState<'nao' | 'ok' | 'falhou'>('nao');
   const [avisoFechar, setAvisoFechar] = useState(false);
+  // o disco deste computador (PLANO §8c): "Também preparar este computador" e "Remover o Writer OS deste computador"
+  const [pc, setPc] = useState<InfoComputador | null>(null);
+  const [preparar, setPreparar] = useState(false);
+  const [prepararGb, setPrepararGb] = useState<number>(TAMANHO_PADRAO_GB);
+  const [preparado, setPreparado] = useState<ResultadoPreparar | null>(null);
+  const [copiarTextos, setCopiarTextos] = useState(true);
+  const [removido, setRemovido] = useState<Extract<ResultadoRemover, { ok: true }> | null>(null);
   const titulo = useFocoNoTitulo(passo);
+  useEffect(() => void ponte.computador().then(setPc), []);
+  const recusaPc = pc ? recusaDoPreparar(pc, prepararGb) : null;
+  // o tamanho escolhido não cabe mais: o maior que cabe
+  useEffect(() => {
+    if (!pc) return;
+    const cabem = tamanhosQueCabem(pc);
+    if (cabem.length && !cabem.includes(prepararGb)) setPrepararGb(cabem.includes(TAMANHO_PADRAO_GB) ? TAMANHO_PADRAO_GB : cabem[cabem.length - 1]!);
+  }, [pc]);
 
   // a lista de discos, de novo a cada 3 s enquanto a pessoa escolhe
   useEffect(() => {
@@ -152,9 +169,19 @@ export function App() {
     setPasso('gravando');
     setProgresso(null);
     setErro(null);
-    const r = await ponte.gravar({ modo, disco: disco.id, confirmacao, origem: usarArquivo ? 'arquivo' : 'release', semLacreConfirmado: semLacre && fraseOk, limiteGb: modo === 'criar' && limitar ? Number(limiteGb) : null });
+    const r = await ponte.gravar({
+      modo,
+      disco: disco.id,
+      confirmacao,
+      origem: usarArquivo ? 'arquivo' : 'release',
+      semLacreConfirmado: semLacre && fraseOk,
+      limiteGb: modo === 'criar' && limitar ? Number(limiteGb) : null,
+      prepararGb: preparar && !recusaPc ? prepararGb : null,
+    });
     setAvisoFechar(false);
     if (r.ok) {
+      setPreparado(r.preparar ?? null);
+      if (r.preparar?.ok) void ponte.computador().then(setPc);
       setDadosCriados(r.dados);
       setEjetado('nao');
       setPasso('pronto');
@@ -165,8 +192,25 @@ export function App() {
     }
   }
 
+  async function remover() {
+    setPasso('removendo');
+    setProgresso({ fase: 'permissao' });
+    setErro(null);
+    const r = await ponte.remover(copiarTextos);
+    if (r.ok) {
+      setRemovido(r);
+      setPasso('removido');
+      void ponte.computador().then(setPc);
+    } else {
+      setErro(r.erro === 'permissao-recusada' || r.erro === 'sem-pkexec' ? r.erro : `pc-${r.erro}`);
+      setDetalhe(r.detalhe ?? '');
+      setPasso('erro');
+    }
+  }
+
   function recomecar() {
     setPasso('disco');
+    setPreparado(null);
     setEscolhido(null);
     setConfirmacao('');
     setFrase('');
@@ -200,7 +244,7 @@ export function App() {
         </div>
         <TrocarTema />
       </header>
-      {passos}
+      {passo !== 'remover' && passo !== 'removendo' && passo !== 'removido' && passos}
 
       {passo === 'disco' && (
         <main data-teste="passo-disco">
@@ -286,9 +330,110 @@ export function App() {
             </div>
           </section>
 
+          {pc?.disponivel && (
+            <section class="computador" aria-labelledby="titulo-computador" data-teste="computador">
+              <h2 id="titulo-computador">{t('gravador.pc.titulo')}</h2>
+              {pc.writer ? (
+                <>
+                  <p>{t('gravador.pc.tem-writer')}</p>
+                  <div class="acoes-linha">
+                    <button type="button" class="botao" onClick={() => setPasso('remover')} data-teste="ir-remover">
+                      {t('gravador.remover.botao')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label class="marcar">
+                    <input type="checkbox" checked={preparar} onChange={(e) => setPreparar((e.target as HTMLInputElement).checked)} data-teste="preparar" />
+                    <span>{t('gravador.pc.preparar')}</span>
+                  </label>
+                  {preparar && recusaPc && (
+                    <p class="aviso" data-teste="preparar-recusa">
+                      {t(`gravador.pc.recusa.${recusaPc}`)}
+                    </p>
+                  )}
+                  {preparar && !recusaPc && pc.windows && (
+                    <>
+                      <div class="barra-pc" aria-hidden="true">
+                        <span class="pc-windows" style={{ flexGrow: Math.max(1, pc.windows.tamanho - prepararGb * GB) }} />
+                        <span class="pc-writer" style={{ flexGrow: prepararGb * GB }} />
+                      </div>
+                      <p data-teste="preparar-fica">{t('gravador.pc.fica', { windows: tamanho(pc.windows.livre - prepararGb * GB), writer: prepararGb })}</p>
+                      <fieldset class="tamanho-pc">
+                        <legend>{t('gravador.pc.tamanho')}</legend>
+                        {TAMANHOS_GB.map((g) => (
+                          <label key={g}>
+                            <input type="radio" name="tamanho-pc" checked={prepararGb === g} disabled={!tamanhosQueCabem(pc).includes(g)} onChange={() => setPrepararGb(g)} data-teste={`preparar-${g}`} />
+                            <span>{t('gravador.pc.gb', { n: g })}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                      <p class="nota">{t('gravador.pc.nada-apaga')}</p>
+                    </>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+
           <div class="acoes">
             <button type="button" class="botao principal" disabled={!disco || !imagemOk} onClick={() => setPasso('confirmar')} data-teste="continuar">
               {t('gravador.continuar')}
+            </button>
+          </div>
+        </main>
+      )}
+
+      {passo === 'remover' && (
+        <main data-teste="passo-remover">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.remover.titulo')}
+          </h1>
+          <p>{t('gravador.remover.texto')}</p>
+          <label class="marcar">
+            <input type="checkbox" checked={copiarTextos} onChange={(e) => setCopiarTextos((e.target as HTMLInputElement).checked)} data-teste="remover-copiar" />
+            <span>{t('gravador.remover.copiar')}</span>
+          </label>
+          {!copiarTextos && (
+            <p class="perigo" data-teste="remover-sem-copia">
+              {t('gravador.remover.sem-copia')}
+            </p>
+          )}
+          <p class="nota">{t('gravador.remover.windows-fica')}</p>
+          <div class="acoes">
+            <button type="button" class="botao" onClick={() => setPasso('disco')} data-teste="remover-voltar">
+              {t('gravador.voltar')}
+            </button>
+            <button type="button" class="botao principal perigoso" onClick={() => void remover()} data-teste="remover">
+              {t('gravador.remover.confirmar')}
+            </button>
+          </div>
+        </main>
+      )}
+
+      {passo === 'removendo' && (
+        <main data-teste="passo-removendo">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.remover.removendo')}
+          </h1>
+          <p aria-live="polite" class="fase" data-teste="fase">
+            {progresso?.fase === 'permissao' ? t('gravador.fase.permissao') : textoProgresso(progresso)}
+          </p>
+          <p class="nota">{t('gravador.remover.nao-desligue')}</p>
+        </main>
+      )}
+
+      {passo === 'removido' && removido && (
+        <main data-teste="passo-removido">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.remover.pronto')}
+          </h1>
+          {removido.copiado ? <p data-teste="removido-copiado">{t('gravador.remover.copiado', { pasta: removido.copiado })}</p> : <p>{t('gravador.remover.nao-copiado')}</p>}
+          <p data-teste={`removido-${removido.espaco}`}>{t(removido.espaco === 'devolvido' ? 'gravador.remover.devolvido' : 'gravador.remover.solto')}</p>
+          <div class="acoes">
+            <button type="button" class="botao principal" onClick={recomecar} data-teste="recomecar">
+              {t('gravador.recomecar')}
             </button>
           </div>
         </main>
@@ -413,6 +558,16 @@ export function App() {
           </h1>
           <p>{t('gravador.pronto.texto')}</p>
           {modo === 'criar' && !dadosCriados && <p class="nota">{t('gravador.pronto.dados-no-boot')}</p>}
+          {preparado?.ok === true && (
+            <p class="lacre-ok" data-teste="preparado">
+              {t('gravador.pc.preparado', { livre: tamanho(preparado.livre) })}
+            </p>
+          )}
+          {preparado?.ok === false && (
+            <p class="aviso" role="alert" data-teste="preparar-falhou">
+              {preparado.erro === 'nao-encolhe' ? t('gravador.pc.erro.nao-encolhe', { maximo: tamanho(preparado.maximo ?? 0) }) : textoDoErro(`pc-${preparado.erro}`)}
+            </p>
+          )}
           <h2>{t('gravador.boot.titulo')}</h2>
           <ul class="marcas" data-teste="marcas">
             {MARCAS.map((m) => (

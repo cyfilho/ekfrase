@@ -341,3 +341,53 @@ input[type='number'] {
     transition: none;
   }
 }
+
+/* este computador (PLANO §8c): preparar para instalar o Writer OS e remover */
+.computador {
+  margin-top: 1rem;
+}
+
+.marcar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.marcar input {
+  margin-top: 0.25rem;
+}
+
+.barra-pc {
+  display: flex;
+  height: 1.1rem;
+  margin: 0.6rem 0 0.3rem;
+  border: calc(var(--px) * 1) solid var(--borda);
+}
+
+.barra-pc span {
+  flex-basis: 0;
+  min-width: 4px;
+}
+
+.pc-windows {
+  background: var(--frio, var(--tinta-suave));
+}
+
+.pc-writer {
+  background: var(--destaque);
+}
+
+.tamanho-pc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.tamanho-pc label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  cursor: pointer;
+}

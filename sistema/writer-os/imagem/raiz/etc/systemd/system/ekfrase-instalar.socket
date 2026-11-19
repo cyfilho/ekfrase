@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# Instalar o Writer OS no computador (PLANO §8c): o pedido chega por este socket, que só o grupo writer abre.
+# Um ekfrase-instalar@.service (root) por conexão; ele lê uma linha e só aceita "consultar" ou "instalar …".
+[Unit]
+Description=Ekfrase Writer OS: o pedido de instalar no computador
+
+[Socket]
+ListenStream=/run/ekfrase/instalar.sock
+SocketUser=root
+SocketGroup=writer
+SocketMode=0660
+Accept=yes
+MaxConnections=2
+
+[Install]
+WantedBy=sockets.target

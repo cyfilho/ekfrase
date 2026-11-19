@@ -11,7 +11,13 @@
 #     do disco (exFAT; ext4 a partir de 1 TB) e formata (rótulo EKFR-DADOS: o exFAT aceita só 11);
 #   - confere (fsck) e monta em /dados (do writer, noexec, nosuid, nodev);
 #   - o fuso escolhido no primeiro uso (sistema.json) vale de novo;
-#   - conta o que achou em /run/ekfrase/dados.json: {"modo": "pendrive" | "sem-dados", "motivo": …}.
+#   - conta o que achou em /run/ekfrase/dados.json: {"modo": "pendrive" | "sem-dados", "motivo": …,
+#     "lugar": "usb" | "computador" | ""}.
+#
+# INSTALADO NO COMPUTADOR (PLANO §8c, ekfrase-instalar.sh): o disco de boot está fora do USB. Aí só vale a
+# EKFRASE-DADOS que o instalador criou: a linha do kernel tem ekfrase.dados=<PARTUUID> (o grub.cfg do disco), a
+# partição de onde o sistema ligou se chama EKFRASE-BOOT, e a de dados se chama EKFRASE-DADOS e está NO MESMO DISCO.
+# No disco interno nunca cria nem formata nada; qualquer outra partição interna (o Windows) nunca é montada.
 #
 # Nunca apaga nem reformata uma partição que já existe.
 set -u
@@ -26,8 +32,9 @@ WRITER=1000
 mkdir -p "$RUN" "$DADOS"
 chmod 0755 "$RUN"
 
+LUGAR=
 relatar() {
-  printf '{"modo":"%s","motivo":"%s"}\n' "$1" "$2" > "$RUN/dados.json"
+  printf '{"modo":"%s","motivo":"%s","lugar":"%s"}\n' "$1" "$2" "$LUGAR" > "$RUN/dados.json"
   chmod 0644 "$RUN/dados.json"
   echo "ekfrase-dados: $1 $2"
   exit 0
@@ -45,12 +52,22 @@ PAI=$(lsblk -no PKNAME "$MEDIO" 2>/dev/null | head -1 | tr -d ' ')
 [ -n "$PAI" ] || relatar sem-dados sem-medio
 DISCO=/dev/$PAI
 [ -b "$DISCO" ] || relatar sem-dados sem-medio
-[ "$(lsblk -dno TRAN "$DISCO" | tr -d ' ')" = usb ] || relatar sem-dados nao-usb
+if [ "$(lsblk -dno TRAN "$DISCO" | tr -d ' ')" = usb ]; then LUGAR=usb; else LUGAR=computador; fi
 [ "$(lsblk -dno RO "$DISCO" | tr -d ' ')" != 1 ] || relatar sem-dados protegido
 
 parte_dados() { lsblk -nrpo NAME,PARTLABEL "$DISCO" | awk -v r="$PARTE_ROTULO" '$2 == r { print $1; exit }'; }
 
-PARTE=$(parte_dados)
+if [ "$LUGAR" = computador ]; then
+  PU=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^ekfrase\.dados=//p' | head -1)
+  [[ $PU =~ ^[0-9a-f-]{36}$ ]] || relatar sem-dados nao-usb
+  [ "$(lsblk -no PARTLABEL "$MEDIO" | head -1 | tr -d ' ')" = EKFRASE-BOOT ] || relatar sem-dados nao-usb
+  PARTE=$(readlink -f "/dev/disk/by-partuuid/$PU")
+  [ -b "$PARTE" ] || relatar sem-dados nao-monta
+  [ "$(lsblk -no PKNAME "$PARTE" | head -1 | tr -d ' ')" = "$PAI" ] || relatar sem-dados nao-usb
+  [ "$(lsblk -no PARTLABEL "$PARTE" | head -1 | tr -d ' ')" = "$PARTE_ROTULO" ] || relatar sem-dados nao-usb
+else
+  PARTE=$(parte_dados)
+fi
 if [ -z "$PARTE" ]; then
   # só num disco que tem SÓ a partição de boot: nunca mexe numa partição de outra pessoa
   [ "$(lsblk -nrpo TYPE "$DISCO" | grep -c '^part$')" = 1 ] || relatar sem-dados outras-particoes
