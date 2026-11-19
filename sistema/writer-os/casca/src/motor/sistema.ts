@@ -94,6 +94,14 @@ export interface Sistema {
   instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void, apagar?: number): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }>;
   /** O fabricante do computador, como o firmware diz (`/sys/class/dmi/id/sys_vendor`; vazio se não diz). */
   fabricante(): string;
+  /** As duas cópias do sistema (o `estado` do ekfrase-atualizar.sh); `null` se o serviço não respondeu. */
+  estadoBoot(): Promise<EstadoBoot | null>;
+  /** Grava a versão já baixada em `<dados>/Ekfrase Writer/.atualizacao/<versão>/` na cópia de reserva. */
+  aplicarAtualizacao(versao: string, aoPasso: (passo: PassoAtualizar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroAplicar }>;
+  /** A janela abriu pela cópia nova: ela passa a valer. */
+  confirmarBoot(): Promise<boolean>;
+  /** O canal da imagem (`/etc/ekfrase/canal`): a de teste vê as pré-releases de teste. */
+  canal(): 'estavel' | 'teste';
   desligar(): Promise<void>;
   reiniciar(): Promise<void>;
   versao(): string;
@@ -139,7 +147,62 @@ export function lerLinhaInstalar(linha: string): { passo: PassoInstalar; feito: 
   return null;
 }
 
-/** Conversa com o serviço de instalar: manda uma linha e entrega cada linha da resposta até ele fechar. */
+// ======================================================================================
+// o Writer OS se atualiza (docs/ATUALIZACOES.md §4): o que o ekfrase-atualizar.sh responde (linhas com TAB)
+// ======================================================================================
+
+/** As duas cópias do sistema na EKFR-BOOT: `live` (A) e `live-b` (B). */
+export type LadoOS = 'live' | 'live-b';
+
+export interface EstadoBoot {
+  /** A cópia que ligou agora e a versão dela. */
+  lado: LadoOS;
+  versao: string;
+  /** A cópia que vale (confirmada). */
+  atual: LadoOS;
+  reserva: { lado: LadoOS; versao: string } | null;
+  /** Uma nova que espera ligar (aplicada; ou ligada e ainda não confirmada). */
+  novo: { lado: LadoOS; versao: string; tentativas: number } | null;
+  /** A última que não ligou: o GRUB voltou para a de antes. */
+  falhou: { lado: LadoOS; versao: string } | null;
+}
+
+export type PassoAtualizar = 'copiar' | 'conferir' | 'grub';
+export type ErroAplicar = 'pendente' | 'versao' | 'arquivos' | 'lacre' | 'sem-espaco' | 'conferir' | 'copia' | 'grub' | 'grubenv' | 'medio' | 'ocupado' | 'pedido' | 'falhou';
+const ERROS_APLICAR: readonly ErroAplicar[] = ['pendente', 'versao', 'arquivos', 'lacre', 'sem-espaco', 'conferir', 'copia', 'grub', 'grubenv', 'medio', 'ocupado', 'pedido', 'falhou'];
+const ehLado = (s: string | undefined): s is LadoOS => s === 'live' || s === 'live-b';
+
+/** Lê a resposta do `estado` (`null` se ela não chegou ao `fim`). */
+export function lerEstadoBoot(texto: string): EstadoBoot | null {
+  const e: EstadoBoot = { lado: 'live', versao: '?', atual: 'live', reserva: null, novo: null, falhou: null };
+  let fim = false;
+  for (const linha of texto.split('\n')) {
+    const c = linha.replace(/\r$/, '').split('\t');
+    if (c[0] === 'lado' && ehLado(c[1])) {
+      e.lado = c[1];
+      e.versao = c[2] || '?';
+    } else if (c[0] === 'atual' && ehLado(c[1])) e.atual = c[1];
+    else if (c[0] === 'reserva' && ehLado(c[1])) e.reserva = { lado: c[1], versao: c[2] || '?' };
+    else if (c[0] === 'novo' && ehLado(c[1])) e.novo = { lado: c[1], versao: c[2] || '?', tentativas: numero(c[3]) };
+    else if (c[0] === 'falhou' && ehLado(c[1])) e.falhou = { lado: c[1], versao: c[2] || '?' };
+    else if (c[0] === 'fim') fim = true;
+  }
+  return fim ? e : null;
+}
+
+/** Uma linha do `aplicar`: o passo, o fim (`ok`) ou o erro. */
+export function lerLinhaAplicar(linha: string): { passo: PassoAtualizar; feito: number; total: number } | { ok: true } | { ok: false; erro: ErroAplicar } | null {
+  const c = linha.replace(/\r$/, '').split('\t');
+  if (c[0] === 'passo' && (c[1] === 'copiar' || c[1] === 'conferir' || c[1] === 'grub')) return { passo: c[1], feito: numero(c[2]), total: numero(c[3]) };
+  if (c[0] === 'ok') return { ok: true };
+  if (c[0] === 'erro') return { ok: false, erro: (ERROS_APLICAR as readonly string[]).includes(c[1] ?? '') ? (c[1] as ErroAplicar) : 'falhou' };
+  return null;
+}
+
+/** A versão no pedido do `aplicar` (a mesma expressão do `ekfrase-atualizar.sh`). */
+export const VERSAO_DO_PEDIDO = /^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-teste\.[0-9]{1,6})?$/;
+
+/** Conversa com um serviço do sistema (instalar, atualizar): manda uma linha e entrega cada linha da resposta até ele fechar. */
 function pedirAoInstalador(sock: string, pedido: string, aoLer: (linha: string) => void, tempo: number): Promise<boolean> {
   return new Promise((ok) => {
     let resto = '';
@@ -418,6 +481,44 @@ export class SistemaLinux implements Sistema {
     return fim;
   }
 
+  async estadoBoot(): Promise<EstadoBoot | null> {
+    let texto = '';
+    const ok = await pedirAoInstalador(join(this.caminhos.run, 'atualizar.sock'), 'estado', (l) => (texto += `${l}\n`), 20000);
+    return ok ? lerEstadoBoot(texto) : null;
+  }
+
+  async aplicarAtualizacao(versao: string, aoPasso: (passo: PassoAtualizar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroAplicar }> {
+    if (!VERSAO_DO_PEDIDO.test(versao)) return { ok: false, erro: 'pedido' };
+    let fim: { ok: true } | { ok: false; erro: ErroAplicar } = { ok: false, erro: 'falhou' };
+    // ~560 MB do pendrive para o pendrive (num USB 2, minutos)
+    await pedirAoInstalador(
+      join(this.caminhos.run, 'atualizar.sock'),
+      `aplicar ${versao}`,
+      (l) => {
+        const r = lerLinhaAplicar(l);
+        if (!r) return;
+        if ('passo' in r) aoPasso(r.passo, r.feito, r.total);
+        else fim = r;
+      },
+      30 * 60 * 1000,
+    );
+    return fim;
+  }
+
+  async confirmarBoot(): Promise<boolean> {
+    let ok = false;
+    await pedirAoInstalador(join(this.caminhos.run, 'atualizar.sock'), 'confirmar', (l) => (ok ||= l.replace(/\r$/, '') === 'ok'), 40000);
+    return ok;
+  }
+
+  canal(): 'estavel' | 'teste' {
+    try {
+      return readFileSync('/etc/ekfrase/canal', 'utf8').trim() === 'teste' ? 'teste' : 'estavel';
+    } catch {
+      return 'estavel';
+    }
+  }
+
   private async logind(metodo: 'PowerOff' | 'Reboot'): Promise<void> {
     await rodar('sync', []);
     await rodar('busctl', ['call', 'org.freedesktop.login1', '/org/freedesktop/login1', 'org.freedesktop.login1.Manager', metodo, 'b', 'false']);
@@ -640,8 +741,59 @@ export class SistemaSimulado implements Sistema {
     this.saiu = 'reiniciar';
   }
 
+  /**
+   * As duas cópias simuladas (docs/ATUALIZACOES.md §4): liga pela A, na versão `EKFRASE_CASCA_OS_VERSAO` (padrão 0.2.0);
+   * `EKFRASE_CASCA_OS_VOLTOU=<versão>` = a última atualização (essa versão, na B) não ligou e o GRUB voltou.
+   */
+  private boot: EstadoBoot | null = null;
+  /** Para os testes: as versões que o `aplicar` simulado gravou e se a casca confirmou. */
+  aplicadas: string[] = [];
+  confirmou = false;
+
+  private bootSimulado(): EstadoBoot {
+    if (!this.boot) {
+      const voltou = process.env['EKFRASE_CASCA_OS_VOLTOU'];
+      this.boot = { lado: 'live', versao: this.versao(), atual: 'live', reserva: voltou ? { lado: 'live-b', versao: voltou } : null, novo: null, falhou: voltou ? { lado: 'live-b', versao: voltou } : null };
+    }
+    return this.boot;
+  }
+
+  async estadoBoot(): Promise<EstadoBoot | null> {
+    return structuredClone(this.bootSimulado());
+  }
+
+  async aplicarAtualizacao(versao: string, aoPasso: (passo: PassoAtualizar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroAplicar }> {
+    if (!VERSAO_DO_PEDIDO.test(versao)) return { ok: false, erro: 'pedido' };
+    const b = this.bootSimulado();
+    if (b.atual !== b.lado) return { ok: false, erro: 'pendente' };
+    // como o serviço: só o que a casca baixou para a pasta da versão
+    const pasta = join(this.caminhos.dados, 'Ekfrase Writer', '.atualizacao', versao);
+    if (!existsSync(join(pasta, `ekfrase-writer-os-${versao}.atualizacao.json.minisig`))) return { ok: false, erro: 'arquivos' };
+    const total = 600 * 1024 ** 2;
+    for (let feito = 0; feito <= total; feito += total / 4) {
+      aoPasso('copiar', feito, total);
+      await new Promise((ok) => setTimeout(ok, 80));
+    }
+    aoPasso('conferir', 0, 0);
+    aoPasso('grub', 0, 0);
+    const outro: LadoOS = b.lado === 'live' ? 'live-b' : 'live';
+    b.reserva = { lado: outro, versao };
+    b.novo = { lado: outro, versao, tentativas: 0 };
+    this.aplicadas.push(versao);
+    return { ok: true };
+  }
+
+  async confirmarBoot(): Promise<boolean> {
+    this.confirmou = true;
+    return true;
+  }
+
+  canal(): 'estavel' | 'teste' {
+    return process.env['EKFRASE_CASCA_OS_CANAL'] === 'teste' ? 'teste' : 'estavel';
+  }
+
   versao(): string {
-    return '0.1.0-simulado';
+    return process.env['EKFRASE_CASCA_OS_VERSAO'] || '0.2.0';
   }
 
   kernel(): string {

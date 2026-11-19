@@ -19,8 +19,18 @@ Com o Secure Boot LIGADO (OVMF com as chaves da Microsoft, como o notebook do Al
   volta (device_add) e o computador reinicia: o banco abre, o integrity_check dá ok e a última
   gravação que a serial contou está lá. Mais: o OUTRO monta (usb ok) e o interno não (interno negado).
 Com o Secure Boot DESLIGADO: liga e chega no primeiro uso.
+
+AS ATUALIZAÇÕES (docs/ATUALIZACOES.md §4, U1), com o Secure Boot LIGADO: um "GitHub" local (ServidorAtualizacao) oferece
+uma versão MAIOR (a mesma imagem, com o número da correção + 1), assinada com a chave de TESTE que a montagem sorteou
+(sai/teste-atualizacao.key; só a imagem de teste confia nela). A máquina virtual só alcança esse servidor (rede do QEMU
+com restrict=on e um guestfwd). teste_atualizar: a casca baixa, o serviço grava na cópia B, reinicia, liga pela B, a
+casca confirma; reinicia de novo e continua na B. teste_voltar: a casca NÃO confirma (fw_cfg opt/ekfrase/nao-confirmar):
+duas vezes pela B e, no 3º boot depois da atualização, o GRUB volta sozinho para a A, com ekfrase_falhou. E o
+teste_instalar, depois de ligar pelo disco do computador, se atualiza por lá também.
 """
 import argparse
+import hashlib
+import http.server
 import json
 import os
 import re
@@ -29,6 +39,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 OVMF = '/usr/share/OVMF'
@@ -88,6 +99,9 @@ class Qemu:
         self.interno_gpt = interno_gpt
         self.boot_interno = False
         self.pela_ordem = False
+        # as atualizações: o "GitHub" do teste (liga a rede só até ele) e se a casca NÃO confirma
+        self.atualizacoes = None
+        self.nao_confirmar = False
         os.makedirs(pasta, exist_ok=True)
         self.trab = tempfile.mkdtemp(prefix=f'ekfrase-qemu-{nome}-')
         if disco_pronto:
@@ -128,6 +142,18 @@ class Qemu:
         opcoes = [os.environ['EKFRASE_QEMU_TELA']] if os.environ.get('EKFRASE_QEMU_TELA') else ['egl-headless', 'sdl,gl=on', 'gtk,gl=on']
         return [sinal + ['-display', t] for t in opcoes]
 
+    def rede(self):
+        """Sem rede, a não ser no teste das atualizações: aí uma placa virtio cuja rede do QEMU NÃO sai para lugar nenhum
+        (restrict=on) e só leva o endereço do "GitHub" do teste (guestfwd) ao servidor local; o endereço vai à imagem pelo
+        fw_cfg (o ekfrase-teste.service copia para /run/ekfrase/teste/atualizacoes)."""
+        if not self.atualizacoes:
+            return ['-nic', 'none']
+        a = self.atualizacoes
+        extra = ['-fw_cfg', 'name=opt/ekfrase/nao-confirmar,string=1'] if self.nao_confirmar else []
+        # cmd: um repassador NOVO por conexão (o guestfwd para um tcp: é UMA conexão só: o 2º pedido da casca nunca chegava)
+        return ['-nic', f'user,model=virtio-net-pci,restrict=on,guestfwd=tcp:{a.IP_VM}:{a.PORTA_VM}-cmd:python3 {a.repassador} {a.porta}',
+                '-fw_cfg', f'name=opt/ekfrase/atualizacoes,string={a.url_vm}', *extra]
+
     def ligar(self):
         codigo = os.path.join(OVMF, 'OVMF_CODE_4M.secboot.fd' if self.secure else 'OVMF_CODE_4M.fd')
         kvm = os.access('/dev/kvm', os.R_OK | os.W_OK)
@@ -152,7 +178,7 @@ class Qemu:
             '-blockdev', 'driver=raw,file=outro-arquivo,node-name=outro',
             '-device', 'usb-storage,bus=xhci.0,drive=outro,id=outro',
             *self.dispositivo_interno(),
-            *tela, '-nic', 'none',
+            *tela, *self.rede(),
             '-serial', f'file:{self.serial}',
             '-qmp', f'unix:{self.sock},server=on,wait=off',
         ]
@@ -515,7 +541,7 @@ def teste_completo(imagem, pasta):
         q.desligar()
 
 
-def teste_instalar(imagem, pasta):
+def teste_instalar(imagem, pasta, srv=None):
     """INSTALAR NO COMPUTADOR (PLANO §8c, fase 3d). O "computador" tem um NVMe com a ESP e o NTFS do "Windows", espaço
     livre e a Recovery no fim. Pelo pendrive: o primeiro uso, a senha, o agente escreve o texto de teste; o menu do
     sistema → End ("Instalar neste computador") → Instalar (levando os textos). Confere: as partições de antes iguais
@@ -596,6 +622,8 @@ def teste_instalar(imagem, pasta):
 
         # ---------- ligar pelo disco do computador, com o pendrive na porta (em segundo) ----------
         q.boot_interno = True
+        # ligado pelo disco, ele também se atualiza (§4): a rede só até o "GitHub" do teste
+        q.atualizacoes = srv
         os.rename(q.serial, q.serial.replace('.log', '-pendrive.log'))
         q.ligar()
         b = q.boot(0)
@@ -610,8 +638,31 @@ def teste_instalar(imagem, pasta):
         q.tecla('ret')
         ok(q.esperar('texto ok', b, 60) is not None, 'pelo disco: a senha de antes abre e o texto levado do pendrive está lá')
         ok(q.esperar('integridade ok', b, 60) is not None, 'pelo disco: o banco está íntegro')
+        _, l = linha_de(q, re.compile(r'^lado '), b, 30)
+        ok(l.startswith('lado live '), f'pelo disco: o instalar copiou a cópia A, a que estava ligada ({l})')
         time.sleep(3)
         q.foto('estante-pelo-disco')
+        if not srv or not esperar_pronta(q, srv, b, 'pelo disco'):
+            return
+        # o disco grava o que ficou no cache (o download de ~560 MB acabou de sair da EKFRASE-DADOS)
+        time.sleep(5)
+        q.qmp('system_reset')
+        b = q.boot(len(q.linhas()))
+        ok(q.esperar('lugar computador', b, 120) is not None, 'pelo disco, atualizado: ligou de novo pelo disco do computador')
+        _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+        ok(l == f'lado live-b {srv.versao}', f'pelo disco, atualizado: ligou pela cópia B ({l})')
+        _, l = linha_de(q, re.compile(r'^atualizacao (confirmada|nao-confirmou|sem-confirmar) '), b, 300)
+        ok(l == f'atualizacao confirmada live-b {srv.versao}', f'pelo disco, atualizado: a casca confirmou ({l})')
+        ok(q.esperar('particao ok exfat', b, 30) is not None, 'pelo disco, atualizado: a EKFRASE-DADOS do disco montou')
+        if q.tela('casca-abrir', b, 120) is not None:
+            q.digitar(SENHA)
+            q.tecla('ret')
+            ok(q.esperar('texto ok', b, 60) is not None, 'pelo disco, atualizado: a senha abre e o texto continua lá')
+        else:
+            q.foto('sem-abrir-pela-b')
+            for l in q.linhas()[b:]:
+                if l.startswith(('dados ', 'particao', 'tela ', 'atualizacao', 'agente', 'erro')):
+                    print('   ' + l, flush=True)
     finally:
         q.desligar()
 
@@ -721,6 +772,216 @@ def teste_apagar(imagem, pasta):
         q.desligar()
 
 
+# ---------- as atualizações (docs/ATUALIZACOES.md §4, U1) ----------
+
+def sha256_de(caminho):
+    h = hashlib.sha256()
+    with open(caminho, 'rb') as f:
+        while bloco := f.read(8 * M):
+            h.update(bloco)
+    return h.hexdigest()
+
+
+REPASSADOR = '''import os, socket, sys, threading
+s = socket.create_connection(('127.0.0.1', int(sys.argv[1])))
+def para_o_servidor():
+    while True:
+        b = os.read(0, 65536)
+        if not b:
+            break
+        s.sendall(b)
+    try:
+        s.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+threading.Thread(target=para_o_servidor, daemon=True).start()
+while True:
+    b = s.recv(65536)
+    if not b:
+        break
+    while b:
+        n = os.write(1, b)
+        b = b[n:]
+'''
+
+
+class ServidorAtualizacao:
+    """O "GitHub" do teste: a API dos Releases (só o que a casca pede) e os arquivos de UMA atualização maior que a
+    imagem (os arquivos de sai/ que o montar.sh deixou, com o nome da versão nova), com o manifesto assinado pela chave
+    de teste. A máquina virtual chega aqui por http://10.0.2.100:8080 (o guestfwd do QEMU)."""
+    IP_VM = '10.0.2.100'
+    PORTA_VM = 8080
+
+    def __init__(self, imagem):
+        pasta = os.path.dirname(os.path.abspath(imagem))
+        m = re.match(r'^ekfrase-writer-os-(.+)-teste\.img$', os.path.basename(imagem))
+        self.de = m.group(1) if m else '?'
+        x = re.match(r'^(\d+)\.(\d+)\.(\d+)', self.de)
+        self.versao = f'{x[1]}.{x[2]}.{int(x[3]) + 1}' if x else '9.9.9'
+        self.url_vm = f'http://{self.IP_VM}:{self.PORTA_VM}'
+        self.trab = tempfile.mkdtemp(prefix='ekfrase-atualizacao-')
+        self.arquivos = {}
+        self.pedidos = []
+        chave = os.path.join(pasta, 'teste-atualizacao.key')
+        lista = []
+        for papel in ('squashfs', 'vmlinuz', 'initrd', 'grub.cfg'):
+            origem = os.path.join(pasta, f'ekfrase-writer-os-{self.de}.{papel}')
+            if not os.path.exists(origem) or not os.path.exists(chave):
+                raise RuntimeError(f'faltam os arquivos da atualização em {pasta} ({os.path.basename(origem)}, teste-atualizacao.key): o montar.sh os faz')
+            nome = f'ekfrase-writer-os-{self.versao}.{papel}'
+            self.arquivos[nome] = origem
+            lista.append({'papel': papel, 'nome': nome, 'tamanho': os.path.getsize(origem), 'sha256': sha256_de(origem)})
+        manifesto = os.path.join(self.trab, f'ekfrase-writer-os-{self.versao}.atualizacao.json')
+        with open(manifesto, 'w', encoding='utf-8') as f:
+            json.dump({'app': 'ekfrase-writer-os', 'versao': self.versao, 'canal': 'estavel', 'arquivos': lista}, f)
+        subprocess.run(['minisign', '-S', '-s', chave, '-m', manifesto, '-t', f'Ekfrase Writer OS {self.versao} atualizacao'],
+                       check=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        for f in (manifesto, manifesto + '.minisig'):
+            self.arquivos[os.path.basename(f)] = f
+        print(f'-- a atualização do teste: {self.de} → {self.versao} ({sum(a["tamanho"] for a in lista) // M} MB)', flush=True)
+        servidor = self
+
+        class Pedido(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                servidor.pedidos.append(self.path)
+                if self.path == '/repos/cyfilho/ekfrase/releases?per_page=50':
+                    corpo = json.dumps([{
+                        'tag_name': f'writer-os-v{servidor.versao}', 'draft': False, 'prerelease': False,
+                        'assets': [{'name': n, 'browser_download_url': f'{servidor.url_vm}/d/{n}', 'size': os.path.getsize(c)} for n, c in servidor.arquivos.items()],
+                    }]).encode()
+                    self.send_response(200)
+                    self.send_header('content-type', 'application/json')
+                    self.send_header('content-length', str(len(corpo)))
+                    self.end_headers()
+                    self.wfile.write(corpo)
+                    return
+                caminho = servidor.arquivos.get(self.path[3:]) if self.path.startswith('/d/') else None
+                if not caminho:
+                    self.send_response(404)
+                    self.send_header('content-length', '0')
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header('content-length', str(os.path.getsize(caminho)))
+                self.end_headers()
+                with open(caminho, 'rb') as f:
+                    shutil.copyfileobj(f, self.wfile, 4 * M)
+
+        # o repassador do guestfwd: a entrada e a saída padrão (a conexão da máquina virtual) ligadas ao servidor local
+        self.repassador = os.path.join(self.trab, 'repassar.py')
+        with open(self.repassador, 'w', encoding='utf-8') as f:
+            f.write(REPASSADOR)
+        self.http = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Pedido)
+        self.porta = self.http.server_address[1]
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+
+    def fechar(self):
+        self.http.shutdown()
+        shutil.rmtree(self.trab, ignore_errors=True)
+
+
+def linha_de(q, alvo, desde, tempo):
+    i = q.esperar(alvo, desde, tempo)
+    return (i, q.linhas()[i]) if i is not None else (None, 'sem resposta')
+
+
+def contar_atualizacao(q, desde):
+    """O que a casca e o serviço contaram (para o log do CI quando algo falha)."""
+    for l in q.linhas()[desde:]:
+        if l.startswith('atualizacao') or l.startswith('lado ') or l.startswith('diario ') or l.startswith('erro'):
+            print('   ' + l, flush=True)
+
+
+def esperar_pronta(q, srv, b, nome):
+    """A casca procura sozinha (automáticas) uns 20 s depois de abrir, baixa ~560 MB, confere e o serviço grava a B."""
+    _, l = linha_de(q, re.compile(r'^atualizacao (pronta|erro) '), b, 900)
+    if not ok(l == f'atualizacao pronta {srv.versao} -', f'{nome}: a casca baixou a {srv.versao}, conferiu o lacre e o serviço gravou na cópia de reserva ({l})'):
+        contar_atualizacao(q, b)
+        print(f'   pedidos ao "GitHub": {srv.pedidos[-6:]}', flush=True)
+        return False
+    return True
+
+
+def teste_atualizar(imagem, pasta, srv):
+    """ATUALIZAR (§4): liga pela A, a casca baixa a versão maior e o serviço a grava na B; reinicia e liga pela B, a casca
+    confirma; reinicia de novo: continua na B (o grubenv diz ekfrase_atual=live-b). Com o Secure Boot ligado (o save_env
+    do GRUB assinado do Debian tem de gravar o grubenv)."""
+    q = Qemu(imagem, pasta, secure=True, nome='atualizar')
+    q.atualizacoes = srv
+    q.ligar()
+    try:
+        b = q.boot()
+        ok(q.esperar('secureboot 1', b, 60) is not None, 'atualizar: com o Secure Boot LIGADO')
+        _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+        ok(l == f'lado live {srv.de}', f'atualizar: o 1º boot é pela cópia A, a da imagem ({l})')
+        if not esperar_pronta(q, srv, b, 'atualizar'):
+            return
+        q.foto('pronta')
+        # ---------- 2º boot: pela B ----------
+        q.qmp('system_reset')
+        b = q.boot(len(q.linhas()))
+        _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+        ok(l == f'lado live-b {srv.versao}', f'atualizar: depois de reiniciar, ligou pela cópia B, a nova ({l})')
+        ok(q.esperar('secureboot 1', b, 30) is not None, 'atualizar: a cópia B liga com o Secure Boot ligado')
+        _, l = linha_de(q, re.compile(r'^atualizacao (confirmada|nao-confirmou|sem-confirmar) '), b, 300)
+        ok(l == f'atualizacao confirmada live-b {srv.versao}', f'atualizar: a janela abriu e a casca confirmou a cópia nova ({l})')
+        if q.tela('os-idioma', b, 120) is not None:
+            q.foto('idioma-pela-b')
+        # ---------- 3º boot: continua na B ----------
+        time.sleep(3)
+        q.qmp('system_reset')
+        b = q.boot(len(q.linhas()))
+        _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+        ok(l == f'lado live-b {srv.versao}', f'atualizar: confirmada, a B continua valendo no boot seguinte ({l})')
+        _, l = linha_de(q, re.compile(r'^atualizacao boot '), b, 120)
+        ok(l == f'atualizacao boot live-b {srv.versao} atual=live-b novo=- falhou=-', f'atualizar: o grubenv diz que a B é a atual ({l})')
+        _, l = linha_de(q, re.compile(r'^atualizacao (em-dia|pronta|erro|disponivel) '), b, 240)
+        ok(l == 'atualizacao em-dia - -', f'atualizar: na B, a casca está em dia (não instala a mesma de novo) ({l})')
+    finally:
+        if falhas:
+            contar_atualizacao(q, 0)
+        q.desligar()
+
+
+def teste_voltar(imagem, pasta, srv):
+    """A VOLTA (§4): como o teste_atualizar, mas a casca não confirma. O GRUB liga pela B duas vezes e, no 3º boot depois
+    da atualização, volta sozinho para a A, anota ekfrase_falhou, e a casca conta (voltou) e não instala a mesma de novo."""
+    q = Qemu(imagem, pasta, secure=True, nome='voltar')
+    q.atualizacoes = srv
+    q.nao_confirmar = True
+    q.ligar()
+    try:
+        b = q.boot()
+        if not esperar_pronta(q, srv, b, 'voltar'):
+            return
+        for vez in (1, 2):
+            q.qmp('system_reset')
+            b = q.boot(len(q.linhas()))
+            _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+            ok(l == f'lado live-b {srv.versao}', f'voltar: {vez}ª tentativa pela cópia B ({l})')
+            _, l = linha_de(q, re.compile(r'^atualizacao (confirmada|sem-confirmar|nao-confirmou) '), b, 300)
+            ok(l == 'atualizacao sem-confirmar live-b', f'voltar: a casca de teste não confirma ({l})')
+        q.qmp('system_reset')
+        b = q.boot(len(q.linhas()))
+        _, l = linha_de(q, re.compile(r'^lado '), b, 60)
+        ok(l == f'lado live {srv.de}', f'voltar: no 3º boot depois da atualização, o GRUB voltou sozinho para a cópia A ({l})')
+        ok(q.esperar('secureboot 1', b, 30) is not None, 'voltar: de volta na A, com o Secure Boot ligado')
+        _, l = linha_de(q, re.compile(r'^atualizacao boot '), b, 120)
+        ok(l == f'atualizacao boot live {srv.de} atual=live novo=- falhou=live-b', f'voltar: o grubenv anota a cópia que falhou ({l})')
+        ok(q.esperar(f'atualizacao voltou {srv.versao} {srv.de}', b, 30) is not None, f'voltar: a casca conta "a {srv.versao} não ligou; voltei para a {srv.de}"')
+        _, l = linha_de(q, re.compile(r'^atualizacao (em-dia|pronta|erro|disponivel) '), b, 240)
+        ok(l == 'atualizacao em-dia - -', f'voltar: a que não ligou não é instalada de novo ({l})')
+        if q.tela('os-idioma', b, 120) is not None:
+            q.foto('idioma-de-volta-na-a')
+    finally:
+        if falhas:
+            contar_atualizacao(q, 0)
+        q.desligar()
+
+
 def teste_sem_secure_boot(imagem, pasta):
     q = Qemu(imagem, pasta, secure=False, nome='sb-desligado')
     q.ligar()
@@ -786,20 +1047,36 @@ def main():
     a.add_argument('--gpu', action='store_true', help='só o teste da placa de vídeo (virtio-vga-gl; rodar com xvfb-run)')
     a.add_argument('--so-instalar', action='store_true', help='só o teste de instalar no computador (PLANO §8c)')
     a.add_argument('--so-apagar', action='store_true', help='só o teste de apagar o 2º disco inteiro e ligar por ele (W3f)')
+    a.add_argument('--so-atualizar', action='store_true', help='só os testes das atualizações (atualizar e voltar; U1)')
     args = a.parse_args()
+    srv = None
+    if args.imagem and not args.gpu and not args.disco_4k and not args.so_apagar:
+        try:
+            srv = ServidorAtualizacao(args.imagem)
+        except Exception as e:
+            ok(False, f'o "GitHub" do teste das atualizações: {e}')
     if args.gpu:
         teste_gpu(args.imagem, args.prints)
     elif args.disco_4k:
         teste_disco_4k(args.disco_4k, args.prints)
     elif args.so_instalar:
-        teste_instalar(args.imagem, args.prints)
+        teste_instalar(args.imagem, args.prints, srv)
     elif args.so_apagar:
         teste_apagar(args.imagem, args.prints)
+    elif args.so_atualizar:
+        if srv:
+            teste_atualizar(args.imagem, args.prints, srv)
+            teste_voltar(args.imagem, args.prints, srv)
     else:
         teste_completo(args.imagem, args.prints)
-        teste_instalar(args.imagem, args.prints)
+        teste_instalar(args.imagem, args.prints, srv)
         teste_apagar(args.imagem, args.prints)
+        if srv:
+            teste_atualizar(args.imagem, args.prints, srv)
+            teste_voltar(args.imagem, args.prints, srv)
         teste_sem_secure_boot(args.imagem, args.prints)
+    if srv:
+        srv.fechar()
     print()
     if falhas:
         print(f'{len(falhas)} falha(s):')
