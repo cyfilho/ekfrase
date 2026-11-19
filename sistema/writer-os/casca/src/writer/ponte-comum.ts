@@ -86,7 +86,7 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         passarWifi: () => pedir<EstadoOS>('os:passar-wifi'),
         passarUso: () => pedir<EstadoOS>('os:passar-uso'),
         instalacao: () => pedir<InfoInstalacao>('os:instalacao'),
-        instalar: (disco: string, levar: boolean) => pedir<RespostaInstalar>('os:instalar', String(disco), levar === true),
+        instalar: (disco: string, levar: boolean, apagar?: string) => pedir<RespostaInstalar>('os:instalar', String(disco), levar === true, typeof apagar === 'string' ? apagar : null),
         aoPassoDaInstalacao: (f: (passo: PassoInstalar, feito: number, total: number) => void) => {
           ouvintesDoInstalar.add(f);
           return () => void ouvintesDoInstalar.delete(f);

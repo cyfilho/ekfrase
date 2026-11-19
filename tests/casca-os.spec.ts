@@ -407,6 +407,10 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       r.ok(await r.esperar('os-instalado', 15000), 'instalou: a tela final com o tutorial');
       if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoEm('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
       r.ok(!!(await p.$('[data-teste="os-tutorial"]')) && !!(await p.$('[data-teste="os-relogio"]')), 'a tela final tem o tutorial e o relógio');
+      // W3f: a tecla do tutorial é a da marca do computador (o simulado é um Lenovo: F12), e o instalar ao lado não apaga
+      const tecla = await p.evaluate(() => [document.querySelector('[data-teste="os-tutorial"]')?.getAttribute('data-marca'), document.querySelector('[data-teste="os-tutorial-tecla"]')?.textContent]);
+      r.ok(tecla[0] === 'lenovo' && tecla[1] === 'F12', `o tutorial mostra a tecla da marca do computador (${tecla.join(' ')})`);
+      r.ok(!!(await p.$('[data-teste="os-instalado-ao-lado"]')), 'instalado ao lado do Windows: o texto do F12, não o do disco todo');
       r.ok(await esperarRelato(raiz1, 'instalar ok'), 'o agente: instalar ok');
       await foto(p, '16-instalado');
     } else r.ok(false, 'a tela de instalar mostra o botão "Instalar"');
@@ -451,6 +455,27 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     if (await r.tabAte('os-uso-instalar')) await r.tecla('Enter');
     r.ok(await r.esperar('os-instalar-motivo-sem-espaco', 8000), 'sem espaço livre: a tela de instalar explica o "preparar" do Gravador');
     await foto(p, '10a-instalar-sem-espaco');
+    // W3f: "Outras opções" vem recolhido; aberto pelo teclado, o disco com Windows mostra o Windows em vermelho
+    r.ok(await p.evaluate(() => (document.querySelector('[data-teste="os-instalar-outras"]') as HTMLDetailsElement | null)?.open === false), '"Outras opções" aparece, recolhido');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-voltar', null, { timeout: 5000 }).catch(() => undefined);
+    if (await r.tabAte('os-instalar-outras-abrir')) {
+      await r.tecla('Enter');
+      if (await r.tabAte('os-apagar-disco-nvme0n1')) {
+        await r.tecla('Enter');
+        r.ok(await r.esperar('os-apagar-nome', 3000), 'escolhido o disco, aparece o campo do nome');
+        await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-apagar-nome', null, { timeout: 3000 }).catch(() => undefined);
+        r.ok(await r.focoEm('os-apagar-nome'), 'o foco vai para o nome do disco');
+        const vermelho = await p.evaluate(() => {
+          const w = document.querySelector('[data-teste="os-apagar-parte-windows"]');
+          const erro = getComputedStyle(document.documentElement).getPropertyValue('--erro').trim();
+          return !!w && w.classList.contains('parte-windows') && getComputedStyle(w).color !== getComputedStyle(document.body).color && erro !== '';
+        });
+        r.ok(vermelho, 'o Windows aparece na lista, em vermelho');
+        await foto(p, '10b-apagar-com-windows');
+      } else r.ok(false, 'a lista dos discos em "Outras opções"');
+    } else r.ok(false, '"Outras opções" pelo teclado');
+    // de volta a Voltar (fica antes de "Outras opções")
+    await r.tabAte('os-instalar-voltar');
     if (await r.esperar('os-instalar-voltar', 3000)) {
       await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-voltar', null, { timeout: 5000 }).catch(() => undefined);
       r.ok(await r.focoEm('os-instalar-voltar'), 'sem espaço: o foco está em Voltar');
@@ -480,6 +505,43 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(existsSync(join(raiz2, 'media', 'OUTRO', 'Ekfrase Writer', 'dados', 'cofre.db')), 'o cofre está no OUTRO');
   r.ok(!existsSync(join(raiz2, 'ram', 'Ekfrase Writer')), 'e saiu da memória');
   r.ok((await p.$('[data-teste="os-faixa-memoria"]')) === null, 'a faixa âmbar some');
+  await app.fechar();
+  somar(r);
+
+  // ================= 3. o computador sem Windows: apagar o disco inteiro (W3f) =================
+  falar('— computador sem Windows (o disco todo com Linux): "Apagar o disco inteiro" com o nome digitado');
+  const raiz3 = join(base, 'sem-windows');
+  const env3 = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz3, EKFRASE_CASCA_OS_DADOS: 'pendrive', EKFRASE_CASCA_OS_TESTE: '1', EKFRASE_CASCA_OS_INTERNO: 'linux', EKFRASE_CASCA_OS_MARCA: 'Dell Inc.', EKFRASE_CASCA_PERFIL: join(raiz3, 'perfil') };
+  app = await abrir(env3);
+  p = await app.pagina();
+  r = new Roteiro(p, falar);
+  await enter(r, 'os-idioma', 'sem-windows-os-idioma');
+  if (await r.esperar('os-uso', 10000)) {
+    if (await r.tabAte('os-uso-instalar')) await r.tecla('Enter');
+    r.ok(await r.esperar('os-instalar-motivo-sem-espaco', 8000), 'o Linux ocupa o disco: sem espaço ao lado');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-voltar', null, { timeout: 5000 }).catch(() => undefined);
+    if ((await r.tabAte('os-instalar-outras-abrir')) && (await r.tecla('Enter'), await r.tabAte('os-apagar-disco-nvme0n1'))) {
+      r.ok(!!(await p.$('[data-teste="os-apagar-parte-linux"]')) && !(await p.$('[data-teste="os-apagar-parte-windows"]')), 'a lista mostra o Linux e nenhum Windows');
+      await r.tecla('Enter');
+      await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-apagar-nome', null, { timeout: 3000 }).catch(() => undefined);
+      r.ok(await r.focoEm('os-apagar-nome'), 'o foco vai para o nome do disco');
+      // o nome errado: nada acontece além do aviso
+      await p.keyboard.type('outro disco');
+      await r.tecla('Enter');
+      r.ok(await r.esperar('os-apagar-nome-errado', 3000), 'o nome errado: o aviso, e nada é apagado');
+      r.ok(!(await esperarRelato(raiz3, /^instalar /m, 800)), 'o nome errado não chega a instalar');
+      await foto(p, '18-apagar-nome-errado');
+      await r.tecla('Control+a');
+      await p.keyboard.type('ssd linux simulado');
+      await r.passo('o nome certo, digitado');
+      await r.tecla('Enter');
+      r.ok(await r.esperar('os-instalado', 15000), 'apagou e instalou: a tela final');
+      r.ok(!!(await p.$('[data-teste="os-instalado-todo"]')) && !(await p.$('[data-teste="os-tutorial"]')), 'no disco todo, o Writer OS liga sozinho: sem o tutorial do F12');
+      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoEm('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
+      r.ok(await esperarRelato(raiz3, 'instalar ok'), 'o agente: instalar ok');
+      await foto(p, '19-apagou-instalado');
+    } else r.ok(false, '"Outras opções" e o disco, pelo teclado');
+  } else r.ok(false, 'a pergunta do uso aparece (sem Windows)');
   await app.fechar();
   somar(r);
 

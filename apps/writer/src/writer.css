@@ -1195,6 +1195,57 @@ a.linha-titulo:hover {
   border: 1px solid var(--borda);
 }
 
+/* "Outras opções" da tela de instalar: apagar o disco inteiro (W3f) */
+.outras-opcoes {
+  margin-top: 1.25rem;
+  border-top: var(--px) solid var(--borda);
+  padding-top: 0.75rem;
+}
+
+.outras-opcoes > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.outras-opcoes h2 {
+  font-size: 1.15rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.discos-apagar {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.discos-apagar .botao[aria-pressed='true'] {
+  border-color: var(--erro);
+  outline: var(--px) solid var(--erro);
+}
+
+.partes-disco {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.parte-windows {
+  color: var(--erro);
+  font-weight: 700;
+}
+
+.apagar-confirmar {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.apagar-confirmar input[type='text'] {
+  width: 100%;
+  max-width: 24rem;
+}
+
 .campo-marcar {
   display: flex;
   gap: 0.6rem;

@@ -119,6 +119,10 @@ export interface EstadoOS {
   usoVisto: boolean;
   /** O Writer OS acabou de ser instalado no computador neste boot: só falta desligar (o cofre já fechou). */
   instalado: boolean;
+  /** Instalou APAGANDO o disco inteiro (W3f): o Writer OS ficou em primeiro na ordem de boot e liga sozinho. */
+  discoTodo: boolean;
+  /** A marca do computador (de `/sys/class/dmi/id/sys_vendor`): o tutorial mostra a tecla do menu de boot dela. */
+  marca: MarcaComputador;
   /** Os testes e os prints (fora do pendrive de verdade). */
   simulado: boolean;
 }
@@ -158,13 +162,53 @@ export interface InfoInstalacao {
   discos: DiscoInterno[];
 }
 
-export type PassoInstalar = 'particoes' | 'copiar' | 'conferir' | 'textos' | 'entrada';
-export type ErroInstalar = 'sem-espaco' | 'nao-gpt' | 'nao-uefi' | 'ja-instalado' | 'nao-usb' | 'disco' | 'copia' | 'textos' | 'entrada' | 'ocupado' | 'falhou';
+export type PassoInstalar = 'apagar' | 'particoes' | 'copiar' | 'conferir' | 'textos' | 'entrada';
+export type ErroInstalar = 'sem-espaco' | 'nao-gpt' | 'nao-uefi' | 'ja-instalado' | 'nao-usb' | 'disco' | 'copia' | 'textos' | 'entrada' | 'ocupado' | 'confirmacao' | 'falhou';
 export type RespostaInstalar = { ok: true; estado: EstadoOS } | { ok: false; erro: ErroInstalar };
 
 /** O espaço livre mínimo para instalar (8 GiB) e o máximo que a instalação usa (32 GiB); igual ao ekfrase-instalar.sh. */
 export const INSTALAR_MINIMO = 8 * 1024 ** 3;
 export const INSTALAR_MAXIMO = 32 * 1024 ** 3;
+
+/** O nome do disco como a tela mostra e a pessoa digita para apagá-lo (o modelo; sem modelo, o nome do kernel). */
+export const nomeDoDisco = (d: Pick<DiscoInterno, 'modelo' | 'id'>): string => d.modelo.trim() || d.id;
+
+/** O nome digitado confere com o do disco? A regra do Gravador (`nomeNormalizado`): sem diferença de maiúsculas e espaços. */
+export function nomeConfere(d: Pick<DiscoInterno, 'modelo' | 'id'>, digitado: string): boolean {
+  const n = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+  return n(digitado) !== '' && n(digitado) === n(nomeDoDisco(d));
+}
+
+/** O que é uma partição, para a lista de "Apagar o disco inteiro" (o Windows aparece em vermelho). */
+export type TipoDeParte = 'windows' | 'recuperacao' | 'efi' | 'linux' | 'writer' | 'outra';
+
+export function tipoDaParte(p: ParteInterna): TipoDeParte {
+  const nome = `${p.nome} ${p.rotulo}`;
+  if (p.nome === 'EKFRASE-BOOT' || p.nome === 'EKFRASE-DADOS') return 'writer';
+  if (p.fs === 'vfat' && (/EFI|ESP|SYSTEM/i.test(nome) || p.tamanho < 1024 ** 3)) return 'efi';
+  if (/recovery|recupera|winre/i.test(nome)) return 'recuperacao';
+  if (p.fs === 'ntfs' || p.fs === 'BitLocker' || /Microsoft|Basic data/i.test(p.nome)) return 'windows';
+  if (/^(ext[234]|btrfs|xfs|f2fs|swap|crypto_LUKS|LVM2_member)$/.test(p.fs)) return 'linux';
+  return 'outra';
+}
+
+/** As marcas que o tutorial conhece (a tabela do "como bootar" do Gravador, mais a Positivo). */
+export const MARCAS = ['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'positivo', 'outra'] as const;
+export type MarcaComputador = (typeof MARCAS)[number];
+
+/** A marca pelo `sys_vendor` do firmware ("LENOVO", "Dell Inc.", "HP", "Hewlett-Packard", "ASUSTeK COMPUTER INC."…). */
+export function marcaDoComputador(fabricante: string): MarcaComputador {
+  const f = fabricante.trim().toLowerCase();
+  if (f.startsWith('lenovo')) return 'lenovo';
+  if (f.startsWith('dell')) return 'dell';
+  if (f === 'hp' || f.startsWith('hp ') || f.startsWith('hewlett')) return 'hp';
+  if (f.startsWith('acer')) return 'acer';
+  if (f.startsWith('asus')) return 'asus';
+  if (f.startsWith('micro-star') || f.startsWith('msi')) return 'msi';
+  if (f.startsWith('samsung')) return 'samsung';
+  if (f.startsWith('positivo')) return 'positivo';
+  return 'outra';
+}
 
 export interface RedeWifi {
   ssid: string;
@@ -233,8 +277,12 @@ export interface PonteSistema {
   passarUso(): Promise<EstadoOS>;
   /** O que há no computador para instalar (pergunta ao serviço do sistema; nada muda). */
   instalacao(): Promise<InfoInstalacao>;
-  /** Instala no maior espaço livre do disco. Antes, a casca grava e fecha os textos; `levar` copia a pasta deles. */
-  instalar(disco: string, levar: boolean): Promise<RespostaInstalar>;
+  /**
+   * Instala no maior espaço livre do disco. Antes, a casca grava e fecha os textos; `levar` copia a pasta deles.
+   * Com `apagar` (o nome do disco, como a pessoa digitou): APAGA o disco inteiro e instala nele (W3f); a casca confere
+   * o nome de novo (`nomeConfere`) antes de pedir ao serviço.
+   */
+  instalar(disco: string, levar: boolean, apagar?: string): Promise<RespostaInstalar>;
   /** O progresso da instalação (o passo e, ao copiar, os bytes). Devolve o "parar de ouvir". */
   aoPassoDaInstalacao(f: (passo: PassoInstalar, feito: number, total: number) => void): () => void;
   redes(): Promise<RedeWifi[]>;

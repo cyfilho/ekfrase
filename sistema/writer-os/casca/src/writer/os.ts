@@ -16,6 +16,8 @@
  *   pasta dos dados e voltam quando a senha é dada.
  */
 import {
+  marcaDoComputador,
+  nomeConfere,
   type DestinoOS,
   type ErroSistema,
   type EscolhaEspelho,
@@ -97,6 +99,8 @@ export class WriterOS {
   private boot: EstadoOS['boot'] = 'outro';
   /** Instalou no computador neste boot: o cofre fechou e só falta desligar. */
   private instalado = false;
+  /** Instalou apagando o disco inteiro (W3f): o Writer OS liga primeiro. */
+  private discoTodo = false;
   private instalando = false;
   /** O progresso da instalação vai à página (`os:instalar-passo`). */
   private aoPasso: ((passo: PassoInstalar, feito: number, total: number) => void) | null = null;
@@ -190,7 +194,7 @@ export class WriterOS {
 
   estado(): EstadoOS {
     const { idioma, teclado, fuso, wifiVisto, uso } = this.lerSistema();
-    return { idioma, teclado, fuso, wifiVisto, motivo: this.motivo, boot: this.boot, usoVisto: uso !== null, instalado: this.instalado, simulado: this.sistema.simulado };
+    return { idioma, teclado, fuso, wifiVisto, motivo: this.motivo, boot: this.boot, usoVisto: uso !== null, instalado: this.instalado, discoTodo: this.discoTodo, marca: marcaDoComputador(this.sistema.fabricante()), simulado: this.sistema.simulado };
   }
 
   /** "Só pelo pendrive": a pergunta do primeiro uso não volta (o item "Instalar neste computador" fica no menu). */
@@ -214,19 +218,30 @@ export class WriterOS {
    * Instala no disco `disco`. Antes, o que a página guarda vai ao cofre e os bancos fecham (o WAL entra no arquivo):
    * o serviço copia a pasta dos textos como ela está no disco. Deu certo: o cofre fica fechado (a tela final só
    * desliga); deu errado: a pessoa dá a senha de novo e continua no pendrive.
+   *
+   * Com `apagar` (W3f, "Apagar o disco inteiro"): o nome que a pessoa digitou tem de ser o do disco (a regra do
+   * Gravador), conferido AQUI antes de tudo; o serviço recebe o tamanho do disco que a tela mostrou e confere de novo.
    */
-  async instalar(disco: string, levar: boolean): Promise<RespostaInstalar> {
+  async instalar(disco: string, levar: boolean, apagar?: string): Promise<RespostaInstalar> {
     if (this.boot !== 'usb') return { ok: false, erro: 'nao-usb' };
     if (this.instalando || this.instalado) return { ok: false, erro: this.instalado ? 'ja-instalado' : 'ocupado' };
     if (typeof disco !== 'string' || !/^(nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)$/.test(disco)) return { ok: false, erro: 'disco' };
     this.instalando = true;
     try {
+      let bytes: number | undefined;
+      if (apagar !== undefined) {
+        const d = (await this.instalacao()).discos.find((x) => x.id === disco);
+        if (!d) return { ok: false, erro: 'disco' };
+        if (typeof apagar !== 'string' || !nomeConfere(d, apagar)) return { ok: false, erro: 'confirmacao' };
+        bytes = d.tamanho;
+      }
       await this.salvarPagina();
       await this.dados?.trancar();
-      const r = await this.sistema.instalar(disco, levar === true, (passo, feito, total) => this.aoPasso?.(passo, feito, total));
+      const r = await this.sistema.instalar(disco, levar === true, (passo, feito, total) => this.aoPasso?.(passo, feito, total), bytes);
       this.aoInstalar?.(r.ok ? 'ok' : r.erro);
       if (!r.ok) return r;
       this.instalado = true;
+      this.discoTodo = bytes !== undefined;
       return { ok: true, estado: this.estado() };
     } finally {
       this.instalando = false;

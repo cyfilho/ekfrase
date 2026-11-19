@@ -14,7 +14,7 @@
  * Toda tela tem `data-teste` (o agente de teste conta qual está aberta) e o foco começa na opção
  * padrão: Enter segue em frente (o CI digita pelo QMP do QEMU).
  */
-import { INSTALAR_MAXIMO, INSTALAR_MINIMO, type Bateria, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
+import { INSTALAR_MAXIMO, INSTALAR_MINIMO, nomeConfere, nomeDoDisco, tipoDaParte, type Bateria, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type MarcaComputador, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
 import { FormConta, IconeEngrenagem, Janela, ponte, useConta } from '@ekfrase/interface';
 import type { ComponentChildren, TargetedKeyboardEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -223,14 +223,27 @@ function EscolherUso() {
 /** O disco onde instalar: o GPT, sem o Writer, com o maior espaço livre. */
 const melhorDisco = (discos: DiscoInterno[]): DiscoInterno | undefined => [...discos].filter((d) => d.tabela === 'gpt' && !d.writer).sort((a, b) => b.livre - a.livre)[0];
 
-/** Por que não dá para instalar (ou `null`: dá). */
-function motivoDeNaoInstalar(info: InfoInstalacao): 'nao-uefi' | 'sem-disco' | 'ja-instalado' | 'nao-gpt' | 'sem-espaco' | null {
+/** Por que não dá para instalar ao lado do que existe (ou `null`: dá). */
+function motivoDeNaoInstalar(info: InfoInstalacao): 'nao-uefi' | 'sem-disco' | 'ja-instalado' | 'vazio' | 'nao-gpt' | 'sem-espaco' | null {
   if (!info.uefi) return 'nao-uefi';
   if (!info.discos.length) return 'sem-disco';
   if (info.discos.some((d) => d.writer)) return 'ja-instalado';
   const d = melhorDisco(info.discos);
-  if (!d) return 'nao-gpt';
+  if (!d) return info.discos.some((x) => x.tabela === 'nenhuma' && !x.partes.length) ? 'vazio' : 'nao-gpt';
   return d.livre < INSTALAR_MINIMO ? 'sem-espaco' : null;
+}
+
+/** O disco tem o Windows (ou parte dele: a recuperação, a partição reservada)? */
+const temWindows = (d: DiscoInterno): boolean => d.partes.some((p) => tipoDaParte(p) === 'windows');
+
+/**
+ * Os discos que "Apagar o disco inteiro" oferece: os que cabem o Writer OS (8 GB + a partição de boot). Se o Writer OS
+ * já está num disco, só ele (o serviço recusa apagar outro: a entrada de boot do de lá sairia). Os sem Windows primeiro.
+ */
+function discosParaApagar(info: InfoInstalacao): DiscoInterno[] {
+  const cabem = info.discos.filter((d) => d.tamanho >= INSTALAR_MINIMO + 1400 * 1024 ** 2);
+  const comWriter = cabem.filter((d) => d.writer);
+  return [...(comWriter.length ? comWriter : cabem)].sort((a, b) => Number(temWindows(a)) - Number(temWindows(b)) || a.id.localeCompare(b.id));
 }
 
 /** A barra do disco (as cores do Guia): o que existe fica como está; o espaço livre vira o Writer OS. */
@@ -263,43 +276,160 @@ function BarraDoDisco({ disco }: { disco: DiscoInterno }) {
   );
 }
 
+/** O que existe num disco, partição por partição (o Windows em vermelho); vazio: "nenhuma partição". */
+function OQueHaNoDisco({ disco }: { disco: DiscoInterno }) {
+  if (!disco.partes.length) return <p class="dica">{t('writer.os.instalar.parte.nada')}</p>;
+  return (
+    <ul class="partes-disco">
+      {disco.partes.map((p, i) => {
+        const tipo = tipoDaParte(p);
+        return (
+          <li key={i} class={`parte-disco parte-${tipo}`} data-teste={`os-apagar-parte-${tipo}`}>
+            {t(`writer.os.instalar.parte.${tipo}`, { tamanho: tamanho(p.tamanho) })}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * "APAGAR O DISCO INTEIRO" (W3f; PLANO §8c item 3): só em "Outras opções", recolhido. A lista dos discos com o que há
+ * em cada um (o Windows em vermelho); escolhido o disco, a pessoa digita o NOME dele (a regra do Gravador) e só então
+ * o botão vermelho apaga. A casca confere o nome de novo e o serviço, o tamanho.
+ */
+function ApagarDisco({ info, levar, temTextos, aoLevar, aoApagar }: { info: InfoInstalacao; levar: boolean; temTextos: boolean; aoLevar: (v: boolean) => void; aoApagar: (d: DiscoInterno, nome: string) => void }) {
+  const discos = discosParaApagar(info);
+  const [escolhido, setEscolhido] = useState<string | null>(null);
+  const [nome, setNome] = useState('');
+  const [errado, setErrado] = useState(false);
+  const campo = useRef<HTMLInputElement>(null);
+  const d = discos.find((x) => x.id === escolhido);
+  useEffect(() => {
+    if (escolhido) campo.current?.focus();
+  }, [escolhido]);
+  if (!discos.length) return null;
+  const enviar = (e: Event) => {
+    e.preventDefault();
+    if (!d) return;
+    if (!nomeConfere(d, nome)) return setErrado(true);
+    aoApagar(d, nome);
+  };
+  return (
+    <details class="outras-opcoes" data-teste="os-instalar-outras">
+      <summary data-teste="os-instalar-outras-abrir">{t('writer.os.instalar.outras')}</summary>
+      <h2>{t('writer.os.instalar.apagar.titulo')}</h2>
+      <p>{t('writer.os.instalar.apagar.texto')}</p>
+      <ul class="discos-apagar">
+        {discos.map((x) => (
+          <li key={x.id}>
+            <button
+              type="button"
+              class="botao"
+              aria-pressed={x.id === escolhido}
+              onClick={() => {
+                setEscolhido(x.id);
+                setNome('');
+                setErrado(false);
+              }}
+              data-teste={`os-apagar-disco-${x.id}`}
+            >
+              {t('writer.os.instalar.apagar.disco', { nome: nomeDoDisco(x), tamanho: tamanho(x.tamanho) })}
+            </button>
+            <OQueHaNoDisco disco={x} />
+          </li>
+        ))}
+      </ul>
+      {d && (
+        <form class="apagar-confirmar" onSubmit={enviar} data-teste="os-apagar-confirmar">
+          <p class="ekf-erro">{t(temWindows(d) ? 'writer.os.instalar.apagar.windows' : 'writer.os.instalar.apagar.some', { nome: nomeDoDisco(d) })}</p>
+          <label class="campo">
+            <span>
+              {t('writer.os.instalar.apagar.digite')} <strong>{nomeDoDisco(d)}</strong>
+            </span>
+            <input
+              ref={campo}
+              type="text"
+              value={nome}
+              autocomplete="off"
+              spellcheck={false}
+              onInput={(e) => {
+                setNome(e.currentTarget.value);
+                setErrado(false);
+              }}
+              data-teste="os-apagar-nome"
+            />
+          </label>
+          {errado && (
+            <p class="ekf-erro" role="alert" data-teste="os-apagar-nome-errado">
+              {t('writer.os.instalar.erro.confirmacao')}
+            </p>
+          )}
+          <label class="campo-marcar">
+            <input type="checkbox" checked={levar && temTextos} disabled={!temTextos} onChange={(e) => aoLevar(e.currentTarget.checked)} data-teste="os-apagar-levar" />
+            <span>{t(temTextos ? 'writer.os.instalar.levar' : 'writer.os.instalar.sem-textos')}</span>
+          </label>
+          <div class="acoes-linha">
+            <button type="submit" class="botao principal perigo" data-teste="os-apagar-botao">
+              {t('writer.os.instalar.apagar.botao')}
+            </button>
+          </div>
+        </form>
+      )}
+    </details>
+  );
+}
+
 /**
  * A TELA DE INSTALAR (uma só, PLANO §8c): a barra do disco, "Levar os textos deste pendrive" (marcado quando há textos),
  * Instalar e Voltar. Nada é apagado: as duas partições novas nascem no espaço livre e a ordem de boot não muda.
  * Sem espaço, explica o "preparar" do Gravador; sem UEFI, sem GPT ou já instalado, explica e só volta.
+ * Embaixo, recolhido, "Outras opções" com o "Apagar o disco inteiro" (W3f), para o computador sem Windows.
  */
 function TelaInstalar({ voltar }: { voltar: () => void }) {
   const estado = useEstadoCasca();
+  const osEstado = useEstadoOS();
   const [info, setInfo] = useState<InfoInstalacao | null>(null);
   const [levar, setLevar] = useState<boolean | null>(null);
   const [passo, setPasso] = useState<{ passo: PassoInstalar; feito: number; total: number } | null>(null);
-  const [instalando, setInstalando] = useState(false);
+  const [instalando, setInstalando] = useState<'ao-lado' | 'apagar' | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const apagou = useRef(false);
   useEffect(() => void os.instalacao().then(setInfo), []);
-  useEffect(() => os.aoPassoDaInstalacao((p, feito, total) => setPasso({ passo: p, feito, total })), []);
+  useEffect(
+    () =>
+      os.aoPassoDaInstalacao((p, feito, total) => {
+        if (p === 'apagar') apagou.current = true;
+        setPasso({ passo: p, feito, total });
+      }),
+    [],
+  );
   const temTextos = !!estado?.temSenha;
   const marcado = levar ?? temTextos;
   const motivo = info ? motivoDeNaoInstalar(info) : null;
   const disco = info ? melhorDisco(info.discos) : undefined;
+  const outras = info && info.uefi && motivo !== 'nao-uefi' && motivo !== 'sem-disco';
 
-  const instalar = async () => {
-    if (!disco) return;
+  const instalar = async (alvo: DiscoInterno, apagar?: string) => {
     setErro(null);
-    setInstalando(true);
-    setPasso({ passo: 'particoes', feito: 0, total: 0 });
+    apagou.current = false;
+    setInstalando(apagar === undefined ? 'ao-lado' : 'apagar');
+    setPasso({ passo: apagar === undefined ? 'particoes' : 'apagar', feito: 0, total: 0 });
     await gravarAgora();
-    const r = await os.instalar(disco.id, marcado && temTextos);
+    const r = await os.instalar(alvo.id, marcado && temTextos, apagar);
     // o cofre fechou para a cópia: a casca conta como ficou (sem a senha, de novo, se não deu certo)
     if (casca) mudarEstado(await casca.estado());
     if (r.ok) return mudarEstadoOS(r.estado);
-    setInstalando(false);
+    setInstalando(null);
     setPasso(null);
-    setErro(t(`writer.os.instalar.erro.${r.erro}`));
+    const texto = t(`writer.os.instalar.erro.${r.erro}`);
+    setErro(apagou.current ? `${texto} ${t('writer.os.instalar.apagar.depois-do-erro')}` : texto);
   };
 
   const pct = passo?.passo === 'copiar' && passo.total > 0 ? Math.round((passo.feito / passo.total) * 100) : null;
-  const ordem: readonly PassoInstalar[] = ['particoes', 'copiar', 'conferir', 'textos', 'entrada'];
-  const geral = passo ? Math.round(((ordem.indexOf(passo.passo) + (pct ?? 0) / 100) / ordem.length) * 100) : 0;
+  const ordem: readonly PassoInstalar[] = instalando === 'apagar' ? ['apagar', 'particoes', 'copiar', 'conferir', 'textos', 'entrada'] : ['particoes', 'copiar', 'conferir', 'textos', 'entrada'];
+  const geral = passo ? Math.round(((Math.max(0, ordem.indexOf(passo.passo)) + (pct ?? 0) / 100) / ordem.length) * 100) : 0;
+  const teclaDoMenu = t(`writer.os.tutorial.tecla.${osEstado?.marca ?? 'outra'}`);
 
   return (
     <Moldura titulo={t('writer.os.instalar.titulo')} teste="os-instalar" foco={instalando ? 'instalando' : info ? `pronto-${motivo ?? 'ok'}` : 'carregando'}>
@@ -313,7 +443,7 @@ function TelaInstalar({ voltar }: { voltar: () => void }) {
       )}
       {info && !instalando && motivo && (
         <>
-          <p data-teste={`os-instalar-motivo-${motivo}`}>{t(`writer.os.instalar.motivo.${motivo}`)}</p>
+          <p data-teste={`os-instalar-motivo-${motivo}`}>{t(`writer.os.instalar.motivo.${motivo}`, { tecla: teclaDoMenu })}</p>
           {motivo === 'sem-espaco' && (
             <ol class="passos-os">
               <li>{t('writer.os.instalar.preparar.1')}</li>
@@ -330,7 +460,7 @@ function TelaInstalar({ voltar }: { voltar: () => void }) {
       )}
       {info && !instalando && !motivo && disco && (
         <>
-          <p>{t('writer.os.instalar.texto', { disco: disco.modelo || disco.id })}</p>
+          <p>{t('writer.os.instalar.texto', { disco: nomeDoDisco(disco) })}</p>
           <BarraDoDisco disco={disco} />
           <p class="dica">{t('writer.os.instalar.nada-apaga')}</p>
           <label class="campo-marcar">
@@ -341,7 +471,7 @@ function TelaInstalar({ voltar }: { voltar: () => void }) {
             <button type="button" class="botao" onClick={voltar} data-teste="os-instalar-voltar">
               {t('writer.os.instalar.voltar')}
             </button>
-            <button type="button" class="botao principal" onClick={() => void instalar()} data-foco-inicial data-teste="os-instalar-botao">
+            <button type="button" class="botao principal" onClick={() => void instalar(disco)} data-foco-inicial data-teste="os-instalar-botao">
               {t('writer.os.instalar.botao')}
             </button>
           </div>
@@ -352,24 +482,36 @@ function TelaInstalar({ voltar }: { voltar: () => void }) {
           {erro}
         </p>
       )}
+      {outras && !instalando && <ApagarDisco info={info} levar={marcado} temTextos={temTextos} aoLevar={setLevar} aoApagar={(d, nome) => void instalar(d, nome)} />}
     </Moldura>
   );
 }
 
-/** Os três passos para ligar no Writer OS instalado (PLANO §8c item 4), com o desenho por código; e o "ligar direto". */
+/**
+ * A tecla do menu de ligar de cada marca, para o desenho do passo 2 (o nome da tecla não se traduz; o texto do passo,
+ * com as variações, vem de `writer.os.tutorial.tecla.<marca>`). A tabela do "como bootar" do Gravador.
+ */
+const TECLA_DO_MENU: Record<MarcaComputador, string> = { lenovo: 'F12', dell: 'F12', hp: 'Esc', acer: 'F12', asus: 'Esc', msi: 'F11', samsung: 'F10', positivo: 'F7', outra: 'F12' };
+
+/**
+ * Os três passos para ligar no Writer OS instalado (PLANO §8c item 4), com o desenho por código; e o "ligar direto".
+ * A tecla é a da marca deste computador (`EstadoOS.marca`, do `sys_vendor` do firmware); marca que o Writer OS não
+ * conhece mostra a lista das outras.
+ */
 function Tutorial() {
+  const marca = useEstadoOS()?.marca ?? 'outra';
   return (
-    <div class="tutorial-os" data-teste="os-tutorial">
+    <div class="tutorial-os" data-teste="os-tutorial" data-marca={marca}>
       <ol class="passos-os passos-desenhados">
         <li>
           <span class="desenho-passo desenho-pendrive" aria-hidden="true" />
           <span>{t('writer.os.tutorial.1')}</span>
         </li>
         <li>
-          <span class="desenho-passo desenho-tecla" aria-hidden="true">
-            F12
+          <span class="desenho-passo desenho-tecla" aria-hidden="true" data-teste="os-tutorial-tecla">
+            {TECLA_DO_MENU[marca]}
           </span>
-          <span>{t('writer.os.tutorial.2')}</span>
+          <span>{t('writer.os.tutorial.2', { tecla: t(`writer.os.tutorial.tecla.${marca}`) })}</span>
         </li>
         <li>
           <span class="desenho-passo desenho-menu" aria-hidden="true">
@@ -380,22 +522,27 @@ function Tutorial() {
           <span>{t('writer.os.tutorial.3')}</span>
         </li>
       </ol>
-      <p class="dica">{t('writer.os.tutorial.teclas')}</p>
+      {marca === 'outra' && <p class="dica">{t('writer.os.tutorial.teclas')}</p>}
+      <p class="dica">{t('writer.os.tutorial.sem-escolher')}</p>
       <details class="tutorial-direto">
         <summary data-teste="os-tutorial-direto">{t('writer.os.tutorial.direto')}</summary>
-        <p>{t('writer.os.tutorial.direto.texto')}</p>
+        <p>{t('writer.os.tutorial.direto.texto', { config: t(`writer.os.tutorial.config.${marca}`) })}</p>
         <p class="aviso-casca">{t('writer.os.tutorial.bitlocker')}</p>
       </details>
     </div>
   );
 }
 
-/** A tela final: instalado. O cofre já fechou; desligar, tirar o pendrive e ligar pelo menu do computador. */
+/**
+ * A tela final: instalado. O cofre já fechou; desligar, tirar o pendrive e ligar pelo menu do computador. Instalado
+ * apagando o disco inteiro, o Writer OS já liga primeiro: basta tirar o pendrive.
+ */
 function Instalado() {
+  const discoTodo = !!useEstadoOS()?.discoTodo;
   return (
     <Moldura titulo={t('writer.os.instalado.titulo')} teste="os-instalado" foco="instalado">
-      <p>{t('writer.os.instalado.texto')}</p>
-      <Tutorial />
+      <p data-teste={discoTodo ? 'os-instalado-todo' : 'os-instalado-ao-lado'}>{t(discoTodo ? 'writer.os.instalado.texto-todo' : 'writer.os.instalado.texto')}</p>
+      {!discoTodo && <Tutorial />}
       <div class="acoes-linha">
         <button type="button" class="botao principal" onClick={() => void os.desligar()} data-foco-inicial data-teste="os-instalado-desligar">
           <IconeLigar tamanho={16} /> {t('writer.os.desligar')}
