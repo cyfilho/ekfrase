@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# Um pedido de atualizar (docs/ATUALIZACOES.md §4). A entrada e a saída são o socket; nada de rede nem de shell.
+[Unit]
+Description=Ekfrase Writer OS: atualizar (um pedido)
+After=ekfrase-dados.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ekfrase/ekfrase-atualizar.sh
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectHome=yes
+NoNewPrivileges=yes

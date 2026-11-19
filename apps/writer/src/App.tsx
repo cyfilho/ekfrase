@@ -36,6 +36,7 @@ import { t, tr, textoDoErro } from './textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, camadaAberta, focarTela } from './ui.tsx';
 import { naCasca, noOS } from './computador/casca.ts';
 import { PendriveOS } from './computador/PendriveOS.tsx';
+import { AvisoDeAtualizacao } from './computador/Atualizacoes.tsx';
 import { BotaoSistema, EntrarOS, MenuSistema, PortaoOS, RelogioOS, SistemaForaDoApp, useAvisoDeBrilho } from './computador/SistemaOS.tsx';
 import { BaixarOS } from './computador/BaixarOS.tsx';
 import { Baixar, PortaoDaCasca } from './computador/Telas.tsx';
@@ -62,6 +63,7 @@ export function App() {
           <AppDoWriter />
         </PortaoOS>
         <RelogioOS />
+        <AvisoDeAtualizacao />
       </>
     );
   }

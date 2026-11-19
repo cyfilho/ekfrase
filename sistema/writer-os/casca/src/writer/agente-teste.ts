@@ -18,11 +18,15 @@
  *   bootorder <lista>       o BootOrder do firmware (ao ligar e depois de instalar), como o efibootmgr mostra
  *   entrada-writer <n>      a entrada "Ekfrase Writer OS" que existe no firmware (Boot<n>)
  *   instalar ok | <erro>    o fim de uma instalação no computador
+ *   atualizacao …           as atualizações (atualizacoes-os.ts): `boot <lado> <versão> atual=… novo=… falhou=…`,
+ *                           cada situação (`procurando`, `baixando <v>`, `pronta <v>`, `erro - <código>`…),
+ *                           `confirmada <lado> <v>`, `sem-confirmar <lado>`, `voltou <de> <para>`
  */
 import { DONO_LOCAL, Escrita } from '@ekfrase/writer-nucleo';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Sistema } from '../motor/sistema.ts';
+import type { AtualizacoesOS } from './atualizacoes-os.ts';
 import type { DadosDoWriter } from './dados.ts';
 import type { WriterOS } from './os.ts';
 import type { Pagina } from './pagina.ts';
@@ -79,7 +83,7 @@ const MARCA = 'Escrito no Writer OS.';
 /** Quantas gravações o laço faz (uma a cada 250 ms: ~75 s). */
 const VOLTAS = 300;
 
-export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoWriter; sistema: Sistema; os?: WriterOS }): (linha: string) => void {
+export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoWriter; sistema: Sistema; os?: WriterOS; atualizacoes?: AtualizacoesOS }): (linha: string) => void {
   mkdirSync(dirname(o.relato), { recursive: true });
   const dizer = (linha: string) => {
     try {
@@ -89,6 +93,7 @@ export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoW
     }
   };
   dizer('agente ligado');
+  if (o.atualizacoes) o.atualizacoes.aoRelatar = dizer;
   const contarEfi = () => {
     const e = lerEfi();
     dizer(`bootorder ${e.ordem ?? '?'}`);

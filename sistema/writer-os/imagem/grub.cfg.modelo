@@ -7,20 +7,53 @@ set timeout_style=hidden
 set superusers="ekfrase"
 password_pbkdf2 ekfrase @HASH@
 
-if [ ! -e /live/vmlinuz ]; then
+if [ ! -e /boot/grub/grubenv ]; then
   search --no-floppy --label --set=root EKFR-BOOT
 fi
+
+# AS DUAS CÓPIAS DO SISTEMA (docs/ATUALIZACOES.md §4, U1): live/ (A) e live-b/ (B) na EKFR-BOOT. O grubenv diz qual
+# está valendo (ekfrase_atual) e, depois de uma atualização, qual é a nova (ekfrase_novo). A nova liga no máximo DUAS
+# vezes sem que a casca confirme (ekfrase-atualizar.sh confirmar, quando a janela do Writer abriu); na terceira, o GRUB
+# desiste: volta para a de antes e anota ekfrase_falhou. Só texto, sem conta de somar (o GRUB não soma).
+load_env --file /boot/grub/grubenv ekfrase_atual ekfrase_novo ekfrase_tentou ekfrase_falhou
+if [ "$ekfrase_atual" != "live-b" ]; then
+  set ekfrase_atual=live
+fi
+set ekfrase_lado="$ekfrase_atual"
+if [ "$ekfrase_novo" = "live" -o "$ekfrase_novo" = "live-b" ]; then
+  if [ -z "$ekfrase_tentou" ]; then
+    set ekfrase_tentou=1
+    set ekfrase_lado="$ekfrase_novo"
+    save_env --file /boot/grub/grubenv ekfrase_tentou
+  elif [ "$ekfrase_tentou" = "1" ]; then
+    set ekfrase_tentou=2
+    set ekfrase_lado="$ekfrase_novo"
+    save_env --file /boot/grub/grubenv ekfrase_tentou
+  else
+    set ekfrase_falhou="$ekfrase_novo"
+    set ekfrase_novo=
+    set ekfrase_tentou=
+    save_env --file /boot/grub/grubenv ekfrase_falhou ekfrase_novo ekfrase_tentou
+  fi
+fi
+# o lado escolhido sumiu (um disco instalado só com o B, uma cópia apagada pela metade): o que existir
+if [ ! -e "/$ekfrase_lado/vmlinuz" ]; then
+  if [ -e /live/vmlinuz ]; then set ekfrase_lado=live; else set ekfrase_lado=live-b; fi
+fi
+export ekfrase_lado
 
 # O live-boot vai direto à partição de onde o GRUB ligou (P3b, 18/11/2026). Sem isto ele sondava os discos, e o
 # `live-media-timeout=30` de antes não era "espere até 30 s": era "NÃO procure antes de 30 s" (9990-misc-helpers.sh,
 # find_livefs), 31 s parados no notebook. Se o PARTUUID não aparecer, o live-boot cai na busca de sempre, tentando
 # a cada segundo por até 60 s (o HD externo lento continua tendo tempo de acordar). Dentro da entrada, porque a
 # entrada do menu só herda as variáveis exportadas (o $root é).
+# A linha do kernel começa com DOIS espaços e "linux /$ekfrase_lado/vmlinuz ": o ekfrase-instalar.sh e o
+# ekfrase-atualizar.sh acrescentam o ekfrase.dados=<PARTUUID> no fim dela.
 menuentry "Ekfrase Writer" --unrestricted {
   set ekfrase_midia=/dev/disk/by-partlabel/EKFRASE-BOOT
   if probe --set=ekfrase_pu --part-uuid "$root"; then
     set ekfrase_midia="/dev/disk/by-partuuid/$ekfrase_pu"
   fi
-  linux /live/vmlinuz boot=live live-media-path=/live live-media=$ekfrase_midia noprompt noeject nopersistence quiet splash loglevel=3 rd.udev.log_level=3 systemd.show_status=false systemd.debug-shell=0 rd.shell=0 rd.emergency=reboot panic=10 vt.global_cursor_default=0
-  initrd /live/initrd.img
+  linux /$ekfrase_lado/vmlinuz boot=live live-media-path=/$ekfrase_lado live-media=$ekfrase_midia noprompt noeject nopersistence quiet splash loglevel=3 rd.udev.log_level=3 systemd.show_status=false systemd.debug-shell=0 rd.shell=0 rd.emergency=reboot panic=10 vt.global_cursor_default=0
+  initrd /$ekfrase_lado/initrd.img
 }

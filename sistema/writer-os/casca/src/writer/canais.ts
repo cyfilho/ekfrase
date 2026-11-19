@@ -13,6 +13,7 @@ import { baseDoServidor, conferirServidor, type EscolhaEspelho, type MetodoArmaz
 import { gravarLembrado, lerLembrado } from '../motor/pastas.ts';
 import { origemDe } from '../motor/rede-node.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
+import type { AtualizacoesOS } from './atualizacoes-os.ts';
 import type { DadosDoWriter } from './dados.ts';
 import type { WriterOS } from './os.ts';
 
@@ -40,6 +41,8 @@ export interface OpcoesCanais {
   lembrado: string;
   writerOS: WriterOS | null;
   sistema: Sistema | null;
+  /** As atualizações do app (docs/ATUALIZACOES.md; no Writer OS desde a U1). */
+  atualizacoes?: AtualizacoesOS | null;
   /** "Escolher outra pasta…" (o seletor do Windows; no Writer OS não há: `null`). */
   escolherPasta: () => Promise<string | null>;
   /** Trocou de servidor: esquecer os cookies da conta e recarregar a página. */
@@ -123,6 +126,17 @@ export function criarCanais(o: OpcoesCanais): Canais {
       'os:desligar': () => writerOS.desligar(false),
       'os:reiniciar': () => writerOS.desligar(true),
       'os:sobre': () => writerOS.sobre(),
+    } satisfies Record<string, Funcao>);
+  }
+
+  // ---- as atualizações (DEC-P072): o ajuste, "Procurar agora", "Instalar"
+  const at = o.atualizacoes;
+  if (at) {
+    Object.assign(pedidos, {
+      'at:estado': () => at.estado(),
+      'at:procurar': () => at.procurar(),
+      'at:instalar': () => at.instalar(),
+      'at:modo': (m: string) => at.usarModo(m === 'perguntar' ? 'perguntar' : 'automaticas'),
     } satisfies Record<string, Funcao>);
   }
 

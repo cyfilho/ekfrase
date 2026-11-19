@@ -10,13 +10,16 @@ import type {
   DiscoUSB,
   ErroSistema,
   EscolhaEspelho,
+  EstadoAtualizacoes,
   EstadoCasca,
   EstadoOS,
   InfoInstalacao,
   ListaDePasta,
   MetodoArmazem,
+  ModoAtualizacoes,
   Mudanca,
   PassoInstalar,
+  PonteAtualizacoes,
   PonteCasca,
   PonteSistema,
   RedeWifi,
@@ -49,7 +52,7 @@ const cada = <F extends (...a: never[]) => void>(lista: Iterable<F>, ...a: Param
   }
 };
 
-export function montarPonte(t: Transporte, info: { versao: string; plataforma: string; os: boolean }): PonteCasca {
+export function montarPonte(t: Transporte, info: { versao: string; plataforma: string; os: boolean; atualizacoes?: boolean }): PonteCasca {
   const pedir = <T>(canal: string, ...a: unknown[]): Promise<T> => t.pedir(canal, ...a) as Promise<T>;
 
   const ouvintes = new Map<string, Set<(m: Mudanca) => void>>();
@@ -74,6 +77,24 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
   t.ouvir('os:instalar-passo', (passo, feito, total) => {
     if (typeof passo === 'string') cada(ouvintesDoInstalar, passo as PassoInstalar, Number(feito) || 0, Number(total) || 0);
   });
+
+  // as atualizações (DEC-P072): o andamento, pronta, erro
+  const ouvintesDaAtualizacao = new Set<(e: EstadoAtualizacoes) => void>();
+  t.ouvir('at:mudou', (e) => {
+    if (e && typeof e === 'object') cada(ouvintesDaAtualizacao, e as EstadoAtualizacoes);
+  });
+  const atualizacoes: PonteAtualizacoes | undefined = info.atualizacoes
+    ? {
+        estado: () => pedir<EstadoAtualizacoes>('at:estado'),
+        procurar: () => pedir<EstadoAtualizacoes>('at:procurar'),
+        instalar: () => pedir<EstadoAtualizacoes>('at:instalar'),
+        usarModo: (m: ModoAtualizacoes) => pedir<EstadoAtualizacoes>('at:modo', m === 'perguntar' ? 'perguntar' : 'automaticas'),
+        aoMudar: (f: (e: EstadoAtualizacoes) => void) => {
+          ouvintesDaAtualizacao.add(f);
+          return () => void ouvintesDaAtualizacao.delete(f);
+        },
+      }
+    : undefined;
 
   const os: PonteSistema | undefined = info.os
     ? {
@@ -153,6 +174,7 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
       aoFechar = typeof f === 'function' ? f : null;
     },
     ...(os ? { os } : {}),
+    ...(atualizacoes ? { atualizacoes } : {}),
   };
 }
 

@@ -12,6 +12,9 @@ Type=simple
 ExecStartPre=/bin/sh -c 'mkdir -p /run/ekfrase/teste && touch /run/ekfrase/teste/relato && chown -R 1000:1000 /run/ekfrase/teste'
 # o teste da placa de vídeo (qemu.py --gpu passa -fw_cfg name=opt/ekfrase/gpu): a sessão NÃO força o pixman
 ExecStartPre=/bin/sh -c 'modprobe qemu_fw_cfg 2>/dev/null; if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/gpu ]; then touch /run/ekfrase/teste/gpu; fi'
+# a atualização (qemu.py teste_atualizar/teste_voltar, docs/ATUALIZACOES.md §4): o "GitHub" do teste (opt/ekfrase/atualizacoes,
+# o endereço do servidor no computador que roda o QEMU) e, no teste da volta, que a casca NÃO confirme a cópia nova
+ExecStartPre=/bin/sh -c 'if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/atualizacoes/raw ]; then head -c 200 /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/atualizacoes/raw > /run/ekfrase/teste/atualizacoes; chmod 0644 /run/ekfrase/teste/atualizacoes; fi; if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/nao-confirmar ]; then touch /run/ekfrase/teste/nao-confirmar; fi'
 ExecStart=/usr/lib/ekfrase/teste/relato.sh
 
 [Install]
