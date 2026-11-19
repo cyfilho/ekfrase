@@ -4,6 +4,8 @@
 # Ekfrase (minisign, segredo EKFRASE_MINISIGN_CHAVE), monta o Gravador no Windows (.exe portátil) e no
 # Linux (AppImage) e cria o Release com tudo. O Gravador baixa a imagem deste Release; a página
 # ekfrase.com/writer/os/ oferece o Gravador. Sem certificado de assinatura por enquanto.
+# AS ATUALIZAÇÕES (docs/ATUALIZACOES.md §4, U1): o Release leva também o que os pendrives baixam para se atualizar
+# sozinhos: ekfrase-writer-os-<v>.squashfs, .vmlinuz, .initrd, .grub.cfg e o manifesto .atualizacao.json com o lacre.
 name: Writer OS e Gravador
 
 on:
@@ -17,8 +19,16 @@ jobs:
   imagem:
     name: Imagem, testes no QEMU e o lacre
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 210
     steps:
+      # espaço no disco do runner: os discos virtuais do QEMU crescem com o que a máquina grava (o teste de instalar e o
+      # de atualizar pelo disco passam de 8 GB); sem isto, o disco do runner enchia e a gravação no disco interno parava
+      - name: Liberar espaço no runner
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          df -h /
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
@@ -36,7 +46,9 @@ jobs:
           if [[ "$GITHUB_REF_NAME" == *-teste.* ]] && gh release view "writer-os-v$VERSAO" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "writer-os-v$VERSAO já saiu como estável: suba a versão em sistema/writer-os/casca/package.json antes de uma de teste"; exit 1
           fi
-          echo "VERSAO=$VERSAO" >> "$GITHUB_ENV"
+          # a imagem leva a versão INTEIRA da tag (X.Y.Z ou X.Y.Z-teste.N): é com ela que um pendrive de teste compara a
+          # próxima de teste (as atualizações) e é ela que diz o canal (/etc/ekfrase/canal)
+          echo "VERSAO=${GITHUB_REF_NAME#writer-os-v}" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ github.token }}
       - run: node sistema/writer-os/casca/scripts/montar.ts --os --sem-abrir
@@ -51,7 +63,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-x86 ovmf dosfstools gdisk ntfs-3g minisign
+      - run: df -h / "$PWD"
       - run: python3 tests/writer-os/qemu.py --imagem "sistema/writer-os/imagem/saida/ekfrase-writer-os-$VERSAO-teste.img" --prints prints-writer-os
+      # os prints e a serial de cada máquina virtual (para entender uma falha sem rodar de novo)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: writer-os-prints
+          path: prints-writer-os
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Comprimir e assinar
         env:
           CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
@@ -62,8 +83,19 @@ jobs:
           sha256sum "ekfrase-writer-os-$VERSAO.img.xz" > "ekfrase-writer-os-$VERSAO.img.xz.sha256"
           ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
           minisign -S -s "$RUNNER_TEMP/minisign.key" -m "ekfrase-writer-os-$VERSAO.img.xz" -t "Ekfrase Writer OS $VERSAO" < /dev/null
+          # a atualização: o manifesto (o formato de packages/atualizacoes/src/manifesto.ts, que o ekfrase-atualizar.sh lê)
+          N="ekfrase-writer-os-$VERSAO"
+          CANAL=estavel
+          [[ "$VERSAO" == *-teste.* ]] && CANAL=teste
+          arq() { jq -n --arg p "$1" --arg n "$2" --argjson t "$(stat -c %s "$2")" --arg s "$(sha256sum "$2" | cut -d' ' -f1)" '{papel: $p, nome: $n, tamanho: $t, sha256: $s}'; }
+          { arq squashfs "$N.squashfs"; arq vmlinuz "$N.vmlinuz"; arq initrd "$N.initrd"; arq grub.cfg "$N.grub.cfg"; } | jq -s . > "$RUNNER_TEMP/arquivos.json"
+          jq -n --arg v "$VERSAO" --arg c "$CANAL" --slurpfile a "$RUNNER_TEMP/arquivos.json" '{app: "ekfrase-writer-os", versao: $v, canal: $c, arquivos: $a[0]}' > "$N.atualizacao.json"
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Writer OS $VERSAO atualizacao" < /dev/null
           rm -f "$RUNNER_TEMP/minisign.key"
           minisign -V -p "$GITHUB_WORKSPACE/sistema/writer-os/imagem/minisign.pub" -m "ekfrase-writer-os-$VERSAO.img.xz"
+          minisign -V -p "$GITHUB_WORKSPACE/sistema/writer-os/imagem/minisign.pub" -m "$N.atualizacao.json"
+          # a chave de teste das atualizações nunca vai ao Release
+          rm -f teste-atualizacao.key
       - uses: actions/upload-artifact@v4
         with:
           name: writer-os-imagem
@@ -71,6 +103,11 @@ jobs:
             sistema/writer-os/imagem/saida/*.img.xz
             sistema/writer-os/imagem/saida/*.sha256
             sistema/writer-os/imagem/saida/*.minisig
+            sistema/writer-os/imagem/saida/*.atualizacao.json
+            sistema/writer-os/imagem/saida/*.squashfs
+            sistema/writer-os/imagem/saida/*.vmlinuz
+            sistema/writer-os/imagem/saida/*.initrd
+            sistema/writer-os/imagem/saida/*.grub.cfg
           if-no-files-found: error
           compression-level: 0
 
@@ -117,8 +154,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      # só a imagem (com a atualização) e os Gravadores: os prints e a serial do QEMU ficam como artefato, fora do Release
       - uses: actions/download-artifact@v4
         with:
+          name: writer-os-imagem
+          path: arquivos
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gravador-*
           path: arquivos
           merge-multiple: true
       - name: Criar o Release (a imagem com o lacre e o Gravador)

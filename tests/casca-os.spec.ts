@@ -14,13 +14,19 @@
  * 3. Tudo Ekfrase (PLANO §6.5): nenhuma tela tem link para fora do app nem seletor de arquivos do sistema,
  *    "Desligar" está à vista no topo, e importar e salvar passam pela tela dos pendrives (só teclado).
  *
+ * 4. As atualizações (DEC-P072, U1): um "GitHub" local; automáticas, o aviso do canto, a parte "Atualizações" do
+ *    menu, "Perguntar antes" e Instalar (`percorrerAtualizacoes`).
+ *
  * Os prints de cada tela vão para `EKFRASE_PRINTS_OS` (se houver). Roda por `npm run teclado -- --so-os`.
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { BrowserType, ElectronApplication, Page } from 'playwright';
+import { assinadorTeste } from './gravador/imagem-teste.ts';
 import { Roteiro, type Resultado } from './teclado.spec.ts';
 
 const SENHA = 'escrever2026';
@@ -545,5 +551,120 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   await app.fechar();
   somar(r);
 
+  // ================= 4. as atualizações (DEC-P072, U1) =================
+  await percorrerAtualizacoes(abrir, base, comum, falar, foto, somar);
+
   return { passos, falhas };
+}
+
+/**
+ * 4. AS ATUALIZAÇÕES (docs/ATUALIZACOES.md): um "GitHub" local oferece a 0.2.1 (assinada com uma chave de teste, em que
+ * a casca simulada confia por `EKFRASE_CASCA_ATUALIZACOES_CHAVE`). Automáticas: logo depois de abrir, a casca baixa,
+ * confere e grava na cópia de reserva; o aviso do canto diz "pronta". Pelo menu (só teclado): a parte "Atualizações"
+ * com a versão, o ajuste e "Procurar agora"; troca para "Perguntar" (fica no `sistema.json`); a 0.2.2 aparece, o aviso
+ * oferece Instalar, e Instalar a deixa pronta. O Writer OS sem o Electron (parado) não tem atualizações: pula.
+ */
+async function percorrerAtualizacoes(abrir: Abrir, base: string, comum: Record<string, string>, falar: (l: string) => void, foto: (p: Page, nome: string) => Promise<void>, somar: (r: Roteiro) => void): Promise<void> {
+  const ass = assinadorTeste();
+  const arquivos = new Map<string, Buffer>();
+  let ofertas: string[] = [];
+  const publicar = (v: string) => {
+    const lista = (['squashfs', 'vmlinuz', 'initrd', 'grub.cfg'] as const).map((papel) => {
+      const b = papel === 'grub.cfg' ? Buffer.from(`# ${v}\n`) : randomBytes(200_000);
+      const nome = `ekfrase-writer-os-${v}.${papel}`;
+      arquivos.set(nome, b);
+      return { papel, nome, tamanho: b.length, sha256: createHash('sha256').update(b).digest('hex') };
+    });
+    const texto = Buffer.from(JSON.stringify({ app: 'ekfrase-writer-os', versao: v, canal: 'estavel', arquivos: lista }));
+    arquivos.set(`ekfrase-writer-os-${v}.atualizacao.json`, texto);
+    arquivos.set(`ekfrase-writer-os-${v}.atualizacao.json.minisig`, Buffer.from(ass.assinar(texto, `Ekfrase Writer OS ${v} atualizacao`)));
+    ofertas.push(v);
+  };
+  let endereco = '';
+  const servidor = createServer((q, s) => {
+    if (q.url === '/repos/cyfilho/ekfrase/releases?per_page=50') {
+      s.setHeader('content-type', 'application/json');
+      s.end(JSON.stringify(ofertas.map((v) => ({ tag_name: `writer-os-v${v}`, assets: [...arquivos.keys()].filter((n) => n.startsWith(`ekfrase-writer-os-${v}.`)).map((n) => ({ name: n, browser_download_url: `${endereco}/d/${n}`, size: arquivos.get(n)!.length })) }))));
+      return;
+    }
+    const b = q.url?.startsWith('/d/') ? arquivos.get(q.url.slice(3)) : undefined;
+    s.writeHead(b ? 200 : 404, b ? { 'content-length': b.length } : {});
+    s.end(b);
+  });
+  await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+  const ad = servidor.address();
+  endereco = `http://127.0.0.1:${typeof ad === 'object' && ad ? ad.port : 0}`;
+  try {
+    publicar('0.2.1');
+    const raiz = join(base, 'atualizar');
+    const chave = join(base, 'chave-teste.pub');
+    writeFileSync(chave, ass.chave);
+    // o primeiro uso já respondido (só a senha nova): o que interessa aqui é o menu
+    mkdirSync(join(raiz, 'dados', 'Ekfrase Writer'), { recursive: true });
+    const sistemaJson = join(raiz, 'dados', 'Ekfrase Writer', 'sistema.json');
+    writeFileSync(sistemaJson, JSON.stringify({ idioma: 'pt-BR', teclado: 'br', fuso: 'America/Sao_Paulo', wifiVisto: true, espelho: 'nao', uso: 'pendrive' }));
+    const env = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz, EKFRASE_CASCA_OS_DADOS: 'pendrive', EKFRASE_CASCA_OS_TESTE: '1', EKFRASE_CASCA_PERFIL: join(raiz, 'perfil'), EKFRASE_CASCA_ATUALIZACOES_API: endereco, EKFRASE_CASCA_ATUALIZACOES_CHAVE: chave, EKFRASE_CASCA_ATUALIZACOES_ATRASO: '500', EKFRASE_CASCA_OS_VERSAO: '0.2.0' };
+    const app = await abrir(env);
+    const p = await app.pagina();
+    const r = new Roteiro(p, falar);
+    if (!(await p.evaluate(() => !!(globalThis as { ekfraseCasca?: { atualizacoes?: unknown } }).ekfraseCasca?.atualizacoes))) {
+      falar('  (esta casca não tem as atualizações: o Writer OS sem o Electron, parado; pula)');
+      await app.fechar();
+      return;
+    }
+    falar('— as atualizações: automáticas, o aviso, a parte do menu, perguntar antes');
+    r.ok(await r.esperar('casca-criar-senha', 10000), 'com o primeiro uso respondido, abre na senha nova');
+    await p.keyboard.type(SENHA);
+    if (await r.tabAte('casca-senha-repetir')) await p.keyboard.type(SENHA);
+    await r.tecla('Enter');
+    r.ok(await esperarRelato(raiz, 'atualizacao pronta 0.2.1 -', 20000), 'automáticas: a 0.2.1 baixou, o lacre conferiu e ficou pronta (o agente: atualizacao pronta)');
+    r.ok(await r.esperar('aviso-atualizacao', 5000), 'o aviso discreto aparece no canto');
+    r.ok(((await p.textContent('[data-teste="aviso-atualizacao"]')) ?? '').includes('0.2.1'), 'o aviso diz a versão pronta');
+    r.ok(!(await r.focoEm('aviso-atualizacao-entendi')), 'o aviso não pega o foco');
+    await foto(p, '20-atualizacao-pronta');
+    await r.tecla('Control+Alt+s');
+    if (await r.esperar('menu-sistema', 5000)) {
+      const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
+      r.ok(itens.indexOf('os-menu-atualizacoes') >= 0 && itens.indexOf('os-menu-atualizacoes') === itens.indexOf('os-menu-sobre') - 1, `o menu tem "Atualizações", logo antes de "Sobre" (${itens.join(', ')})`);
+      for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-atualizacoes')); i++) await r.tecla('ArrowDown');
+      await r.tecla('Enter');
+      if (await r.esperar('os-painel-atualizacoes', 5000)) {
+        await p.waitForTimeout(300);
+        await r.passo('a parte "Atualizações": o foco no ajuste de agora', 'menu-sistema');
+        r.ok(await r.focoEm('atualizacoes-modo-automaticas'), 'o foco começa em "Automáticas (recomendado)", o padrão');
+        r.ok(((await p.textContent('[data-teste="atualizacoes-versao"]')) ?? '').includes('0.2.0'), 'mostra a versão de agora');
+        r.ok(!!(await p.$('[data-teste="atualizacoes-situacao-pronta"]')), 'mostra que a 0.2.1 está pronta');
+        await foto(p, '21-atualizacoes');
+        // as setas trocam o ajuste (botões de opção)
+        await r.tecla('ArrowDown');
+        await p.waitForTimeout(300);
+        let sj: Record<string, unknown> = {};
+        try {
+          sj = JSON.parse(readFileSync(sistemaJson, 'utf8')) as Record<string, unknown>;
+        } catch {
+          // fica vazio
+        }
+        r.ok(sj['atualizacoes'] === 'perguntar', `"Perguntar antes de instalar" fica no sistema.json (${String(sj['atualizacoes'])})`);
+        // uma versão ainda mais nova: Procurar agora → "há uma versão nova", com Instalar
+        publicar('0.2.2');
+        if (await r.tabAte('atualizacoes-procurar')) await r.tecla('Enter');
+        r.ok(await r.esperar('atualizacoes-situacao-disponivel', 8000), 'perguntar: "Procurar agora" acha a 0.2.2 e espera o Instalar');
+        r.ok(!(await esperarRelato(raiz, 'atualizacao baixando 0.2.2 -', 500)), 'perguntar: não baixa sozinho');
+        r.ok(!!(await p.$('[data-teste="aviso-atualizacao-instalar"]')), 'o aviso do canto oferece Instalar e Agora não');
+        await foto(p, '22-atualizacao-disponivel');
+        if (await r.tabAte('atualizacoes-instalar')) await r.tecla('Enter');
+        r.ok(await r.esperar('atualizacoes-situacao-pronta', 15000), 'Instalar: a 0.2.2 baixa, confere e fica pronta');
+        r.ok(await r.focoEm('atualizacoes-procurar'), 'depois do Instalar, o foco continua no mesmo botão (agora "Procurar agora")');
+        r.ok(await esperarRelato(raiz, 'atualizacao pronta 0.2.2 -'), 'o agente: atualizacao pronta 0.2.2');
+        await r.tecla('Escape');
+        r.ok((await r.esperar('os-menu-atualizacoes', 3000)) && (await r.focoEm('os-menu-atualizacoes')), 'Esc volta ao menu, no item "Atualizações"');
+        await r.tecla('Escape');
+      } else r.ok(false, 'Enter em "Atualizações" abre a parte');
+    } else r.ok(false, 'Ctrl+Alt+S abre o menu do sistema');
+    r.ok(!existsSync(join(raiz, 'dados', 'Ekfrase Writer', '.atualizacao', '0.2.2')), 'o que foi baixado sai da partição de dados depois de gravado');
+    await app.fechar();
+    somar(r);
+  } finally {
+    servidor.close();
+  }
 }
