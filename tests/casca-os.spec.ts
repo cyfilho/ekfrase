@@ -180,7 +180,14 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   let p = await app.pagina();
   let r = new Roteiro(p, falar);
   falar('— Writer OS (simulado), com a partição de dados: o primeiro uso');
+  // a data e a hora em todas as telas depois do boot (pedido do Alcy em 18/11), já no idioma
+  if (await r.esperar('os-idioma', 10000)) {
+    const relogio = await p.textContent('[data-teste="os-relogio"]').catch(() => null);
+    r.ok(!!relogio && /\d{1,2}:\d{2}/.test(relogio) && /\d/.test(relogio.replace(/\d{1,2}:\d{2}/, '')), `o relógio mostra a data e a hora já no idioma (${relogio})`);
+  }
   await enter(r, 'os-idioma', '01-idioma', raiz1);
+  // ligou pelo pendrive: "Como você quer usar o Writer OS?" logo depois do idioma; Enter = só pelo pendrive
+  await enter(r, 'os-uso', '01b-uso', raiz1);
   await enter(r, 'os-teclado', '02-teclado', raiz1);
   await enter(r, 'os-fuso', '03-fuso', raiz1);
   await senhaNova(r);
@@ -216,6 +223,9 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     // fica vazio
   }
   r.ok(sj['idioma'] === 'pt-BR' && sj['teclado'] === 'br' && sj['fuso'] === 'America/Sao_Paulo' && sj['wifiVisto'] === true, `o sistema.json fica ao lado dos textos (${JSON.stringify(sj)})`);
+  r.ok(sj['uso'] === 'pendrive', `"Só pelo pendrive" fica lembrado no sistema.json (${String(sj['uso'])})`);
+  r.ok(await esperarRelato(raiz1, 'lugar usb'), 'o agente: ligou pelo pendrive (lugar usb)');
+  r.ok(!!(await p.$('[data-teste="os-relogio"]')), 'a estante também mostra o relógio');
   r.ok(existsSync(join(raiz1, 'dados', 'Ekfrase Writer', 'dados', 'cofre.db')), 'os textos estão na partição de dados (a mesma pasta do computador)');
 
   // as abas do topo: "Início" antes de todas (18/11)
@@ -232,6 +242,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
     r.ok(itens[0] === 'os-desligar' && itens[1] === 'os-reiniciar' && itens[2] === 'os-conta-entrar', `Desligar e Reiniciar em cima, depois a conta (${itens.join(', ')})`);
     for (const s of ['os-menu-wifi', 'os-menu-energia', 'os-menu-teclado', 'os-menu-fuso', 'os-menu-servidor', 'os-menu-discos', 'os-menu-sobre', 'os-menu-ajustes']) r.ok(itens.includes(s), `o menu tem "${s}"`);
+    r.ok(itens[itens.length - 1] === 'os-menu-instalar', `ligado pelo pendrive, "Instalar neste computador" é o último item do menu (${itens[itens.length - 1]})`);
     r.ok(((await p.textContent('[data-teste="os-menu-conta"]')) ?? '').includes('sem conta'), 'o menu mostra a conta (aqui, escrevendo sem conta, com Entrar)');
     await p.waitForTimeout(300);
     await foto(p, '08-menu');
@@ -377,17 +388,76 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   const lembrou = await r.esperar('nova-historia', 10000);
   r.ok(lembrou, 'escrever sem conta foi lembrado (cifrado no cofre)');
   if (!lembrou) falar(`   (tela: ${await p.evaluate(() => document.querySelector('main[data-teste], [data-teste^="tela-"], [data-teste^="entrada"]')?.getAttribute('data-teste'))}; relato: ${lerRelato(raiz1).split('\n').filter((l) => !l.startsWith('gravado')).join(' | ')})`);
+
+  // ---- instalar no computador (PLANO §8c), pelo menu: End chega no último item, como o qemu.py
+  falar('— instalar no computador (o disco interno simulado: 16 GB livres)');
+  await r.tecla('Control+Alt+s');
+  if (await r.esperar('menu-sistema', 5000)) {
+    await r.tecla('End');
+    r.ok(await r.focoEm('os-menu-instalar'), 'End no menu: "Instalar neste computador"');
+    await r.tecla('Enter');
+    if (await r.esperar('os-instalar-botao', 8000)) {
+      await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-botao', null, { timeout: 5000 }).catch(() => undefined);
+      await r.passo('instalar: o foco visível em "Instalar"');
+      r.ok(await r.focoEm('os-instalar-botao'), 'o foco começa em "Instalar"');
+      r.ok(await p.isChecked('[data-teste="os-instalar-levar"]'), '"Levar os textos deste pendrive" vem marcado (há textos)');
+      r.ok(!!(await p.$('[data-teste="os-instalar-barra"]')), 'a barra do disco aparece');
+      await foto(p, '15-instalar');
+      await r.tecla('Enter');
+      r.ok(await r.esperar('os-instalado', 15000), 'instalou: a tela final com o tutorial');
+      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoEm('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
+      r.ok(!!(await p.$('[data-teste="os-tutorial"]')) && !!(await p.$('[data-teste="os-relogio"]')), 'a tela final tem o tutorial e o relógio');
+      r.ok(await esperarRelato(raiz1, 'instalar ok'), 'o agente: instalar ok');
+      await foto(p, '16-instalado');
+    } else r.ok(false, 'a tela de instalar mostra o botão "Instalar"');
+  } else r.ok(false, 'Ctrl+Alt+S abre o menu para instalar');
+  await app.fechar();
+  somar(r);
+
+  // ---- ligado pelo disco do computador: sem a pergunta do uso; o menu tem o tutorial, não o "Instalar"
+  falar('— ligado pelo disco do computador: o tutorial no menu');
+  app = await abrir({ ...env1, EKFRASE_CASCA_OS_BOOT: 'computador', EKFRASE_CASCA_PERFIL: join(raiz1, 'perfil-3') });
+  p = await app.pagina();
+  r = new Roteiro(p, falar);
+  r.ok(await r.esperar('casca-abrir', 10000), 'ligado pelo disco: direto na senha');
+  await p.keyboard.type(SENHA);
+  await r.tecla('Enter');
+  if (await r.esperar('nova-historia', 10000)) {
+    await r.tecla('Control+Alt+s');
+    if (await r.esperar('menu-sistema', 5000)) {
+      r.ok(!(await p.$('[data-teste="os-menu-instalar"]')), 'ligado pelo disco, o menu não tem "Instalar neste computador"');
+      await r.tecla('End');
+      r.ok(await r.focoEm('os-menu-tutorial'), 'o último item é "Como ligar no Writer OS"');
+      await r.tecla('Enter');
+      r.ok(await r.esperar('os-painel-tutorial', 5000), 'o tutorial abre dentro do menu');
+      await foto(p, '17-tutorial-no-menu');
+      await r.tecla('Escape');
+      await r.tecla('Escape');
+    } else r.ok(false, 'Ctrl+Alt+S abre o menu (ligado pelo disco)');
+  } else r.ok(false, 'a estante abre (ligado pelo disco)');
   await app.fechar();
   somar(r);
 
   // ================= 2. sem a partição de dados =================
   falar('— Writer OS (simulado), sem a partição de dados: memória → outro pendrive');
   const raiz2 = join(base, 'sem-dados');
-  const env2 = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz2, EKFRASE_CASCA_OS_DADOS: 'sem-dados', EKFRASE_CASCA_PERFIL: join(raiz2, 'perfil') };
+  const env2 = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz2, EKFRASE_CASCA_OS_DADOS: 'sem-dados', EKFRASE_CASCA_OS_INTERNO: 'sem-espaco', EKFRASE_CASCA_PERFIL: join(raiz2, 'perfil') };
   app = await abrir(env2);
   p = await app.pagina();
   r = new Roteiro(p, falar);
-  for (const t of ['os-idioma', 'os-teclado', 'os-fuso']) await enter(r, t, `sem-dados-${t}`);
+  await enter(r, 'os-idioma', 'sem-dados-os-idioma');
+  // "Instalar neste computador" sem espaço livre no disco: a tela explica o "preparar" do Gravador e volta
+  if (await r.esperar('os-uso', 10000)) {
+    if (await r.tabAte('os-uso-instalar')) await r.tecla('Enter');
+    r.ok(await r.esperar('os-instalar-motivo-sem-espaco', 8000), 'sem espaço livre: a tela de instalar explica o "preparar" do Gravador');
+    await foto(p, '10a-instalar-sem-espaco');
+    if (await r.esperar('os-instalar-voltar', 3000)) {
+      await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-voltar', null, { timeout: 5000 }).catch(() => undefined);
+      r.ok(await r.focoEm('os-instalar-voltar'), 'sem espaço: o foco está em Voltar');
+      await r.tecla('Enter');
+    }
+  }
+  for (const t of ['os-uso', 'os-teclado', 'os-fuso']) await enter(r, t, `sem-dados-${t}`);
   r.ok(await r.esperar('os-onde-guardar', 10000), 'sem a partição de dados: "onde guardar"');
   await p.waitForSelector('[data-teste="os-guardar-disco"]', { timeout: 6000 }).catch(() => null);
   await r.passo('o foco começa no pendrive OUTRO');

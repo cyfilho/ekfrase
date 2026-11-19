@@ -103,13 +103,16 @@ gravarDiscos([sistema, pen]);
 // ---- o Gravador
 const { _electron } = await import('playwright');
 const { ELECTRON_RUN_AS_NODE: _comoNode, ...doSistema } = process.env;
-const app: ElectronApplication = await _electron.launch({
-  executablePath: electron(),
-  args: [GRAVADOR],
-  env: { ...doSistema, EKFRASE_GRAVADOR_DISCOS: arquivoDiscos, EKFRASE_GRAVADOR_API: api, EKFRASE_GRAVADOR_CHAVE: join(trab, 'chave.pub'), EKFRASE_GRAVADOR_CACHE: join(trab, 'cache'), EKFRASE_GRAVADOR_IMAGEM: arquivoCaseira, EKFRASE_GRAVADOR_LOG: '1' } as Record<string, string>,
-});
+/** O Gravador com os discos simulados e um computador simulado (`livre`: dá para preparar; `writer`: tem o Writer OS). */
+const abrir = (computador: string): Promise<ElectronApplication> =>
+  _electron.launch({
+    executablePath: electron(),
+    args: [GRAVADOR],
+    env: { ...doSistema, EKFRASE_GRAVADOR_DISCOS: arquivoDiscos, EKFRASE_GRAVADOR_API: api, EKFRASE_GRAVADOR_CHAVE: join(trab, 'chave.pub'), EKFRASE_GRAVADOR_CACHE: join(trab, 'cache'), EKFRASE_GRAVADOR_IMAGEM: arquivoCaseira, EKFRASE_GRAVADOR_LOG: '1', EKFRASE_GRAVADOR_COMPUTADOR: computador } as Record<string, string>,
+  });
+let app: ElectronApplication = await abrir('livre');
 app.process().stderr?.on('data', (d: Buffer) => process.stdout.write(`   `+d.toString().trim()+`\n`));
-const p: Page = await app.firstWindow();
+let p: Page = await app.firstWindow();
 const foto = async (nome: string) => {
   if (!pastaPrints) return;
   for (const tema of ['claro', 'escuro'] as const) {
@@ -149,6 +152,14 @@ try {
   ok(await ate('disco-sim:pen'), 'Tab chega no pendrive');
   await p.keyboard.press('Space');
   ok(await p.isChecked('[data-teste="disco-sim:pen"] input'), 'Espaço escolhe o pendrive');
+  // "Também preparar este computador" (PLANO §8c): o padrão é 16 GB, e a tela diz com quanto o Windows fica
+  await p.waitForSelector('[data-teste="computador"]');
+  ok(await ate('preparar'), 'Tab chega em "Também preparar este computador"');
+  await p.keyboard.press('Space');
+  await p.waitForSelector('[data-teste="preparar-fica"]');
+  ok(await p.isChecked('[data-teste="preparar-16"]'), 'preparar: o padrão é 16 GB');
+  ok(((await p.textContent('[data-teste="preparar-fica"]')) ?? '').includes('16'), 'a tela diz com quanto o Windows e o Writer OS ficam');
+  await foto('1b-preparar');
   ok(await ate('continuar'), 'Tab chega em Continuar');
   await p.keyboard.press('Enter');
   await p.waitForSelector('[data-teste="passo-confirmar"]');
@@ -177,6 +188,7 @@ try {
   const p1 = oficial.subarray(MIB, oficial.length - MIB);
   ok(sha256(lerDe(arquivoPen, MIB, p1.length)) === sha256(p1), 'a partição 1 é idêntica à da imagem');
   ok((await p.textContent('[data-teste="marcas"]'))?.includes('Lenovo'), 'mostra como bootar por marca');
+  ok(await p.isVisible('[data-teste="preparado"]'), 'o computador também foi preparado (no mesmo pedido de permissão)');
   ok(await ate('ejetar'), 'Tab chega em Ejetar');
   await p.keyboard.press('Enter');
   await p.waitForSelector('[data-teste="ejetado"]');
@@ -220,6 +232,30 @@ try {
   ok(sha256(lerDe(arquivoPen, MIB, p1nova.length)) === sha256(p1nova), 'a partição 1 agora é a da imagem nova');
   ok(sha256(lerDe(arquivoPen, p2.inicio * 512, 8 * MIB)) === dadosAntes, 'a EKFRASE-DADOS ficou igual (o arquivo de teste está lá)');
   ok((await p.evaluate(() => (window as unknown as { cliques: number }).cliques)) === 0, 'nenhum evento de mouse');
+
+  // ④ remover o Writer OS deste computador (outro Gravador: um computador com o Writer OS instalado)
+  await app.close();
+  app = await abrir('writer');
+  p = await app.firstWindow();
+  await p.waitForSelector('[data-teste="ir-remover"]', { timeout: 20_000 });
+  ok(true, 'com o Writer OS instalado, aparece "Remover o Writer OS deste computador"');
+  ok(!(await p.$('[data-teste="preparar"]')), 'e não aparece o "preparar"');
+  ok(await ate('ir-remover'), 'Tab chega em "Remover o Writer OS deste computador"');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="passo-remover"]');
+  ok(await p.isChecked('[data-teste="remover-copiar"]'), 'copiar os textos para os Documentos vem marcado');
+  ok(await ate('remover-copiar'), 'Tab chega em "copiar os textos"');
+  await p.keyboard.press('Space');
+  ok(await p.isVisible('[data-teste="remover-sem-copia"]'), 'sem a cópia, o aviso de que os textos serão apagados');
+  await p.keyboard.press('Space');
+  await foto('6-remover');
+  ok(await ate('remover'), 'Tab chega em Remover');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="passo-removido"], [data-teste="passo-erro"]', { timeout: 30_000 });
+  ok(await p.isVisible('[data-teste="passo-removido"]'), `removeu (${(await p.textContent('[data-teste="erro"]').catch(() => '')) ?? ''})`);
+  ok(((await p.textContent('[data-teste="removido-copiado"]').catch(() => '')) ?? '').includes('Ekfrase Writer (Writer OS'), 'diz para onde os textos foram');
+  ok(await p.isVisible('[data-teste="removido-devolvido"]'), 'o espaço voltou ao Windows');
+  await foto('7-removido');
 } catch (e) {
   falhas.push(String(e));
   console.error(e);

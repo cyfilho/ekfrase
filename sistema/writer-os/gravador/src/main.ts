@@ -23,11 +23,12 @@ import { criarJanela, registrarEsquema, servirApp, travarApp, travarPermissoes }
 import { gravarElevado } from './elevar.ts';
 import { ambienteSimulado } from './nucleo/ambientes.ts';
 import { CHAVE_EKFRASE } from './nucleo/chave.ts';
+import { computadorSimulado, GB, infoDoComputador, recusaDoPreparar, TAMANHOS_GB, type InfoComputador, type Removido, type TarefaComputador } from './nucleo/computador.ts';
 import { listarDiscos, resumoDoConteudo, type Disco } from './nucleo/discos.ts';
 declare const __EKFRASE_CANAL__: string;
 import { API_GITHUB, type Canal, ErroOrigem, imagemDoArquivo, imagemDoLancamento, pastaCache, ultimoLancamento, type Buscar, type Etapa, type ImagemPronta, type Lancamento } from './nucleo/origem.ts';
 import { rodarTrabalhador } from './nucleo/trabalhador.ts';
-import { nomeNormalizado, type DiscoNaTela, type FaseTela, type InfoLancamento, type PedidoGravar, type Progresso, type ResultadoGravar } from './ponte.ts';
+import { nomeNormalizado, type DiscoNaTela, type FaseTela, type InfoLancamento, type PedidoGravar, type Progresso, type ResultadoGravar, type ResultadoPreparar, type ResultadoRemover } from './ponte.ts';
 
 const rodar = promisify(execFile);
 const iTrabalhador = process.argv.indexOf('--ekfrase-trabalhador');
@@ -47,6 +48,8 @@ function iniciar(): void {
   const dev = !app.isPackaged;
   const amb = (n: string) => (dev ? process.env[n] || undefined : undefined);
   const SIMULADO = amb('EKFRASE_GRAVADOR_DISCOS');
+  /** O computador simulado (`livre`, `writer`, `pouco`, `legado`): só junto com os discos simulados. */
+  const PC_SIMULADO = SIMULADO ? amb('EKFRASE_GRAVADOR_COMPUTADOR') : undefined;
   const API = amb('EKFRASE_GRAVADOR_API') ?? API_GITHUB;
   /** O canal vem da montagem (scripts/montar.ts: EKFRASE_GRAVADOR_CANAL=teste só no Gravador da pré-release de teste). */
   const CANAL: Canal = (amb('EKFRASE_GRAVADOR_CANAL') ?? __EKFRASE_CANAL__) === 'teste' ? 'teste' : 'estavel';
@@ -94,6 +97,49 @@ function iniciar(): void {
   };
 
   ipcMain.handle('gravador:estado', tratar(async () => ({ versao: app.getVersion(), plataforma: process.platform, simulado: !!SIMULADO })));
+
+  // ---- o disco deste computador (PLANO §8c): preparar para instalar e remover o Writer OS
+  const lerComputador = (): Promise<InfoComputador> => (SIMULADO ? Promise.resolve(computadorSimulado(PC_SIMULADO)) : infoDoComputador());
+  ipcMain.handle('gravador:computador', tratar(lerComputador));
+  const avisoDoTrabalhador = (a: { fase: string; feito?: number | undefined; total?: number | undefined; etapa?: string }) => {
+    if (a.fase === 'computador') return enviar({ fase: 'computador', etapa: a.etapa });
+    if (a.fase !== 'gravar' && a.fase !== 'verificar') registro('aviso', a.fase);
+    enviar({ fase: a.fase as FaseTela, feito: a.feito, total: a.total });
+  };
+
+  ipcMain.handle(
+    'gravador:remover',
+    tratar(async (copiar: boolean): Promise<ResultadoRemover> => {
+      if (ocupado) return { ok: false, erro: 'ocupado' };
+      ocupado = true;
+      try {
+        const info = await lerComputador();
+        if (!info.disponivel || !info.disco || !info.windows) return { ok: false, erro: 'nao-windows' };
+        if (!info.writer) return { ok: false, erro: 'sem-writer' };
+        const dia = new Date().toISOString().slice(0, 10);
+        const destino = copiar === true ? join(SIMULADO ? tmpdir() : app.getPath('documents'), `Ekfrase Writer (Writer OS, ${dia})`) : null;
+        const computador: TarefaComputador = { tipo: 'remover', disco: info.disco.numero, serial: info.disco.serial, letra: info.windows.letra, copiarPara: destino };
+        enviar({ fase: 'permissao' });
+        const r = await gravarElevado({
+          pedido: { computador, protegidos: protegidos(), ...(SIMULADO ? { simulado: SIMULADO } : {}) },
+          executavel: process.execPath,
+          trabalhador: join(DIST, 'trabalhador.cjs'),
+          aviso: avisoDoTrabalhador,
+          semElevar: !!SIMULADO,
+        });
+        registro('remover', JSON.stringify(r));
+        if (!r.ok) return { ok: false, erro: r.erro, detalhe: r.detalhe ?? '' };
+        if (!r.computador) return { ok: false, erro: 'falhou' };
+        if (!r.computador.ok) return { ok: false, erro: r.computador.erro, detalhe: r.computador.detalhe };
+        const feito = JSON.parse(r.computador.resultado) as Removido;
+        return { ok: true, copiado: feito.copiado, espaco: feito.espaco };
+      } catch (e) {
+        return { ok: false, erro: 'falhou', detalhe: String((e as Error)?.message ?? e).slice(0, 300) };
+      } finally {
+        ocupado = false;
+      }
+    }),
+  );
 
   ipcMain.handle(
     'gravador:discos',
@@ -171,19 +217,29 @@ function iniciar(): void {
         }
         registro('imagem pronta', img.arquivo, img.lacre);
         const limiteDados = p.modo === 'criar' && p.limiteGb && p.limiteGb > 0 ? Math.floor(p.limiteGb * 1e9) : null;
+        // "Também preparar este computador" (PLANO §8c): no mesmo UAC, depois de gravar; uma recusa não impede gravar
+        let computador: TarefaComputador | undefined;
+        let preparar: ResultadoPreparar | undefined;
+        const gb = p.prepararGb;
+        if (typeof gb === 'number' && (TAMANHOS_GB as readonly number[]).includes(gb)) {
+          const info = await lerComputador();
+          const recusa = recusaDoPreparar(info, gb);
+          if (recusa || !info.disco || !info.windows) preparar = { ok: false, erro: recusa ?? 'nao-windows' };
+          else computador = { tipo: 'preparar', disco: info.disco.numero, serial: info.disco.serial, letra: info.windows.letra, bytes: gb * GB };
+        }
         enviar({ fase: 'permissao' });
         const r = await gravarElevado({
-          pedido: { tarefa: { modo: p.modo, disco: d, imagem: { arquivo: img.arquivo, sha256: img.sha256 }, limiteDados }, protegidos: protegidos(), ...(SIMULADO ? { simulado: SIMULADO } : {}) },
+          pedido: { tarefa: { modo: p.modo, disco: d, imagem: { arquivo: img.arquivo, sha256: img.sha256 }, limiteDados }, ...(computador ? { computador } : {}), protegidos: protegidos(), ...(SIMULADO ? { simulado: SIMULADO } : {}) },
           executavel: process.platform === 'linux' ? (process.env['APPIMAGE'] ?? process.execPath) : process.execPath,
           trabalhador: join(DIST, 'trabalhador.cjs'),
-          aviso: (a) => {
-            if (a.fase !== 'gravar' && a.fase !== 'verificar') registro('aviso', a.fase);
-            enviar({ fase: a.fase as FaseTela, feito: a.feito, total: a.total });
-          },
+          aviso: avisoDoTrabalhador,
           semElevar: !!SIMULADO,
         });
         registro('resultado', JSON.stringify(r));
-        return r.ok ? { ok: true, dados: r.dados } : { ok: false, erro: r.erro, detalhe: r.detalhe ?? '' };
+        if (!r.ok) return { ok: false, erro: r.erro, detalhe: r.detalhe ?? '' };
+        if (r.computador?.ok) preparar = { ok: true, livre: Number((JSON.parse(r.computador.resultado) as { livre?: number }).livre ?? 0) };
+        else if (r.computador) preparar = { ok: false, erro: r.computador.erro, ...(r.computador.erro === 'nao-encolhe' ? { maximo: Number(r.computador.detalhe) || 0 } : {}) };
+        return { ok: true, dados: r.dados, ...(preparar ? { preparar } : {}) };
       } catch (e) {
         registro('erro', e);
         return { ok: false, erro: e instanceof ErroOrigem ? e.codigo : 'escrita', detalhe: String((e as Error)?.stack ?? e).slice(0, 600) };
