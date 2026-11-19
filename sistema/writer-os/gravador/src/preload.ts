@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // A ponte da página do Gravador (`window.gravador`): só estas chamadas; a página não tem Node.
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { PonteGravador, Progresso } from './ponte.ts';
+import type { EstadoDoAtualizador, PonteGravador, Progresso } from './ponte.ts';
 
 const ponte: PonteGravador = {
   estado: () => ipcRenderer.invoke('gravador:estado'),
@@ -22,6 +22,17 @@ const ponte: PonteGravador = {
     const h = () => f();
     ipcRenderer.on('gravador:tentou-fechar', h);
     return () => ipcRenderer.removeListener('gravador:tentou-fechar', h);
+  },
+  atualizacoes: {
+    estado: () => ipcRenderer.invoke('gravador:at-estado'),
+    procurar: () => ipcRenderer.invoke('gravador:at-procurar'),
+    instalar: () => ipcRenderer.invoke('gravador:at-instalar'),
+    usarModo: (m) => ipcRenderer.invoke('gravador:at-modo', m === 'perguntar' ? 'perguntar' : 'automaticas'),
+    aoMudar(f) {
+      const h = (_e: IpcRendererEvent, e: EstadoDoAtualizador) => f(e);
+      ipcRenderer.on('gravador:at-mudou', h);
+      return () => ipcRenderer.removeListener('gravador:at-mudou', h);
+    },
   },
 };
 

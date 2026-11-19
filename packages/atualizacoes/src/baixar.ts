@@ -64,6 +64,14 @@ export interface OpcoesBaixar {
   agente?: string;
   /** Quanto tempo sem receber nada até a conexão cair e ser retomada (padrão 60 s). */
   parado?: number;
+  /**
+   * A cada quantos bytes o que veio vai de fato ao disco (`datasync`; U2, 19/11). Sem isto, centenas de MB ficam na
+   * memória esperando e descem de uma vez no fim: num pendrive, tudo o que grava no mesmo disco (o banco dos textos)
+   * espera junto. Padrão: só no fim.
+   */
+  gravarACada?: number;
+  /** Cada nova tentativa (para o diário: a tentativa, quanto já veio e o porquê). */
+  aoTentarDeNovo?: ((tentativa: number, feito: number, motivo: string) => void) | undefined;
 }
 
 export async function baixarArquivo(buscar: Buscar, url: string, destino: string, o: OpcoesBaixar = {}): Promise<void> {
@@ -103,11 +111,17 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
       try {
         if (!inicio) await fh.truncate(0);
         let pos = inicio;
+        let desde = 0;
         if (!r.body) throw new Error('sem corpo');
         for await (const pedaco of r.body as unknown as AsyncIterable<Uint8Array>) {
           vivo();
           await fh.write(pedaco, 0, pedaco.length, pos);
           pos += pedaco.length;
+          desde += pedaco.length;
+          if (o.gravarACada && desde >= o.gravarACada) {
+            desde = 0;
+            await fh.datasync();
+          }
           o.aoBaixar?.(pos, total);
         }
         await fh.sync();
@@ -122,6 +136,7 @@ export async function baixarArquivo(buscar: Buscar, url: string, destino: string
       if (o.sinal?.aborted) throw new ErroBaixar('cancelado');
       if ((e as NodeJS.ErrnoException).code === 'ENOSPC') throw new ErroBaixar('sem-espaco');
       if (i + 1 >= tentativas) throw new ErroBaixar('sem-rede', (e as Error).message);
+      o.aoTentarDeNovo?.(i + 2, existsSync(parte) ? statSync(parte).size : 0, parar.signal.aborted ? 'silencio' : (e as Error).message);
       await esperar(Math.min(15_000, 1000 * 2 ** i), o.sinal);
     } finally {
       clearTimeout(silencio);

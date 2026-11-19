@@ -5,13 +5,15 @@
  * nunca aparece; travados com o motivo) e de onde vem a imagem → ② conferir o que será apagado e digitar
  * o nome do disco → ③ gravando (em palavras simples) → ④ pronto: como bootar por marca e ejetar.
  * Tudo pelo teclado (campos e botões de verdade; o foco vai para o título de cada passo) e com leitor
- * de tela (o progresso é uma região viva e uma barra com valor).
+ * de tela (o progresso é uma região viva e uma barra com valor). O botão ↻ do topo abre as atualizações do próprio
+ * Gravador (U2, `Atualizacoes.tsx`).
  */
 import { aplicarTema, temaEfetivo } from '@ekfrase/nucleo';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import logo from '../../../../apps/writer/src/img/logo-writer.png';
 import { GB, recusaDoPreparar, TAMANHO_PADRAO_GB, TAMANHOS_GB, tamanhosQueCabem } from '../src/nucleo/computador-regras.ts';
 import { nomeNormalizado, type DiscoNaTela, type ImagemEscolhida, type InfoComputador, type InfoLancamento, type PonteGravador, type Progresso, type ResultadoPreparar, type ResultadoRemover } from '../src/ponte.ts';
+import { AvisoDeAtualizacao, TelaAtualizacoes, useAtualizacoes } from './Atualizacoes.tsx';
 import { t, tamanho, textoDoErro } from './textos.ts';
 
 declare global {
@@ -21,7 +23,7 @@ declare global {
 }
 
 const ponte = window.gravador!;
-type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro' | 'remover' | 'removendo' | 'removido';
+type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro' | 'remover' | 'removendo' | 'removido' | 'atualizacoes';
 type Modo = 'criar' | 'atualizar';
 const MARCAS = ['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'outra'] as const;
 
@@ -99,6 +101,10 @@ export function App() {
   const [copiarTextos, setCopiarTextos] = useState(true);
   const [removido, setRemovido] = useState<Extract<ResultadoRemover, { ok: true }> | null>(null);
   const titulo = useFocoNoTitulo(passo);
+  // as atualizações do próprio Gravador (U2): a tela do botão ↻ e o aviso de baixo
+  const at = useAtualizacoes();
+  const [antesDasAtualizacoes, setAntesDasAtualizacoes] = useState<Passo>('disco');
+  const trabalhando = passo === 'gravando' || passo === 'removendo';
   useEffect(() => void ponte.computador().then(setPc), []);
   const recusaPc = pc ? recusaDoPreparar(pc, prepararGb) : null;
   // o tamanho escolhido não cabe mais: o maior que cabe
@@ -242,9 +248,33 @@ export function App() {
           <p class="nome">{t('gravador.titulo')}</p>
           <p class="sub">{t('gravador.subtitulo')}</p>
         </div>
+        {at && !trabalhando && passo !== 'atualizacoes' && (
+          <button
+            type="button"
+            class="botao-icone"
+            aria-label={t('gravador.atualizacoes.abrir')}
+            title={t('gravador.atualizacoes.abrir')}
+            onClick={() => {
+              setAntesDasAtualizacoes(passo);
+              setPasso('atualizacoes');
+            }}
+            data-teste="ir-atualizacoes"
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+        )}
         <TrocarTema />
       </header>
-      {passo !== 'remover' && passo !== 'removendo' && passo !== 'removido' && passos}
+      {passo !== 'remover' && passo !== 'removendo' && passo !== 'removido' && passo !== 'atualizacoes' && passos}
+
+      {passo === 'atualizacoes' && at && (
+        <main data-teste="passo-atualizacoes">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.atualizacoes.titulo')}
+          </h1>
+          <TelaAtualizacoes e={at} voltar={() => setPasso(antesDasAtualizacoes)} />
+        </main>
+      )}
 
       {passo === 'disco' && (
         <main data-teste="passo-disco">
@@ -607,6 +637,7 @@ export function App() {
           </div>
         </main>
       )}
+      {!trabalhando && passo !== 'atualizacoes' && <AvisoDeAtualizacao e={at} />}
     </div>
   );
 }

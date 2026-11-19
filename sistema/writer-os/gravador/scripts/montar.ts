@@ -19,6 +19,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
+/** A versão do pacote (a da tag, no CI do público): `-c.extraMetadata` no lugar do `--config` (o yml desta pasta é lido igual). */
+function configComVersao(versao: string | undefined): string[] {
+  if (versao === undefined || versao === '') return ['--config', 'electron-builder.yml'];
+  if (!/^\d{1,6}\.\d{1,6}\.\d{1,6}(-teste\.\d{1,6})?$/.test(versao)) throw new Error(`versão inválida: ${versao}`);
+  return [`-c.extraMetadata.version=${versao}`];
+}
+
 export const GRAVADOR = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const RAIZ = join(GRAVADOR, '..', '..', '..');
 const DIST = join(GRAVADOR, 'dist');
@@ -80,7 +87,8 @@ function pacote(): number {
   const alvo = process.platform === 'win32' ? ['--win', 'portable'] : process.platform === 'linux' ? ['--linux', 'AppImage'] : [];
   if (!alvo.length) throw new Error(`pacote só para Windows e Linux (aqui: ${process.platform})`);
   const bin = join(GRAVADOR, 'node_modules', 'electron-builder', 'cli.js');
-  const r = spawnSync(process.execPath, [bin, ...alvo, '--x64', '--publish', 'never', '--config', 'electron-builder.yml'], { cwd: GRAVADOR, stdio: 'inherit', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
+  // a versão do Gravador é a da tag writer-os-v* que o publica (U2: é com ela que ele se atualiza)
+  const r = spawnSync(process.execPath, [bin, ...alvo, '--x64', '--publish', 'never', ...configComVersao(process.env['EKFRASE_GRAVADOR_VERSAO'])], { cwd: GRAVADOR, stdio: 'inherit', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
   return r.status ?? 1;
 }
 

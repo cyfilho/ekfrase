@@ -147,8 +147,19 @@ function instalador(os = false): number {
   const alvo = os ? ['--linux', 'dir'] : process.platform === 'win32' ? ['--win', 'nsis'] : process.platform === 'linux' ? ['--linux', 'AppImage'] : [];
   if (!alvo.length) throw new Error(`instalador só para Windows e Linux (aqui: ${process.platform})`);
   const bin = join(CASCA, 'node_modules', 'electron-builder', 'cli.js');
-  const r = spawnSync(process.execPath, [bin, ...alvo, '--x64', '--publish', 'never', '--config', 'electron-builder.yml'], { cwd: CASCA, stdio: 'inherit', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
+  const r = spawnSync(process.execPath, [bin, ...alvo, '--x64', '--publish', 'never', ...configComVersao(process.env['EKFRASE_CASCA_VERSAO'])], { cwd: CASCA, stdio: 'inherit', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
   return r.status ?? 1;
+}
+
+/**
+ * A versão do instalador (U2): o CI do público passa a da tag (`writer-vX.Y.Z[-teste.N]`) em `EKFRASE_CASCA_VERSAO`, e é
+ * ela que o `app.getVersion()` devolve (é com ela que a atualização compara). Com a versão, o `-c.extraMetadata` vai no
+ * lugar do `--config` (o electron-builder lê o `electron-builder.yml` desta pasta sozinho e põe isto por cima).
+ */
+export function configComVersao(versao: string | undefined): string[] {
+  if (versao === undefined || versao === '') return ['--config', 'electron-builder.yml'];
+  if (!/^\d{1,6}\.\d{1,6}\.\d{1,6}(-teste\.\d{1,6})?$/.test(versao)) throw new Error(`versão inválida: ${versao}`);
+  return [`-c.extraMetadata.version=${versao}`];
 }
 
 // rodado direto
