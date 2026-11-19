@@ -57,6 +57,9 @@ dosfstools
 e2fsprogs
 gdisk
 efibootmgr
+# as atualizações (docs/ATUALIZACOES.md §4): o lacre do manifesto (minisign) e a leitura dele (jq), no ekfrase-atualizar.sh
+minisign
+jq
 upower
 ca-certificates
 

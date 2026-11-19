@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * O LACRE DA EKFRASE: a assinatura minisign (https://jedisct1.github.io/minisign/) da imagem, conferida
+ * O LACRE DA EKFRASE: a assinatura minisign (https://jedisct1.github.io/minisign/) da imagem e das atualizações, conferida
  * com o `crypto` do Node (Ed25519 + BLAKE2b-512), sem programa de fora. Só o formato "pré-hash" (`ED`,
  * o padrão do minisign desde a 0.10): a assinatura cobre o BLAKE2b-512 do arquivo, então não é preciso
  * ter a imagem inteira na memória. A assinatura "global" cobre também o comentário de confiança.
@@ -87,6 +87,13 @@ export async function hashesDoArquivo(arquivo: string, aoLer?: (feito: number) =
     aoLer?.(tamanho);
   }
   return { sha256: sha.digest('hex'), blake2b: blake.digest(), tamanho };
+}
+
+/** O SHA-256 e o BLAKE2b-512 de bytes que já estão na memória (o manifesto de uma atualização). */
+export function hashesDeBytes(b: Uint8Array): Hashes {
+  const blake = novoBlake2b();
+  blake.update(b);
+  return { sha256: createHash('sha256').update(b).digest('hex'), blake2b: blake.digest(), tamanho: b.length };
 }
 
 /** Só o SHA-256 (rápido em todo lugar; o que amarra o arquivo depois que o lacre foi conferido). */

@@ -47,6 +47,8 @@ interface ArquivoSistema {
   espelho: EscolhaEspelho | null;
   /** "Como você quer usar o Writer OS?" (PLANO §8c, pedido do Alcy de 18/11): `pendrive` = respondida, só pelo pendrive. */
   uso: 'pendrive' | null;
+  /** As atualizações (docs/ATUALIZACOES.md §1): "Automáticas" (o padrão) ou "Perguntar antes". */
+  atualizacoes: 'automaticas' | 'perguntar';
 }
 
 interface RedeGuardada {
@@ -151,12 +153,13 @@ export class WriterOS {
           wifiVisto: j.wifiVisto === true,
           espelho: j.espelho === 'sim' || j.espelho === 'sempre' || j.espelho === 'nao' ? j.espelho : null,
           uso: j.uso === 'pendrive' ? 'pendrive' : null,
+          atualizacoes: j.atualizacoes === 'perguntar' ? 'perguntar' : 'automaticas',
         };
       } catch {
         // o próximo
       }
     }
-    return { idioma: null, teclado: null, fuso: null, wifiVisto: false, espelho: null, uso: null };
+    return { idioma: null, teclado: null, fuso: null, wifiVisto: false, espelho: null, uso: null, atualizacoes: 'automaticas' };
   }
 
   private gravarSistema(mudar: Partial<ArquivoSistema>): void {
@@ -195,6 +198,21 @@ export class WriterOS {
   estado(): EstadoOS {
     const { idioma, teclado, fuso, wifiVisto, uso } = this.lerSistema();
     return { idioma, teclado, fuso, wifiVisto, motivo: this.motivo, boot: this.boot, usoVisto: uso !== null, instalado: this.instalado, discoTodo: this.discoTodo, marca: marcaDoComputador(this.sistema.fabricante()), simulado: this.sistema.simulado };
+  }
+
+  // ---------- as atualizações (docs/ATUALIZACOES.md; quem procura e baixa é o atualizacoes-os.ts) ----------
+
+  modoAtualizacoes(): 'automaticas' | 'perguntar' {
+    return this.lerSistema().atualizacoes;
+  }
+
+  usarModoAtualizacoes(modo: 'automaticas' | 'perguntar'): void {
+    if (modo === 'automaticas' || modo === 'perguntar') this.gravarSistema({ atualizacoes: modo });
+  }
+
+  /** Onde baixar as atualizações: na partição de dados (`/dados/Ekfrase Writer/.atualizacao`); sem ela, `null`. */
+  pastaDasAtualizacoes(): string | null {
+    return this.motivo === null ? join(this.pastaDoPendrive, '.atualizacao') : null;
   }
 
   /** "Só pelo pendrive": a pergunta do primeiro uso não volta (o item "Instalar neste computador" fica no menu). */

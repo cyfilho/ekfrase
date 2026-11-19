@@ -23,6 +23,7 @@ import { teclaDe } from '../comandos.ts';
 import { aoPedido, pedir } from '../pedidos.ts';
 import { t, tr } from '../textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, confirmar, focaveis } from '../ui.tsx';
+import { atualizacoesDaCasca, ParteAtualizacoes } from './Atualizacoes.tsx';
 import { casca, gravarAgora, mudarEstado, mudarEstadoOS, noOS, sistemaOS, useEstadoCasca, useEstadoOS } from './casca.ts';
 import { EscolhaServidor, Moldura, PerguntaEspelho, Senha, textoDoErroCasca } from './Telas.tsx';
 
@@ -886,7 +887,7 @@ function WifiPrimeiroUso() {
 // ---------- o menu do sistema (§6.4) ----------
 
 /** As partes do sistema que o menu abre (PLANO §6.4); cada uma é uma tela dentro do próprio menu. */
-type SecaoOS = 'wifi' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'sobre' | 'tutorial';
+type SecaoOS = 'wifi' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'atualizacoes' | 'sobre' | 'tutorial';
 const TITULO_TUTORIAL = 'writer.os.menu.tutorial';
 const SECOES: readonly { id: Exclude<SecaoOS, 'tutorial'>; titulo: string }[] = [
   { id: 'wifi', titulo: 'writer.os.wifi.titulo' },
@@ -895,6 +896,8 @@ const SECOES: readonly { id: Exclude<SecaoOS, 'tutorial'>; titulo: string }[] = 
   { id: 'fuso', titulo: 'writer.os.fuso.titulo' },
   { id: 'servidor', titulo: 'writer.os.servidor.titulo' },
   { id: 'discos', titulo: 'writer.os.discos.titulo' },
+  // as atualizações (DEC-P072, U1): só quando a casca as tem
+  ...(atualizacoesDaCasca ? [{ id: 'atualizacoes' as const, titulo: 'writer.atualizacoes.titulo' }] : []),
   { id: 'sobre', titulo: 'writer.os.sobre.titulo' },
 ];
 
@@ -1183,6 +1186,8 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
       );
     case 'discos':
       return <ParteDosDiscos recado={recado} />;
+    case 'atualizacoes':
+      return <ParteAtualizacoes />;
     case 'tutorial':
       return (
         <Secao titulo={t(TITULO_TUTORIAL)} teste="os-painel-tutorial">
