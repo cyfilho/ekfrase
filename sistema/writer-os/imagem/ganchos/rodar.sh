@@ -16,6 +16,10 @@ rm -rf "$R/opt/ekfrase-writer"
 cp -a "$CASCA" "$R/opt/ekfrase-writer"
 cp "$LOGO" "$R/usr/share/ekfrase/logo.png"
 echo "$VERSAO" > "$R/etc/ekfrase/versao"
+# as atualizações (docs/ATUALIZACOES.md §3 e §4): o canal (o de teste vê as pré-releases de teste) e a chave pública do
+# lacre da Ekfrase, com que o ekfrase-atualizar.sh (root) confere o manifesto antes de gravar
+echo "$CANAL" > "$R/etc/ekfrase/canal"
+install -m 0644 "$AQUI/minisign.pub" "$R/usr/share/ekfrase/atualizacao.pub"
 
 # o update-initramfs e o systemctl querem /proc, /sys e /dev (o mmdebstrap costuma deixar montados)
 MONTEI=()

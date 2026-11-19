@@ -22,7 +22,7 @@ import { promisify } from 'node:util';
 import { criarJanela, registrarEsquema, servirApp, travarApp, travarPermissoes } from '../../casca/src/motor/janela.ts';
 import { gravarElevado } from './elevar.ts';
 import { ambienteSimulado } from './nucleo/ambientes.ts';
-import { CHAVE_EKFRASE } from './nucleo/chave.ts';
+import { CHAVE_EKFRASE } from '@ekfrase/atualizacoes';
 import { computadorSimulado, GB, infoDoComputador, recusaDoPreparar, TAMANHOS_GB, type InfoComputador, type Removido, type TarefaComputador } from './nucleo/computador.ts';
 import { listarDiscos, resumoDoConteudo, type Disco } from './nucleo/discos.ts';
 declare const __EKFRASE_CANAL__: string;

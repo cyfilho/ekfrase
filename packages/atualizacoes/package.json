@@ -1,0 +1,14 @@
+{
+  "name": "@ekfrase/atualizacoes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "As atualizações dos apps de computador da Ekfrase: o lacre minisign, os Releases do repositório público por canal, o download com retomada e o manifesto de uma atualização",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
+  }
+}

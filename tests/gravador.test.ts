@@ -14,14 +14,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ambienteSimulado, MARCA_SIMULADA, particaoLinux } from '../sistema/writer-os/gravador/src/nucleo/ambientes.ts';
-import { CHAVE_EKFRASE, ID_CHAVE_EKFRASE } from '../sistema/writer-os/gravador/src/nucleo/chave.ts';
+import { CHAVE_EKFRASE, ID_CHAVE_EKFRASE } from '@ekfrase/atualizacoes';
 import { computadorSimulado, entradasDoWriter, executarComputador, GB, guardaDoSistema, lerInfo, recusaDoPreparar, scriptPreparar, SEM_COMPUTADOR, TAMANHOS_GB, tamanhosQueCabem } from '../sistema/writer-os/gravador/src/nucleo/computador.ts';
 import { discosDoLinux, discosDoWindows, MINIMO_DISCO, type Disco } from '../sistema/writer-os/gravador/src/nucleo/discos.ts';
 import { lerBpb, traduzir4k } from '../sistema/writer-os/gravador/src/nucleo/fat4k.ts';
 import { bytesParaGuid, crc32, guidParaBytes, lerGpt, montarGpt, NOME_BOOT, NOME_DADOS, TIPO } from '../sistema/writer-os/gravador/src/nucleo/gpt.ts';
 import { executar, type Ambiente, type Aviso, type Tarefa } from '../sistema/writer-os/gravador/src/nucleo/gravar.ts';
 import { Fluxo } from '../sistema/writer-os/gravador/src/nucleo/imagem.ts';
-import { conferirAssinatura, hashesDoArquivo, lerChavePublica } from '../sistema/writer-os/gravador/src/nucleo/minisign.ts';
+import { conferirAssinatura, hashesDoArquivo, lerChavePublica } from '@ekfrase/atualizacoes';
 import { baixarArquivo, imagemDoArquivo, ultimoLancamento, type Buscar } from '../sistema/writer-os/gravador/src/nucleo/origem.ts';
 import { arquivosTeste, assinadorTeste, comprimirXz, fat32, imagemTeste, lerDaFat, MIB, sha256 } from './gravador/imagem-teste.ts';
 
