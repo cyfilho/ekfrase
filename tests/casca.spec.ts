@@ -337,7 +337,9 @@ async function percorrerAtualizacoes(abrir: Abrir, envBase: Record<string, strin
     }
     const instalou = /instalar 0\.2\.2 (.+) abrir=nao/.exec(lerRelato());
     r.ok(!!instalou, 'fechar a janela roda o instalador da 0.2.2 em silêncio (sem abrir de novo)');
-    r.ok(!!instalou && readFileSync(instalou[1]!.trim()).equals(arquivos.get('0.2.2/Ekfrase-Writer-Setup.exe')!), 'é o instalador publicado, conferido');
+    // o arquivo do sistema em que o roteiro roda (no Linux, o AppImage: o CI do writer-computador.yml roda no Ubuntu)
+    const deste = process.platform === 'win32' ? 'Ekfrase-Writer-Setup.exe' : 'Ekfrase-Writer.AppImage';
+    r.ok(!!instalou && readFileSync(instalou[1]!.trim()).equals(arquivos.get(`0.2.2/${deste}`)!), 'é o instalador publicado, conferido');
     r.ok(!/instalar 0\.2\.1 /.test(lerRelato()), 'a 0.2.1 (substituída pela 0.2.2) não roda');
     somar(r);
 
