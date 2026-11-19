@@ -29,7 +29,7 @@ import { SistemaLinux, SistemaSimulado, type Sistema } from '../motor/sistema.ts
 import { ligarAgente } from './agente-teste.ts';
 import { chamarCanal, criarCanais } from './canais.ts';
 import { DadosDoWriter } from './dados.ts';
-import { passoDaTecla, WriterOS } from './os.ts';
+import { dadosSimulados, passoDaTecla, WriterOS } from './os.ts';
 import { paginaDoElectron } from './pagina.ts';
 
 const HOST = 'writer';
@@ -57,7 +57,7 @@ function sistemaDoOS(): Sistema | null {
     // o que o ekfrase-dados.service da imagem teria achado
     const comDados = (env('EKFRASE_CASCA_OS_DADOS') ?? 'pendrive') === 'pendrive';
     if (comDados) mkdirSync(s.caminhos.dados, { recursive: true });
-    writeFileSync(join(s.caminhos.run, 'dados.json'), JSON.stringify(comDados ? { modo: 'pendrive', motivo: '' } : { modo: 'sem-dados', motivo: 'sem-espaco' }));
+    writeFileSync(join(s.caminhos.run, 'dados.json'), dadosSimulados(comDados, env('EKFRASE_CASCA_OS_BOOT')));
     return s;
   }
   if (process.argv.includes('--modo-os') && process.platform === 'linux' && existsSync('/etc/ekfrase/writer-os')) return new SistemaLinux(existsSync('/etc/ekfrase/teste'));
@@ -128,7 +128,8 @@ void app.whenReady().then(async () => {
     });
     // o que a página guarda (escrever sem conta, idioma, tema) vai cifrado para o cofre de tempos em tempos
     setInterval(() => void writerOS.salvarPagina(), 20000);
-    if (sistemaOS?.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistemaOS.caminhos.teste, 'relato'), pagina, dados, sistema: sistemaOS });
+    writerOS.ouvirInstalacao((passo, feito, total) => pagina.enviar('os:instalar-passo', passo, feito, total));
+    if (sistemaOS?.caminhos.teste) writerOS.depurar = ligarAgente({ relato: join(sistemaOS.caminhos.teste, 'relato'), pagina, dados, sistema: sistemaOS, os: writerOS });
   }
 
   servirApp({ sessao: sessaoPagina, host: HOST, pasta: join(__dirname, 'app'), base: '/writer/', api: (p, c) => rede.levar(p, c) });

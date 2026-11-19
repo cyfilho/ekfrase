@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /** O contrato entre a página do Gravador e o processo principal (o preload põe em `window.gravador`). */
+import type { InfoComputador } from './nucleo/computador-regras.ts';
 import type { Recusa } from './nucleo/discos.ts';
+
+export type { InfoComputador };
 
 export interface DiscoNaTela {
   id: string;
@@ -19,13 +22,20 @@ export type InfoLancamento = { ok: true; versao: string; tamanho: number } | { o
 
 export type ImagemEscolhida = { ok: true; arquivo: string; nome: string; lacre: 'ekfrase' | 'ausente'; comentario: string | null } | { ok: false; erro: string } | null;
 
-export type FaseTela = 'baixar' | 'conferir-imagem' | 'permissao' | 'conferir' | 'preparar' | 'gravar' | 'verificar' | 'dados' | 'pronto';
+export type FaseTela = 'baixar' | 'conferir-imagem' | 'permissao' | 'conferir' | 'preparar' | 'gravar' | 'verificar' | 'dados' | 'pronto' | 'computador';
 
 export interface Progresso {
   fase: FaseTela;
   feito?: number | undefined;
   total?: number | undefined;
+  /** Na fase `computador`: `preparar`, `copiar`, `entrada`, `remover`, `devolver`. */
+  etapa?: string | undefined;
 }
+
+/** O que o preparar deste computador deu (depois de gravar o pendrive). */
+export type ResultadoPreparar = { ok: true; livre: number } | { ok: false; erro: string; maximo?: number };
+
+export type ResultadoRemover = { ok: true; copiado: string | null; espaco: 'devolvido' | 'solto' } | { ok: false; erro: string; detalhe?: string };
 
 export interface PedidoGravar {
   modo: 'criar' | 'atualizar';
@@ -37,12 +47,18 @@ export interface PedidoGravar {
   semLacreConfirmado: boolean;
   /** Limite da EKFRASE-DADOS, em GB (null = o resto do disco). */
   limiteGb: number | null;
+  /** "Também preparar este computador" (PLANO §8c): o espaço do Writer OS, em GB (8, 16 ou 32); null = não. */
+  prepararGb?: number | null;
 }
 
-export type ResultadoGravar = { ok: true; dados: string | null } | { ok: false; erro: string; detalhe?: string };
+export type ResultadoGravar = { ok: true; dados: string | null; preparar?: ResultadoPreparar } | { ok: false; erro: string; detalhe?: string };
 
 export interface PonteGravador {
   estado(): Promise<{ versao: string; plataforma: string; simulado: boolean }>;
+  /** O disco deste computador (só no Windows): para preparar ou remover o Writer OS. */
+  computador(): Promise<InfoComputador>;
+  /** Remove o Writer OS deste computador; `copiar` = os textos vão antes para os Documentos. */
+  remover(copiar: boolean): Promise<ResultadoRemover>;
   discos(): Promise<DiscoNaTela[]>;
   lancamento(): Promise<InfoLancamento>;
   escolherImagem(): Promise<ImagemEscolhida>;

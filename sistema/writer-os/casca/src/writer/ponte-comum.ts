@@ -12,14 +12,17 @@ import type {
   EscolhaEspelho,
   EstadoCasca,
   EstadoOS,
+  InfoInstalacao,
   ListaDePasta,
   MetodoArmazem,
   Mudanca,
+  PassoInstalar,
   PonteCasca,
   PonteSistema,
   RedeWifi,
   RespostaArmazem,
   RespostaCasca,
+  RespostaInstalar,
   RespostaSistema,
   ServidorConferido,
   SobreOS,
@@ -32,7 +35,7 @@ export interface Transporte {
   sincrono(canal: string, ...a: unknown[]): unknown;
   /** Um aviso sem resposta. */
   avisar(canal: string, ...a: unknown[]): void;
-  /** O que o outro lado manda (`armazem:mudou`, `casca:fechar`, `os:brilho-mudou`). */
+  /** O que o outro lado manda (`armazem:mudou`, `casca:fechar`, `os:brilho-mudou`, `os:instalar-passo`). */
   ouvir(canal: string, f: (...a: unknown[]) => void): void;
 }
 
@@ -66,6 +69,11 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
   t.ouvir('os:brilho-mudou', (n) => {
     if (typeof n === 'number' && Number.isFinite(n)) cada(ouvintesDoBrilho, n);
   });
+  // o progresso da instalação no computador (PLANO §8c)
+  const ouvintesDoInstalar = new Set<(passo: PassoInstalar, feito: number, total: number) => void>();
+  t.ouvir('os:instalar-passo', (passo, feito, total) => {
+    if (typeof passo === 'string') cada(ouvintesDoInstalar, passo as PassoInstalar, Number(feito) || 0, Number(total) || 0);
+  });
 
   const os: PonteSistema | undefined = info.os
     ? {
@@ -76,6 +84,13 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         fusos: () => pedir<string[]>('os:fusos'),
         usarFuso: (id: string) => pedir<EstadoOS>('os:fuso', String(id)),
         passarWifi: () => pedir<EstadoOS>('os:passar-wifi'),
+        passarUso: () => pedir<EstadoOS>('os:passar-uso'),
+        instalacao: () => pedir<InfoInstalacao>('os:instalacao'),
+        instalar: (disco: string, levar: boolean) => pedir<RespostaInstalar>('os:instalar', String(disco), levar === true),
+        aoPassoDaInstalacao: (f: (passo: PassoInstalar, feito: number, total: number) => void) => {
+          ouvintesDoInstalar.add(f);
+          return () => void ouvintesDoInstalar.delete(f);
+        },
         redes: () => pedir<RedeWifi[]>('os:redes'),
         conectar: (ssid: string, senha: string | null) => pedir<RespostaSistema>('os:conectar', String(ssid), senha === null ? null : String(senha)),
         esquecer: (ssid: string) => pedir<void>('os:esquecer', String(ssid)),

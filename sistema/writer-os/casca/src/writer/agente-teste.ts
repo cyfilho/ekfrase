@@ -14,20 +14,72 @@
  *   usb ok | usb negado     o 2º pendrive (rótulo OUTRO) monta e aceita um arquivo?
  *   interno negado          o disco interno NÃO monta (§7)
  *   gravado <N>             o laço de gravação (cada linha depois do COMMIT): é o teste de arrancar
+ *   lugar <usb|computador>  de onde o sistema ligou (o `lugar` do dados.json; instalar no computador, PLANO §8c)
+ *   bootorder <lista>       o BootOrder do firmware (ao ligar e depois de instalar), como o efibootmgr mostra
+ *   entrada-writer <n>      a entrada "Ekfrase Writer OS" que existe no firmware (Boot<n>)
+ *   instalar ok | <erro>    o fim de uma instalação no computador
  */
 import { DONO_LOCAL, Escrita } from '@ekfrase/writer-nucleo';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Sistema } from '../motor/sistema.ts';
 import type { DadosDoWriter } from './dados.ts';
+import type { WriterOS } from './os.ts';
 import type { Pagina } from './pagina.ts';
+
+const EFIVARS = '/sys/firmware/efi/efivars';
+const GUID_GLOBAL = '8be4df61-93ca-11d2-aa0d-00e098032b8c';
+
+/**
+ * O BootOrder e as entradas "Ekfrase Writer OS" lidos das variáveis do firmware (o efivarfs deixa qualquer um ler).
+ * Cada arquivo começa com 4 bytes de atributos; o BootOrder é uma lista de UINT16; o Boot#### é um EFI_LOAD_OPTION
+ * (UINT32 atributos, UINT16 tamanho dos caminhos e a descrição em UTF-16, terminada em zero).
+ */
+export function lerEfi(pasta = EFIVARS): { ordem: string | null; writer: string[] } {
+  const hex = (n: number) => n.toString(16).toUpperCase().padStart(4, '0');
+  let ordem: string | null = null;
+  const writer: string[] = [];
+  try {
+    const b = readFileSync(join(pasta, `BootOrder-${GUID_GLOBAL}`));
+    const l: string[] = [];
+    for (let i = 4; i + 1 < b.length; i += 2) l.push(hex(b.readUInt16LE(i)));
+    ordem = l.join(',');
+  } catch {
+    // sem UEFI (ou sem o efivarfs)
+  }
+  let nomes: string[] = [];
+  try {
+    nomes = readdirSync(pasta);
+  } catch {
+    // idem
+  }
+  for (const f of nomes) {
+    const m = new RegExp(`^Boot([0-9A-Fa-f]{4})-${GUID_GLOBAL}$`).exec(f);
+    if (!m?.[1]) continue;
+    let b: Buffer;
+    try {
+      b = readFileSync(join(pasta, f));
+    } catch {
+      // uma entrada que o writer não pode ler (o efivarfs pode deixar só o root): as outras seguem
+      continue;
+    }
+    let nome = '';
+    for (let i = 10; i + 1 < b.length; i += 2) {
+      const c = b.readUInt16LE(i);
+      if (!c) break;
+      nome += String.fromCharCode(c);
+    }
+    if (nome === 'Ekfrase Writer OS') writer.push(m[1].toUpperCase());
+  }
+  return { ordem, writer: writer.sort() };
+}
 
 export const HISTORIA_DE_TESTE = 'Teste do Writer OS';
 const MARCA = 'Escrito no Writer OS.';
 /** Quantas gravações o laço faz (uma a cada 250 ms: ~75 s). */
 const VOLTAS = 300;
 
-export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoWriter; sistema: Sistema }): (linha: string) => void {
+export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoWriter; sistema: Sistema; os?: WriterOS }): (linha: string) => void {
   mkdirSync(dirname(o.relato), { recursive: true });
   const dizer = (linha: string) => {
     try {
@@ -37,6 +89,19 @@ export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoW
     }
   };
   dizer('agente ligado');
+  const contarEfi = () => {
+    const e = lerEfi();
+    dizer(`bootorder ${e.ordem ?? '?'}`);
+    for (const n of e.writer) dizer(`entrada-writer ${n}`);
+  };
+  if (o.os) {
+    dizer(`lugar ${o.os.estado().boot}`);
+    contarEfi();
+    o.os.aoInstalar = (r) => {
+      dizer(`instalar ${r}`);
+      contarEfi();
+    };
+  }
   let tela = '';
   let conferindo = false;
 

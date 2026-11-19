@@ -408,7 +408,8 @@ function Folha({ cena, palavrasDoDia, metaDoDia, maquina, foco, semMenus, letra,
         </span>
         {soMemoria && <span class="selo-memoria">{t('writer.nuvem.selo-memoria')}</span>}
         <Nuvem />
-        <time class="relogio">{agora}</time>
+        {/* no Writer OS a data e a hora ficam no canto de todas as telas (RelogioOS) */}
+        {!noOS && <time class="relogio">{agora}</time>}
       </footer>
 
       {notas && <NotasDaCena cena={cena} fechar={() => setNotas(false)} />}

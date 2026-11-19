@@ -5,6 +5,8 @@ import type { PonteGravador, Progresso } from './ponte.ts';
 
 const ponte: PonteGravador = {
   estado: () => ipcRenderer.invoke('gravador:estado'),
+  computador: () => ipcRenderer.invoke('gravador:computador'),
+  remover: (copiar) => ipcRenderer.invoke('gravador:remover', copiar === true),
   discos: () => ipcRenderer.invoke('gravador:discos'),
   lancamento: () => ipcRenderer.invoke('gravador:lancamento'),
   escolherImagem: () => ipcRenderer.invoke('gravador:escolher-imagem'),

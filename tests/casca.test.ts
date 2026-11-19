@@ -15,10 +15,11 @@ import { Cofre } from '../sistema/writer-os/casca/src/motor/cofre.ts';
 import { caminhoSeguro, EspelhoDePasta, LISTA } from '../sistema/writer-os/casca/src/motor/espelho.ts';
 import { lerMarcador, pastaDoApp } from '../sistema/writer-os/casca/src/motor/pastas.ts';
 import { destinoDaApi } from '../sistema/writer-os/casca/src/motor/destino.ts';
-import { escolherLuz, SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
+import { escolherLuz, lerConsulta, lerLinhaInstalar, SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
 import { teclaProibida } from '../sistema/writer-os/casca/src/motor/teclas.ts';
+import { lerEfi } from '../sistema/writer-os/casca/src/writer/agente-teste.ts';
 import { DadosDoWriter, NOME_DA_PASTA } from '../sistema/writer-os/casca/src/writer/dados.ts';
-import { passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
+import { dadosSimulados, passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
 
 const pastas: string[] = [];
 const temp = (): string => {
@@ -327,5 +328,93 @@ describe('Writer OS: o brilho e o Num Lock (pedidos de 18/11)', () => {
     os.sessaoPronta();
     expect(readFileSync(join(raiz, 'run', 'sessao', 'pronta'), 'utf8')).toMatch(/^\d+ \d+\n$/);
     rmSync(raiz, { recursive: true, force: true });
+  });
+});
+describe('Writer OS: instalar no computador (PLANO §8c, fase 3d)', () => {
+  const T = String.fromCharCode(9);
+  const N = String.fromCharCode(10);
+  const linhas = (...l: string[][]) => l.map((c) => c.join(T)).join(N) + N;
+
+  it('lê o consultar do ekfrase-instalar.sh (discos, partições em ordem, o maior livre) e exige o fim', () => {
+    const saida = linhas(
+      ['boot', 'usb'],
+      ['uefi', 'sim'],
+      ['disco', 'nvme0n1', '256060514304', '237296943104', '17179869184', 'gpt', 'nao', 'SAMSUNG MZ'],
+      ['parte', 'nvme0n1', '122683392', '236870000000', 'ntfs', 'Basic data partition', 'Windows'],
+      ['parte', 'nvme0n1', '1048576', '104857600', 'vfat', 'EFI system partition', 'SYSTEM'],
+      ['disco', 'sda', '500107862016', '0', '0', 'dos', 'nao', ''],
+      ['fim'],
+    );
+    const info = lerConsulta(saida);
+    expect(info?.uefi).toBe(true);
+    expect(info?.discos.map((d) => d.id)).toEqual(['nvme0n1', 'sda']);
+    const d = info!.discos[0]!;
+    expect(d).toMatchObject({ tamanho: 256060514304, livreInicio: 237296943104, livre: 17179869184, tabela: 'gpt', writer: false, modelo: 'SAMSUNG MZ' });
+    expect(d.partes.map((p) => p.rotulo)).toEqual(['SYSTEM', 'Windows']);
+    expect(info!.discos[1]!.tabela).toBe('dos');
+    // cortada no meio (o serviço caiu): nada
+    expect(lerConsulta(saida.replace(`fim${N}`, ''))).toBeNull();
+    expect(lerConsulta(linhas(['uefi', 'nao'], ['fim']))).toEqual({ uefi: false, discos: [] });
+  });
+
+  it('lê o progresso do instalar: passos, ok, erro (código desconhecido vira falhou)', () => {
+    expect(lerLinhaInstalar(['passo', 'copiar', '100', '600'].join(T))).toEqual({ passo: 'copiar', feito: 100, total: 600 });
+    expect(lerLinhaInstalar(['passo', 'particoes'].join(T))).toEqual({ passo: 'particoes', feito: 0, total: 0 });
+    expect(lerLinhaInstalar('ok')).toEqual({ ok: true });
+    expect(lerLinhaInstalar(['erro', 'sem-espaco'].join(T))).toEqual({ ok: false, erro: 'sem-espaco' });
+    expect(lerLinhaInstalar(['erro', 'pedido'].join(T))).toEqual({ ok: false, erro: 'falhou' });
+    expect(lerLinhaInstalar(['passo', 'rm -rf'].join(T))).toBeNull();
+    expect(lerLinhaInstalar('qualquer coisa')).toBeNull();
+  });
+
+  const comBoot = (lugar: string) => {
+    const raiz = temp();
+    const sistema = new SistemaSimulado(raiz, false);
+    mkdirSync(sistema.caminhos.dados, { recursive: true });
+    writeFileSync(join(sistema.caminhos.run, 'dados.json'), JSON.stringify({ modo: 'pendrive', motivo: '', lugar }));
+    return { sistema, os: new WriterOS(sistema) };
+  };
+
+  it('o estado diz de onde ligou; "Só pelo pendrive" fica lembrado no sistema.json', () => {
+    expect(comBoot('computador').os.estado()).toMatchObject({ boot: 'computador', usoVisto: false, instalado: false });
+    expect(comBoot('').os.estado().boot).toBe('outro');
+    const { os, sistema } = comBoot('usb');
+    expect(os.estado()).toMatchObject({ boot: 'usb', usoVisto: false });
+    expect(os.passarUso().usoVisto).toBe(true);
+    expect(JSON.parse(readFileSync(join(sistema.caminhos.run, 'sistema.json'), 'utf8')).uso).toBe('pendrive');
+    expect(dadosSimulados(true, 'computador')).toContain('"lugar":"computador"');
+    expect(dadosSimulados(false, undefined)).toContain('"lugar":"usb"');
+  });
+
+  it('instalar: só ligado pelo pendrive, só um nome de disco do kernel; o progresso chega e o estado vira instalado', async () => {
+    expect(await comBoot('computador').os.instalar('nvme0n1', true)).toEqual({ ok: false, erro: 'nao-usb' });
+    const { os, sistema } = comBoot('usb');
+    expect(await os.instalar('nvme0n1; reboot', true)).toEqual({ ok: false, erro: 'disco' });
+    expect(await os.instalar('/dev/nvme0n1', true)).toEqual({ ok: false, erro: 'disco' });
+    const passos: string[] = [];
+    os.ouvirInstalacao((p) => passos.push(p));
+    let fim = '';
+    os.aoInstalar = (r) => (fim = r);
+    const r = await os.instalar('nvme0n1', true);
+    expect(r.ok && r.estado.instalado).toBe(true);
+    expect(fim).toBe('ok');
+    expect(new Set(passos)).toEqual(new Set(['particoes', 'copiar', 'conferir', 'textos', 'entrada']));
+    expect(sistema.instalou).toEqual({ disco: 'nvme0n1', levar: true });
+    // instalado, não instala de novo
+    expect(await os.instalar('nvme0n1', true)).toEqual({ ok: false, erro: 'ja-instalado' });
+  });
+
+  it('o agente lê o BootOrder e a entrada "Ekfrase Writer OS" das variáveis do firmware', () => {
+    const pasta = temp();
+    const G = '8be4df61-93ca-11d2-aa0d-00e098032b8c';
+    const atr = Buffer.from([7, 0, 0, 0]);
+    const u16 = (...n: number[]) => Buffer.from(new Uint16Array(n).buffer);
+    writeFileSync(join(pasta, `BootOrder-${G}`), Buffer.concat([atr, u16(0x0001, 0x0000, 0x0003)]));
+    const opcao = (nome: string) => Buffer.concat([atr, Buffer.from([1, 0, 0, 0]), u16(4), Buffer.from(nome + String.fromCharCode(0), 'utf16le'), Buffer.from([0x7f, 0xff, 4, 0])]);
+    writeFileSync(join(pasta, `Boot0001-${G}`), opcao('Windows Boot Manager'));
+    writeFileSync(join(pasta, `Boot0003-${G}`), opcao('Ekfrase Writer OS'));
+    writeFileSync(join(pasta, `Boot0003-00000000-0000-0000-0000-000000000000`), opcao('Ekfrase Writer OS'));
+    expect(lerEfi(pasta)).toEqual({ ordem: '0001,0000,0003', writer: ['0003'] });
+    expect(lerEfi(join(pasta, 'nao-existe'))).toEqual({ ordem: null, writer: [] });
   });
 });

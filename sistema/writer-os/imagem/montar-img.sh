@@ -32,6 +32,8 @@ mcopy -i "$ESP" "$TRAB/efi/mmx64.efi.signed" ::/EFI/BOOT/mmx64.efi
 for d in EFI/BOOT EFI/debian boot/grub; do mcopy -i "$ESP" "$TRAB/grub.cfg" "::/$d/grub.cfg"; done
 mcopy -i "$ESP" "$TRAB/vmlinuz" "$TRAB/initrd.img" "$TRAB/filesystem.squashfs" ::/live/
 for extra in "$@"; do mcopy -i "$ESP" "$extra" ::/live/; done
+# sem o fbx64.efi: com ele, o shim rodaria o fallback e mexeria na ordem de boot do computador (PLANO §8c)
+! mdir -b -i "$ESP" ::/EFI/BOOT | grep -qi fbx64 || { echo "A partição de boot não pode ter o fbx64.efi."; exit 1; }
 
 # 1 MiB antes (a GPT) + a partição + 1 MiB depois (a cópia da GPT)
 truncate -s $((ESP_MB + 2))M "$IMG"

@@ -50,7 +50,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-x86 ovmf dosfstools minisign
+          sudo apt-get install -y -qq qemu-system-x86 ovmf dosfstools gdisk ntfs-3g minisign
       - run: python3 tests/writer-os/qemu.py --imagem "sistema/writer-os/imagem/saida/ekfrase-writer-os-$VERSAO-teste.img" --prints prints-writer-os
       - name: Comprimir e assinar
         env:
@@ -77,6 +77,8 @@ jobs:
   gravador:
     name: Gravador (${{ matrix.os }})
     strategy:
+      # um sistema que falha não cancela o outro (o VHD do Windows tem de rodar mesmo se o Linux cair)
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
@@ -93,6 +95,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run gravador:roteiro
+      # o "preparar" (Resize-Partition) e o "remover" de verdade, num VHD que faz o papel do disco do computador (PLANO §8c)
+      - name: Preparar e remover o Writer OS do computador (num VHD)
+        if: runner.os == 'Windows'
+        run: node tests/gravador/computador-vhd.ts
       - run: npm run gravador:pacote
         env:
           # o Gravador de uma tag de teste vê as pré-releases de teste (src/nucleo/origem.ts); o do público, nunca

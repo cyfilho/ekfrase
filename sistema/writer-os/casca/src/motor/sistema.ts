@@ -8,6 +8,8 @@
  *
  * - Wi-Fi: `nmcli` (NetworkManager: `network-control`, `wifi.scan`, `settings.modify.own`; as conexões
  *   são do `writer`, `connection.permissions user:writer`);
+ * - instalar no computador (PLANO §8c): o socket do `ekfrase-instalar.socket` (só o grupo `writer` abre), que aceita
+ *   só `consultar` e `instalar <disco> <levar|nao-levar>`; quem mexe no disco é o serviço (root), nunca a casca;
  * - discos: `lsblk` (ler) e `udisksctl` (montar, desmontar, desligar), **só no barramento USB**
  *   (§6.1b: pendrive, SSD portátil e HD externo; o disco interno nem aparece para o udisks2);
  * - brilho, desligar, reiniciar: `busctl` (logind); fuso: `timedatectl`; bateria: `/sys`.
@@ -15,8 +17,9 @@
  * Duas versões: `SistemaLinux` (a de verdade) e `SistemaSimulado` (para os testes e os prints fora do
  * pendrive, no Windows também). Nenhum comando passa por shell: `execFile` com a lista de argumentos.
  */
-import type { Bateria, DiscoUSB, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
+import type { Bateria, DiscoInterno, DiscoUSB, ErroInstalar, InfoInstalacao, PassoInstalar, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
 import { execFile } from 'node:child_process';
+import { connect } from 'node:net';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { release } from 'node:os';
 import { join } from 'node:path';
@@ -81,6 +84,10 @@ export interface Sistema {
   ejetar(id: string): Promise<RespostaSistema>;
   /** Só o agente de teste: tenta montar o disco interno (tem de ser negado). */
   montarInterno(): Promise<'negado' | 'montou' | 'sem-disco'>;
+  /** O que há no computador para instalar o Writer OS (PLANO §8c); `null` se o serviço não respondeu. */
+  consultarInstalacao(): Promise<InfoInstalacao | null>;
+  /** Instala no disco interno `disco` (o serviço confere tudo de novo). */
+  instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }>;
   desligar(): Promise<void>;
   reiniciar(): Promise<void>;
   versao(): string;
@@ -90,6 +97,72 @@ export interface Sistema {
 
 /** O Writer tem uma pasta com textos neste disco montado? */
 export const temWriter = (montado: string | null): boolean => !!montado && existsSync(join(montado, 'Ekfrase Writer', 'dados', 'cofre.db'));
+
+// ======================================================================================
+// instalar no computador: o que o ekfrase-instalar.sh responde (linhas com TAB)
+// ======================================================================================
+
+const PASSOS: readonly PassoInstalar[] = ['particoes', 'copiar', 'conferir', 'textos', 'entrada'];
+const ERROS_INSTALAR: readonly ErroInstalar[] = ['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'falhou'];
+const numero = (s: string | undefined): number => (s && /^[0-9]+$/.test(s) ? Number(s) : 0);
+
+/** Lê a resposta do `consultar` (`null` se ela não chegou ao `fim`). */
+export function lerConsulta(texto: string): InfoInstalacao | null {
+  const info: InfoInstalacao = { uefi: false, discos: [] };
+  let fim = false;
+  for (const linha of texto.split('\n')) {
+    const c = linha.replace(/\r$/, '').split('\t');
+    if (c[0] === 'uefi') info.uefi = c[1] === 'sim';
+    else if (c[0] === 'disco' && c[1]) {
+      info.discos.push({ id: c[1], tamanho: numero(c[2]), livreInicio: numero(c[3]), livre: numero(c[4]), tabela: c[5] || 'nenhuma', writer: c[6] === 'sim', modelo: c[7] ?? '', partes: [] });
+    } else if (c[0] === 'parte') {
+      const d = info.discos.find((x) => x.id === c[1]);
+      d?.partes.push({ inicio: numero(c[2]), tamanho: numero(c[3]), fs: c[4] ?? '', nome: c[5] ?? '', rotulo: c[6] ?? '' });
+    } else if (c[0] === 'fim') fim = true;
+  }
+  for (const d of info.discos) d.partes.sort((a, b) => a.inicio - b.inicio);
+  return fim ? info : null;
+}
+
+/** Uma linha do progresso do `instalar`: o passo, o fim (`ok`) ou o erro. */
+export function lerLinhaInstalar(linha: string): { passo: PassoInstalar; feito: number; total: number } | { ok: true } | { ok: false; erro: ErroInstalar } | null {
+  const c = linha.replace(/\r$/, '').split('\t');
+  if (c[0] === 'passo' && (PASSOS as readonly string[]).includes(c[1] ?? '')) return { passo: c[1] as PassoInstalar, feito: numero(c[2]), total: numero(c[3]) };
+  if (c[0] === 'ok') return { ok: true };
+  if (c[0] === 'erro') return { ok: false, erro: (ERROS_INSTALAR as readonly string[]).includes(c[1] ?? '') ? (c[1] as ErroInstalar) : 'falhou' };
+  return null;
+}
+
+/** Conversa com o serviço de instalar: manda uma linha e entrega cada linha da resposta até ele fechar. */
+function pedirAoInstalador(sock: string, pedido: string, aoLer: (linha: string) => void, tempo: number): Promise<boolean> {
+  return new Promise((ok) => {
+    let resto = '';
+    let feito = false;
+    const c = connect(sock, () => c.write(`${pedido}\n`));
+    const acabar = (r: boolean) => {
+      if (feito) return;
+      feito = true;
+      clearTimeout(relogio);
+      c.destroy();
+      ok(r);
+    };
+    const relogio = setTimeout(() => acabar(false), tempo);
+    c.setEncoding('utf8');
+    c.on('data', (parte: string) => {
+      resto += parte;
+      let i: number;
+      while ((i = resto.indexOf('\n')) >= 0) {
+        aoLer(resto.slice(0, i));
+        resto = resto.slice(i + 1);
+      }
+    });
+    c.on('end', () => {
+      if (resto) aoLer(resto);
+      acabar(true);
+    });
+    c.on('error', () => acabar(false));
+  });
+}
 
 // ======================================================================================
 // o Linux de verdade
@@ -313,6 +386,30 @@ export class SistemaLinux implements Sistema {
     return 'negado';
   }
 
+  async consultarInstalacao(): Promise<InfoInstalacao | null> {
+    let texto = '';
+    const ok = await pedirAoInstalador(join(this.caminhos.run, 'instalar.sock'), 'consultar', (l) => (texto += `${l}\n`), 30000);
+    return ok ? lerConsulta(texto) : null;
+  }
+
+  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
+    if (!/^(nvme[0-9]+n[0-9]+|sd[a-z]+|vd[a-z]+|mmcblk[0-9]+)$/.test(disco)) return { ok: false, erro: 'disco' };
+    let fim: { ok: true } | { ok: false; erro: ErroInstalar } = { ok: false, erro: 'falhou' };
+    // a cópia e a conferência levam minutos num pendrive USB 2; 30 min é o limite de quem esperaria
+    await pedirAoInstalador(
+      join(this.caminhos.run, 'instalar.sock'),
+      `instalar ${disco} ${levar ? 'levar' : 'nao-levar'}`,
+      (l) => {
+        const r = lerLinhaInstalar(l);
+        if (!r) return;
+        if ('passo' in r) aoPasso(r.passo, r.feito, r.total);
+        else fim = r;
+      },
+      30 * 60 * 1000,
+    );
+    return fim;
+  }
+
   private async logind(metodo: 'PowerOff' | 'Reboot'): Promise<void> {
     await rodar('sync', []);
     await rodar('busctl', ['call', 'org.freedesktop.login1', '/org/freedesktop/login1', 'org.freedesktop.login1.Manager', metodo, 'b', 'false']);
@@ -379,10 +476,16 @@ export class SistemaSimulado implements Sistema {
   // como a imagem: a tela começa sempre em 50% (ekfrase-brilho.sh)
   private luz = 50;
   private outroMontado = false;
+  /** O disco interno simulado (`EKFRASE_CASCA_OS_INTERNO`): 16 GB livres (o padrão), sem espaço, nenhum disco, ou já instalado. */
+  private interno: 'livre16' | 'sem-espaco' | 'nenhum' | 'instalado';
   saiu: 'desligar' | 'reiniciar' | null = null;
+  /** Para os testes: o último pedido de instalar. */
+  instalou: { disco: string; levar: boolean } | null = null;
 
   constructor(raiz: string, teste: boolean) {
     this.raiz = raiz;
+    const i = process.env['EKFRASE_CASCA_OS_INTERNO'];
+    this.interno = i === 'sem-espaco' || i === 'nenhum' || i === 'instalado' ? i : 'livre16';
     this.caminhos = { run: join(raiz, 'run'), dados: join(raiz, 'dados'), ram: join(raiz, 'ram'), teste: teste ? join(raiz, 'run', 'teste') : null };
     for (const c of [this.caminhos.run, this.caminhos.ram]) mkdirSync(c, { recursive: true });
   }
@@ -448,6 +551,43 @@ export class SistemaSimulado implements Sistema {
 
   async montarInterno(): Promise<'negado'> {
     return 'negado';
+  }
+
+  async consultarInstalacao(): Promise<InfoInstalacao | null> {
+    if (this.interno === 'nenhum') return { uefi: true, discos: [] };
+    const G = 1024 ** 3;
+    const M = 1024 ** 2;
+    const partes = [
+      { inicio: M, tamanho: 100 * M, fs: 'vfat', nome: 'EFI system partition', rotulo: 'SYSTEM' },
+      { inicio: 117 * M, tamanho: 220 * G, fs: 'ntfs', nome: 'Basic data partition', rotulo: 'Windows' },
+    ];
+    const livre = this.interno === 'livre16' ? 16 * G : this.interno === 'instalado' ? 0 : 200 * M;
+    if (this.interno === 'instalado') partes.push({ inicio: 221 * G, tamanho: 1400 * M, fs: 'vfat', nome: 'EKFRASE-BOOT', rotulo: 'EKFR-BOOT' });
+    partes.push({ inicio: 238 * G - 800 * M, tamanho: 750 * M, fs: 'ntfs', nome: 'Basic data partition', rotulo: 'Recovery' });
+    const disco: DiscoInterno = { id: 'nvme0n1', modelo: 'SSD NVMe simulado', tamanho: 238 * G, livreInicio: 221 * G, livre, tabela: 'gpt', writer: this.interno === 'instalado', partes };
+    return { uefi: true, discos: [disco] };
+  }
+
+  async instalar(disco: string, levar: boolean, aoPasso: (passo: PassoInstalar, feito: number, total: number) => void): Promise<{ ok: true } | { ok: false; erro: ErroInstalar }> {
+    const d = (await this.consultarInstalacao())?.discos.find((x) => x.id === disco);
+    if (!d) return { ok: false, erro: 'disco' };
+    if (d.writer) return { ok: false, erro: 'ja-instalado' };
+    if (d.livre < 8 * 1024 ** 3) return { ok: false, erro: 'sem-espaco' };
+    const espera = () => new Promise((ok) => setTimeout(ok, 120));
+    const total = 600 * 1024 ** 2;
+    aoPasso('particoes', 0, 0);
+    await espera();
+    for (let feito = 0; feito <= total; feito += total / 4) {
+      aoPasso('copiar', feito, total);
+      await espera();
+    }
+    for (const p of ['conferir', 'textos', 'entrada'] as const) {
+      aoPasso(p, 0, 0);
+      await espera();
+    }
+    this.instalou = { disco, levar };
+    this.interno = 'instalado';
+    return { ok: true };
   }
 
   async desligar(): Promise<void> {
