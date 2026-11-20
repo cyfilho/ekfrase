@@ -84,7 +84,7 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
   dizer "brilho ${luz:-sem-luz}"
 ) &
 
-# As medidas (P3, 18/11: o Electron contra o Cog, com os mesmos números): "medida …"
+# As medidas (P3, 18/11: o tempo da janela e a memória): "medida …"
 #   janela <s desde o boot> <s desde a sessão>: quando a casca avisou que a janela apareceu (/run/ekfrase/sessao/pronta)
 #   memoria <quando> usada <MB> pss <MB> [<processo>=<MB>…]: o sistema todo (MemTotal − MemAvailable) e o PSS dos
 #   processos do writer (a sessão: o Cage, o navegador e o resto), 30 s e 150 s depois da janela
@@ -107,7 +107,7 @@ medir_memoria() {
     dizer "$(awk -v a="$agora" -v u="$up" -v p="$pronta" -v i="$ini" 'BEGIN{t=u-(a-p); printf "medida janela %.1f %.1f", t, t-i/1e6}')"
   else
     dizer "medida janela falta"
-    # a janela não apareceu: o que a sessão (o Cage, o serviço do Writer, o Cog) escreveu vai para a serial
+    # a janela não apareceu: o que a sessão (o Cage, a casca) escreveu vai para a serial
     journalctl -b _UID=1000 --no-pager -o cat 2>/dev/null | grep -v "^agente" | tail -n 70 | while IFS= read -r l; do dizer "diario $l"; done
   fi
   dizer "medida disco $(du -sm /opt/ekfrase-writer 2>/dev/null | cut -f1) squashfs $(du -m "/run/live/medium/${LADO:-live}/filesystem.squashfs" 2>/dev/null | cut -f1)"

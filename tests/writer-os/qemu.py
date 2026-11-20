@@ -485,7 +485,7 @@ def teste_completo(imagem, pasta):
         for l in q.linhas()[b:]:
             if l.startswith('tempo'):
                 print('   ' + l, flush=True)
-        # as medidas (P3: o Electron contra o Cog) saem até 150 s depois da janela: espera a última do 1º boot
+        # as medidas (P3) saem até 150 s depois da janela: espera a última do 1º boot
         q.esperar(re.compile(r'^medida memoria 150s '), b, 120)
         time.sleep(2)
         q.foto('conta')
