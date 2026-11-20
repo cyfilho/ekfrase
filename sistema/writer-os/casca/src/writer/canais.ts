@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * Os CANAIS entre a página do Writer e o lado de cá: a mesma tabela no Writer do computador (o `main.ts`, pelo
- * IPC do Electron) e no Writer OS (o `servico-os.ts`, pelo serviço local do Cog). Quem chama já conferiu que o
- * pedido veio da página do app; aqui só se decide O QUE cada canal faz (o contrato é a `PonteCasca`).
+ * Os CANAIS entre a página do Writer e o processo principal (o `main.ts`, pelo IPC do Electron; o mesmo no Writer
+ * do computador e no Writer OS). Quem chama já conferiu que o pedido veio da página do app; aqui só se decide O QUE cada canal faz (o contrato é a `PonteCasca`).
  *
  * - `pedidos`: com resposta (o `ipcRenderer.invoke`);
  * - `sincronos`: o rascunho de emergência (a página pode estar fechando);
@@ -11,7 +10,7 @@
  */
 import { baseDoServidor, conferirServidor, type EscolhaEspelho, type MetodoArmazem, type RespostaCasca } from '@ekfrase/writer-nucleo';
 import { gravarLembrado, lerLembrado } from '../motor/pastas.ts';
-import { origemDe } from '../motor/rede-node.ts';
+import { origemDe } from '../motor/rede.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
 import type { DadosDoWriter } from './dados.ts';
 import type { WriterOS } from './os.ts';
@@ -32,7 +31,7 @@ export interface Canais {
   avisos: Record<string, Funcao>;
 }
 
-/** O pedaço da rede que os canais usam (a `Rede` do Electron e a `RedeNode` do Writer OS). */
+/** O pedaço da rede que os canais usam (a `Rede` do Electron). */
 export interface RedeDosCanais {
   readonly servidor: string;
   usar(base: string): void;
