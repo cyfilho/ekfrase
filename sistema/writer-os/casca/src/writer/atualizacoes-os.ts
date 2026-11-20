@@ -16,6 +16,7 @@ import {
   API_GITHUB,
   arquivoDe,
   baixarArquivo,
+  baixarArquivoEmProcesso,
   baixarTexto,
   CHAVE_EKFRASE,
   conferirManifesto,
@@ -282,7 +283,13 @@ export class AtualizacoesOS {
           (vigia as { unref?: () => void }).unref?.();
           let soma = '';
           try {
-            await baixarArquivo(buscar, url, destino, {
+            // em produção o download roda num processo à parte: se o processo principal travar (a trava intermitente da
+            // writer-os-v0.2.0-teste.7/.8/.10), só o filho é morto e outro recomeça; o `buscar` dos testes fica no processo
+            const script = join(__dirname, 'baixador.cjs');
+            const emFilho = !this.o.buscar && process.env.EKFRASE_CASCA_SEM_FILHO !== '1' && existsSync(script);
+            type Op = Parameters<typeof baixarArquivo>[3];
+            const baixar = (op: Op) => (emFilho ? baixarArquivoEmProcesso(script, url, destino, op) : baixarArquivo(buscar, url, destino, op));
+            await baixar({
               tamanho: a.tamanho,
               agente: 'Ekfrase-Writer-OS',
               // o que veio desce ao disco a cada 16 MB: os ~560 MB não ficam na memória para descer de uma vez no fim,

@@ -12,6 +12,7 @@ files:
   - package.json
   - dist/main.cjs
   - dist/preload.cjs
+  - dist/baixador.cjs
   - dist/app/**/*
   - "!dist/app/**/*.map"
 extraResources:

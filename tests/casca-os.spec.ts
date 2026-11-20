@@ -24,8 +24,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
-import type { BrowserType, ElectronApplication, Page } from 'playwright';
+import type { ElectronApplication, Page } from 'playwright';
 import { assinadorTeste } from './gravador/imagem-teste.ts';
 import { Roteiro, type Resultado } from './teclado.spec.ts';
 
@@ -64,45 +63,6 @@ export const abrirComElectron =
   async (env) => {
     const app = await lancar(env);
     return { pagina: () => janela(app), fechar: () => fechar(app) };
-  };
-
-/**
- * A casca SEM o Electron (prompt P3): o serviço do Writer OS (`instalador/writer-os/servico-os.cjs`) no Node e, no
- * lugar do Cog, o WebKit do Playwright (o mesmo motor do WPE) com a ponte da página injetada antes de tudo, como o
- * Cog faz. Fechar = "fechar" na entrada do serviço (a página grava o que falta, os bancos fecham).
- */
-export const abrirComCog =
-  (servico: string, webkit: BrowserType, porta: number): Abrir =>
-  async (env) => {
-    const filho = spawn(process.execPath, [servico], {
-      env: { ...process.env, ...env, EKFRASE_CASCA_NAVEGADOR: 'nenhum', EKFRASE_CASCA_PORTA: String(porta) },
-      stdio: ['pipe', 'pipe', 'inherit'],
-    });
-    const saiu = new Promise<void>((ok) => filho.once('exit', () => ok()));
-    let saida = '';
-    const ponte = await new Promise<string>((ok, falhou) => {
-      filho.stdout.on('data', (d: Buffer) => {
-        saida += String(d);
-        const m = /ekfrase-servico pronto \S+ (.+)/.exec(saida);
-        if (m?.[1]) ok(m[1].trim());
-      });
-      void saiu.then(() => falhou(new Error(`o serviço saiu antes de ficar pronto: ${saida}`)));
-    });
-    const navegador = await webkit.launch();
-    const contexto = await navegador.newContext({ viewport: { width: 1280, height: 800 } });
-    await contexto.addInitScript({ path: ponte });
-    const p = await contexto.newPage();
-    await p.goto(`http://127.0.0.1:${porta}/writer/`);
-    await p.waitForLoadState('domcontentloaded');
-    return {
-      pagina: async () => p,
-      fechar: async () => {
-        filho.stdin.write('fechar' + String.fromCharCode(10));
-        await Promise.race([saiu, new Promise((ok) => setTimeout(ok, 15000))]);
-        if (filho.exitCode === null) filho.kill();
-        await navegador.close();
-      },
-    };
   };
 
 const lerRelato = (raiz: string): string => {

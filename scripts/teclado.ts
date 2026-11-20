@@ -18,7 +18,7 @@ import { createServer } from 'node:net';
 import { join } from 'node:path';
 import type { BrowserType } from 'playwright';
 import { build, preview } from 'vite';
-import { abrirComCog, abrirComElectron, percorrerCascaOS } from '../tests/casca-os.spec.ts';
+import { abrirComElectron, percorrerCascaOS } from '../tests/casca-os.spec.ts';
 import { percorrerCasca } from '../tests/casca.spec.ts';
 import { percorrer } from '../tests/teclado.spec.ts';
 import { RAIZ } from './raiz.ts';
@@ -44,8 +44,7 @@ async function navegador(): Promise<BrowserType> {
 }
 
 const args = process.argv.slice(2);
-const soOSCog = args.includes('--so-os-cog');
-const soOS = args.includes('--so-os') || soOSCog;
+const soOS = args.includes('--so-os');
 const soCasca = args.includes('--so-casca') || soOS;
 const falar = (l: string) => (l.startsWith('XX') ? console.error(l) : console.log(l));
 let falhas = 0;
@@ -77,10 +76,10 @@ if (!soCasca) {
 }
 
 // ---- a casca do computador (Electron): só se o Electron dela estiver instalado (ou com --so-casca)
-const { electron, montar, montarOS, OS } = await import('../sistema/writer-os/casca/scripts/montar.ts');
+const { electron, montar } = await import('../sistema/writer-os/casca/scripts/montar.ts');
 let executavel: string | null = null;
 try {
-  if (!soOSCog) executavel = electron();
+  executavel = electron();
 } catch (e) {
   if (soCasca) throw e;
   console.log('\n(A casca do computador ficou de fora: o Electron dela não está instalado. "npm ci" em sistema/writer-os/casca.)');
@@ -103,15 +102,5 @@ if (executavel) {
   const o = await percorrerCascaOS(abrir, falar);
   falhas += o.falhas.length;
   console.log(o.falhas.length ? `\n${o.falhas.length} de ${o.passos} passos do Writer OS falharam.` : `\nWriter OS: ${o.passos} passos, tudo certo.`);
-}
-// o Writer OS SEM o Electron (P3): o serviço no Node e o WebKit do Playwright no lugar do Cog (o mesmo motor do WPE).
-// --sem-cog pula (o caminho está parado, DEC-P071, e falha uns passos de vez em quando: o CI da tag writer-v* não o usa)
-if ((soOS || executavel) && !args.includes('--sem-cog')) {
-  console.log('\nWriter OS sem o Electron (o serviço + WebKit, simulado)…');
-  await montarOS({ semWriter: true });
-  const { webkit } = await import('playwright');
-  const o = await percorrerCascaOS(abrirComCog(join(OS, 'servico-os.cjs'), webkit, await portaLivre()), falar);
-  falhas += o.falhas.length;
-  console.log(o.falhas.length ? `\n${o.falhas.length} de ${o.passos} passos do Writer OS (Cog) falharam.` : `\nWriter OS (Cog): ${o.passos} passos, tudo certo.`);
 }
 process.exit(falhas ? 1 : 0);
