@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * O que o lado de cá (o processo principal do Electron ou o serviço do Writer OS) pede à PÁGINA do Writer.
+ * O que o lado de cá (o processo principal do Electron) pede à PÁGINA do Writer.
  * Sem importar o `electron`: o `os.ts`, o agente de teste e os testes usam só esta interface.
  */
 export interface Pagina {
-  /** A página está aberta (a janela existe; no Cog, a página está ligada ao serviço). */
+  /** A página está aberta (a janela existe). */
   aberta(): boolean;
   /** Um recado à página (`armazem:mudou`, `casca:fechar`, `os:brilho-mudou`). */
   enviar(canal: string, ...a: unknown[]): void;
@@ -18,7 +18,7 @@ export interface Pagina {
   recarregar(): void;
 }
 
-/** O código que roda na página para cada pedido (o Electron usa `executeJavaScript`; a ponte do Cog, o mesmo). */
+/** O código que roda na página para cada pedido (o Electron usa `executeJavaScript`). */
 export const NA_PAGINA = {
   copiarGuardado: () => JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('ekfrase')).map((k) => [k, localStorage.getItem(k)]))),
   porGuardado: (json: string): boolean => {

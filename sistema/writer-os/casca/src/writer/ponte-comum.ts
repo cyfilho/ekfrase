@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * A `PonteCasca` (`packages/writer-nucleo/src/casca.ts`) montada sobre um TRANSPORTE: o mesmo objeto
- * `window.ekfraseCasca` no Writer do computador (o preload do Electron: `ipcRenderer`) e no Writer OS (a ponte
- * da página do Cog, `ponte-pagina.ts`: pedidos ao serviço local). Os canais são os de `canais.ts`.
+ * A `PonteCasca` (`packages/writer-nucleo/src/casca.ts`) montada sobre um TRANSPORTE: o objeto
+ * `window.ekfraseCasca` que o preload do Electron põe na página (o transporte é o `ipcRenderer`).
+ * Os canais são os de `canais.ts`.
  */
 import type {
   Bateria,

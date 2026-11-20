@@ -110,7 +110,8 @@ describe('o download que fica mudo no meio', () => {
       // gravarACada: o que veio desce ao disco aos pedaços (U2, parte 3), e o arquivo continua inteiro
       await baixarArquivo((u, i) => fetch(u, i), `http://127.0.0.1:${typeof ad === 'object' && ad ? ad.port : 0}/a`, destino, {
         tamanho: conteudo.length,
-        parado: 300,
+        // 1,5 s: com 300 ms, o Windows do GitHub calava antes do 1º pedaço chegar e a 2ª tentativa contava 0 bytes
+        parado: 1500,
         gravarACada: 64 * 1024,
         aoTentarDeNovo: (n, feito, motivo) => tentativas.push([n, feito, motivo]),
         aoPasso: (p) => passos.add(p),

@@ -49,8 +49,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Roteiro da casca (teclado, travas, cifra, espelho, atualizações)
-        # --sem-cog: o Writer OS sem o Electron está parado (DEC-P071) e não entra no Writer do computador
-        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run teclado -- --so-casca --sem-cog
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run teclado -- --so-casca
       - run: npm run casca:instalador
       - uses: actions/upload-artifact@v4
         with:
