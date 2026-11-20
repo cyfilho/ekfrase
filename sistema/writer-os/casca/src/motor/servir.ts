@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * Servir os arquivos do app (parte do Motor, SEM o Electron): o que a janela do computador (`janela.ts`, pelo
- * `app://`) e o serviço do Writer OS (`servico-os.ts`, pelo `http://127.0.0.1`) entregam do mesmo jeito. Nunca
+ * Servir os arquivos do app (parte do Motor, sem importar o Electron): o que a janela (`janela.ts`, pelo
+ * `app://`) entrega. Nunca
  * fora da pasta; o caminho sem extensão que não é arquivo (uma tela do app: `/writer/app/ideias`) recebe o
  * `index.html`, como o `.htaccess` do site; com extensão (um .js que falta) = nada.
  *

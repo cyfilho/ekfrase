@@ -4,7 +4,7 @@
  * O PRELOAD: a única coisa entre a página do Writer e o computador. Roda com `sandbox:true` e
  * `contextIsolation:true`: põe em `window.ekfraseCasca` (por `contextBridge`) só as funções da
  * `PonteCasca` (`packages/writer-nucleo/src/casca.ts`), e mais nada. A página não ganha Node,
- * nem `ipcRenderer`, nem `require`. A ponte é a de `ponte-comum.ts` (a mesma do Writer OS no Cog), sobre o IPC.
+ * nem `ipcRenderer`, nem `require`. A ponte é a de `ponte-comum.ts`, sobre o IPC.
  *
  * E segura o arrastar: um arquivo solto na janela (fora de um campo de arquivo) não abre nada.
  */

@@ -8,6 +8,7 @@ export * from './ajuste.ts';
 export * from './aplicar.ts';
 export * from './atualizador.ts';
 export * from './baixar.ts';
+export * from './baixar-processo.ts';
 export * from './chave.ts';
 export * from './manifesto.ts';
 export * from './minisign.ts';
