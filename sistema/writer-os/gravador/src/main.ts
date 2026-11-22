@@ -333,7 +333,7 @@ function iniciar(): void {
     const sessao = session.fromPartition('gravador');
     travarPermissoes(sessao);
     servirApp({ sessao, host: 'gravador', pasta: join(DIST, 'pagina') });
-    janela = criarJanela({ sessao, host: 'gravador', preload: join(DIST, 'preload.cjs'), titulo: 'Ekfrase Gravador', largura: 520, altura: 620, devTools: dev && process.env['EKFRASE_GRAVADOR_DEVTOOLS'] === '1', argumentos: [`--ekfrase-gravador-versao=${VERSAO}`] });
+    janela = criarJanela({ sessao, host: 'gravador', preload: join(DIST, 'preload.cjs'), titulo: 'Gravador Writer OS', largura: 520, altura: 620, devTools: dev && process.env['EKFRASE_GRAVADOR_DEVTOOLS'] === '1', argumentos: [`--ekfrase-gravador-versao=${VERSAO}`] });
     atualizador?.iniciar();
     janela.on('close', (e) => {
       if (ocupado) {
