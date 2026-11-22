@@ -16,7 +16,7 @@ import { enderecoDe, LISTA_DE_RELEASES, useRelease } from './releases.ts';
 const GRAVAR_MD = `${LINKS.codigo}/blob/main/sistema/writer-os/imagem/GRAVAR.md`;
 
 export function BaixarOS() {
-  const rel = useRelease('writer-os-v', ['Ekfrase-Gravador.exe', 'Ekfrase-Gravador.AppImage']);
+  const rel = useRelease('writer-os-v', ['Gravador-Writer-OS.exe', 'Gravador-Writer-OS.AppImage']);
   const naoPublicado = rel === null;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.querySelector<HTMLElement>('h1')?.focus(), []);
@@ -37,10 +37,10 @@ export function BaixarOS() {
           ) : (
             <>
               <div class="ekf-linha">
-                <a class="ekf-botao principal" href={enderecoDe(rel, 'Ekfrase-Gravador.exe')} data-teste="baixar-gravador-windows">
+                <a class="ekf-botao principal" href={enderecoDe(rel, 'Gravador-Writer-OS.exe')} data-teste="baixar-gravador-windows">
                   {t('writer.os-pagina.windows')}
                 </a>
-                <a class="ekf-botao" href={enderecoDe(rel, 'Ekfrase-Gravador.AppImage')} data-teste="baixar-gravador-linux">
+                <a class="ekf-botao" href={enderecoDe(rel, 'Gravador-Writer-OS.AppImage')} data-teste="baixar-gravador-linux">
                   {t('writer.os-pagina.linux')}
                 </a>
               </div>

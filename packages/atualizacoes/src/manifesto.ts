@@ -39,7 +39,7 @@ export class ErroManifesto extends Error {
 
 /**
  * O nome de um arquivo de atualização: letras, números, ponto, traço; nada de barra nem de ponto no começo. Maiúsculas
- * desde a U2 (os instaladores são `Ekfrase-Writer-Setup.exe`, `Ekfrase-Gravador.exe`); o `ekfrase-atualizar.sh` do
+ * desde a U2 (os instaladores são `Ekfrase-Writer-Setup.exe`, `Gravador-Writer-OS.exe`); o `ekfrase-atualizar.sh` do
  * Writer OS continua só com minúsculas (os arquivos dele são todos minúsculos).
  */
 export const NOME_DE_ARQUIVO = /^[A-Za-z0-9][A-Za-z0-9.-]{0,120}$/;

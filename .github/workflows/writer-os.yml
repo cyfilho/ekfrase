@@ -148,8 +148,8 @@ jobs:
         with:
           name: gravador-${{ runner.os }}
           path: |
-            sistema/writer-os/gravador/instalador/Ekfrase-Gravador.exe
-            sistema/writer-os/gravador/instalador/Ekfrase-Gravador.AppImage
+            sistema/writer-os/gravador/instalador/Gravador-Writer-OS.exe
+            sistema/writer-os/gravador/instalador/Gravador-Writer-OS.AppImage
           if-no-files-found: error
 
   release:
@@ -187,16 +187,16 @@ jobs:
           [[ "$VERSAO" == *-teste.* ]] && CANAL=teste
           cd arquivos
           ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
-          for g in Ekfrase-Gravador.exe Ekfrase-Gravador.AppImage; do
+          for g in Gravador-Writer-OS.exe Gravador-Writer-OS.AppImage; do
             minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$g" -t "Ekfrase Gravador $VERSAO" < /dev/null
           done
           arq() { jq -n --arg p "$1" --arg n "$2" --argjson t "$(stat -c %s "$2")" --arg s "$(sha256sum "$2" | cut -d' ' -f1)" '{papel: $p, nome: $n, tamanho: $t, sha256: $s}'; }
-          { arq windows Ekfrase-Gravador.exe; arq linux Ekfrase-Gravador.AppImage; } | jq -s . > "$RUNNER_TEMP/gravadores.json"
+          { arq windows Gravador-Writer-OS.exe; arq linux Gravador-Writer-OS.AppImage; } | jq -s . > "$RUNNER_TEMP/gravadores.json"
           N="ekfrase-gravador-$VERSAO"
           jq -n --arg v "$VERSAO" --arg c "$CANAL" --slurpfile a "$RUNNER_TEMP/gravadores.json" '{app: "ekfrase-gravador", versao: $v, canal: $c, arquivos: $a[0]}' > "$N.atualizacao.json"
           minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Gravador $VERSAO atualizacao" < /dev/null
           rm -f "$RUNNER_TEMP/minisign.key"
-          for f in Ekfrase-Gravador.exe Ekfrase-Gravador.AppImage "$N.atualizacao.json"; do
+          for f in Gravador-Writer-OS.exe Gravador-Writer-OS.AppImage "$N.atualizacao.json"; do
             minisign -V -p "$GITHUB_WORKSPACE/fonte/sistema/writer-os/imagem/minisign.pub" -m "$f"
           done
       - name: Criar o Release (a imagem com o lacre e o Gravador)
@@ -213,4 +213,4 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" \
             --title "Ekfrase Writer OS $versao" \
-            --notes "Para criar o pendrive: baixe o Gravador (Windows: Ekfrase-Gravador.exe; Linux: Ekfrase-Gravador.AppImage), que baixa e confere a imagem sozinho. Para o Rufus ou o balenaEtcher: o .img.xz (confira o .sha256 e o lacre .minisig com a chave em sistema/writer-os/imagem/minisign.pub). Passo a passo em https://ekfrase.com/writer/os/"
+            --notes "Para criar o pendrive: baixe o Gravador (Windows: Gravador-Writer-OS.exe; Linux: Gravador-Writer-OS.AppImage), que baixa e confere a imagem sozinho. Para o Rufus ou o balenaEtcher: o .img.xz (confira o .sha256 e o lacre .minisig com a chave em sistema/writer-os/imagem/minisign.pub). Passo a passo em https://ekfrase.com/writer/os/"
