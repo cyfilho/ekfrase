@@ -81,15 +81,15 @@ const PAPEL = process.platform === 'linux' ? 'linux' : 'windows';
 const publicarGravador = (v: string) => {
   const exe = Buffer.from(`Gravador ${v} para Windows ${'x'.repeat(200_000)}`);
   const app = Buffer.from(`Gravador ${v} para Linux ${'y'.repeat(150_000)}`);
-  gravadores.set(`${v}/Ekfrase-Gravador.exe`, exe);
-  gravadores.set(`${v}/Ekfrase-Gravador.AppImage`, app);
-  const texto = Buffer.from(JSON.stringify({ app: 'ekfrase-gravador', versao: v, canal: 'estavel', arquivos: [{ papel: 'windows', nome: 'Ekfrase-Gravador.exe', tamanho: exe.length, sha256: sha256(exe) }, { papel: 'linux', nome: 'Ekfrase-Gravador.AppImage', tamanho: app.length, sha256: sha256(app) }] }));
+  gravadores.set(`${v}/Gravador-Writer-OS.exe`, exe);
+  gravadores.set(`${v}/Gravador-Writer-OS.AppImage`, app);
+  const texto = Buffer.from(JSON.stringify({ app: 'ekfrase-gravador', versao: v, canal: 'estavel', arquivos: [{ papel: 'windows', nome: 'Gravador-Writer-OS.exe', tamanho: exe.length, sha256: sha256(exe) }, { papel: 'linux', nome: 'Gravador-Writer-OS.AppImage', tamanho: app.length, sha256: sha256(app) }] }));
   gravadores.set(`${v}/ekfrase-gravador-${v}.atualizacao.json`, texto);
   gravadores.set(`${v}/ekfrase-gravador-${v}.atualizacao.json.minisig`, Buffer.from(assinador.assinar(texto, `Ekfrase Gravador ${v} atualizacao`)));
   ofertasGravador.unshift(v);
 };
 /** O Gravador deste sistema na versão `v` (o que tem de estar no lugar do `.exe` depois de atualizar). */
-const gravadorDe = (v: string) => gravadores.get(`${v}/${PAPEL === 'linux' ? 'Ekfrase-Gravador.AppImage' : 'Ekfrase-Gravador.exe'}`)!;
+const gravadorDe = (v: string) => gravadores.get(`${v}/${PAPEL === 'linux' ? 'Gravador-Writer-OS.AppImage' : 'Gravador-Writer-OS.exe'}`)!;
 
 // ---- o "GitHub"
 const servidor = createServer((q, r) => {
@@ -282,7 +282,7 @@ try {
 
   // ⑤ o Gravador se atualiza (U2): um "Gravador 0.2.0" no lugar do .exe; o "GitHub" oferece a 0.2.1 e depois a 0.2.2
   await app.close();
-  const alvo = join(trab, PAPEL === 'linux' ? 'Ekfrase-Gravador.AppImage' : 'Ekfrase-Gravador.exe');
+  const alvo = join(trab, PAPEL === 'linux' ? 'Gravador-Writer-OS.AppImage' : 'Gravador-Writer-OS.exe');
   writeFileSync(alvo, 'o Gravador 0.2.0');
   publicarGravador('0.2.1');
   app = await abrir('livre', { EKFRASE_GRAVADOR_VERSAO: '0.2.0', EKFRASE_GRAVADOR_ATUALIZAR_ALVO: alvo, EKFRASE_GRAVADOR_ATUALIZACOES_ATRASO: '500' });

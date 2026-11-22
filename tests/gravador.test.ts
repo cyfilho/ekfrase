@@ -126,7 +126,7 @@ describe('disco de setor 4096: a FAT32 reescrita', () => {
 
 // ---------------------------------------------------------------- a regra dos discos
 
-const CTX = { caminhosProtegidos: ['E:\\Ekfrase-Gravador.exe', 'C:\\Users\\a\\AppData\\Local\\Ekfrase\\Gravador'] };
+const CTX = { caminhosProtegidos: ['E:\\Gravador-Writer-OS.exe', 'C:\\Users\\a\\AppData\\Local\\Ekfrase\\Gravador'] };
 
 describe('quais discos podem ser apagados (Windows)', () => {
   const json = JSON.stringify({
@@ -174,7 +174,7 @@ describe('quais discos podem ser apagados (Linux)', () => {
       { name: 'loop0', path: '/dev/loop0', type: 'loop', size: 8e9 },
     ],
   });
-  const d = discosDoLinux(json, { caminhosProtegidos: ['/media/ana/PEN/Ekfrase-Gravador.AppImage'] });
+  const d = discosDoLinux(json, { caminhosProtegidos: ['/media/ana/PEN/Gravador-Writer-OS.AppImage'] });
   const por = (n: string) => d.find((x) => x.id === `/dev/${n}`);
 
   it('só USB: o NVMe, o cartão SD embutido e o loop nem aparecem', () => {

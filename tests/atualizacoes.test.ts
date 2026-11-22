@@ -533,7 +533,7 @@ describe('o Writer no computador e o Gravador se atualizam (Atualizador, U2, "Gi
   it('trocar no lugar: o novo confere, o de agora vira .velho (Windows) e volta ao lugar se a troca falhar', async () => {
     const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-trocar-'));
     pastas.push(raiz);
-    const alvo = join(raiz, 'Ekfrase-Gravador.exe');
+    const alvo = join(raiz, 'Gravador-Writer-OS.exe');
     const novo = join(raiz, 'baixado.exe');
     writeFileSync(alvo, 'velho');
     writeFileSync(novo, 'novo');

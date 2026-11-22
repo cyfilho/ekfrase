@@ -31,12 +31,12 @@ win:
   requestedExecutionLevel: asInvoker
   signAndEditExecutable: true
 portable:
-  artifactName: Ekfrase-Gravador.exe
+  artifactName: Gravador-Writer-OS.exe
   requestExecutionLevel: user
   # a tela de abertura enquanto o .exe se descompacta (pixel art por código: scripts/arte/writer-os.mjs)
   splashImage: recursos/splash.bmp
   # sempre a mesma pasta no %TEMP%: o antivírus e o Windows não tratam cada abertura como um programa novo
-  unpackDirName: Ekfrase-Gravador
+  unpackDirName: Gravador-Writer-OS
 linux:
   executableName: ekfrase-gravador
   target:
@@ -44,5 +44,5 @@ linux:
       arch: [x64]
   icon: dist/icone.png
   category: Utility
-  artifactName: Ekfrase-Gravador.AppImage
+  artifactName: Gravador-Writer-OS.AppImage
   synopsis: Cria o pendrive do Ekfrase Writer OS
