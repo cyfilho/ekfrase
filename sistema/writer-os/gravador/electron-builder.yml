@@ -3,7 +3,7 @@
 # instalar; pede a permissão de administrador só na hora de gravar), Linux = AppImage. Sem certificado de
 # assinatura (DEC-P064; PLANO §12, linha 13): a página ekfrase.com/writer/os/ explica o aviso do SmartScreen.
 appId: com.ekfrase.gravador
-productName: Ekfrase Gravador
+productName: Gravador Writer OS
 copyright: Ekfrase (MPL-2.0)
 directories:
   output: instalador

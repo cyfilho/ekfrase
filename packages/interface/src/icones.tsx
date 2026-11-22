@@ -129,3 +129,12 @@ const ENGRENAGEM: readonly Px[] = [
   [4, 3, 4, 1], [3, 4, 1, 4], [8, 4, 1, 4], [4, 8, 4, 1],
 ];
 export const IconeEngrenagem = (p: P) => <Pixels px={ENGRENAGEM} {...p} />;
+
+// A lupa (o zoom do modo jogo): a lente redonda, o cabo na diagonal e o + (aproximar) ou o - (afastar) dentro.
+// prettier-ignore
+const LUPA: readonly Px[] = [
+  [2, 0, 4, 1], [1, 1, 1, 1], [6, 1, 1, 1], [0, 2, 1, 4], [7, 2, 1, 4], [1, 6, 1, 1], [6, 6, 1, 1], [2, 7, 4, 1],
+  [7, 7, 1, 1], [8, 8, 2, 2], [10, 10, 2, 2],
+];
+export const IconeAproximar = (p: P) => <Pixels px={[...LUPA, [2, 3, 4, 2], [3, 2, 2, 4]]} {...p} />;
+export const IconeAfastar = (p: P) => <Pixels px={[...LUPA, [2, 3, 4, 2]]} {...p} />;

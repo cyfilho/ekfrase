@@ -13,7 +13,9 @@
  *   ekfrase.com/<app>/app/<tela>/<id>  uma tela dentro do app
  *
  * MODO JOGO = o castelo, sempre na raiz e sempre depois do `#`:
- *   ekfrase.com/#/patio                o pátio (a página inicial do modo jogo)
+ *   ekfrase.com/#/patio                o pátio, os terrenos do castelo (a página inicial do modo jogo)
+ *   ekfrase.com/#/castelo              o Grande Hall do castelo central (DEC-P073)
+ *   ekfrase.com/#/castelo/<área>       o corredor de uma área (ala) do castelo; `/#/castelo/retratos` a Sala dos Retratos
  *   ekfrase.com/#/<app>                o hall da torre do app
  *   ekfrase.com/#/<app>/app            a sala do app
  *
@@ -39,6 +41,8 @@ export const site = {
 /** O castelo (modo jogo). */
 export const jogo = {
   patio: '/#/patio',
+  /** O castelo central: sem nada, o Grande Hall; com uma área (`letras`, `mundos`…) ou `retratos`, a cena dela. */
+  castelo: (lugar = ''): string => `/#/castelo${lugar ? `/${lugar}` : ''}`,
   hall: (app: string): string => `/#/${app}`,
   sala: (app: string): string => `/#/${app}/app`,
 };
