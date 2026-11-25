@@ -19,7 +19,9 @@ import { escolherLuz, estadoDoCabo, lerConsulta, lerLinhaInstalar, SistemaSimula
 import { teclaProibida } from '../sistema/writer-os/casca/src/motor/teclas.ts';
 import { lerEfi } from '../sistema/writer-os/casca/src/writer/agente-teste.ts';
 import { DadosDoWriter, NOME_DA_PASTA } from '../sistema/writer-os/casca/src/writer/dados.ts';
-import { dadosSimulados, passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
+import { ARQUIVO_DO_SELO, dadosSimulados, passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
+import type { Pagina } from '../sistema/writer-os/casca/src/writer/pagina.ts';
+import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../sistema/writer-os/casca/src/motor/selo.ts';
 
 const pastas: string[] = [];
 const temp = (): string => {
@@ -530,5 +532,96 @@ describe('Writer OS: apagar o disco inteiro e a marca do computador (W3f)', () =
     } finally {
       fim();
     }
+  });
+});
+
+describe('Writer OS: o feedback guardado sem internet fica selado (Bloco F, segurança item 2)', { timeout: 60_000 }, () => {
+  const PRINT = 'o print mostra o capitulo secreto';
+  const feedback = (n: number) => ({ campos: { texto: `feedback ${n}`, app: 'writer' }, arquivos: [{ campo: 'print', nome: 'tela.png', tipo: 'image/png', bytes: new Uint8Array(Buffer.from(PRINT)) }] });
+  const semPagina = { aberta: () => false } as unknown as Pagina;
+
+  async function comPendrive(raiz = temp()) {
+    const sistema = new SistemaSimulado(raiz, false);
+    mkdirSync(sistema.caminhos.dados, { recursive: true });
+    writeFileSync(join(sistema.caminhos.run, 'dados.json'), dadosSimulados(true, 'usb'));
+    const os = new WriterOS(sistema);
+    const dados = new DadosDoWriter({ lembrado: join(raiz, 'perfil', 'casca.json'), sugerida: join(raiz, 'Documentos'), servidor: () => ({ base: 'https://ekfrase.com/api/v1/', padrao: true }), atrasoDoEspelho: 0 });
+    await os.ligar({ dados, pagina: semPagina, sair: async () => undefined, versaoApp: '0' });
+    return { raiz, os, dados, feedbacks: join(os.pastaDoPendrive, 'feedbacks') };
+  }
+  const nada = (pasta: string) => {
+    for (const a of todos(pasta)) expect(readFileSync(a).includes(Buffer.from('capitulo secreto')), a).toBe(false);
+  };
+
+  it('sem a chave ainda, espera na memória; dada a senha, vai ao disco selado, e trancado não abre', async () => {
+    const { raiz, os, dados, feedbacks } = await comPendrive();
+    expect(await os.guardarFeedback(feedback(1))).toEqual({ ok: true });
+    expect(existsSync(feedbacks)).toBe(false);
+    expect((await os.feedbacksGuardados()).map((f) => f.id)).toEqual([expect.stringMatching(/\.memoria$/)]);
+
+    expect((await dados.criarSenha('senha dos testes')).ok).toBe(true);
+    await os.depoisDeAbrir();
+    expect(readdirSync(feedbacks)).toEqual([expect.stringMatching(/^feedback-.*\.cifrado$/)]);
+    expect(existsSync(join(os.pastaDoPendrive, 'dados', ARQUIVO_DO_SELO))).toBe(true);
+    const abertos = await os.feedbacksGuardados();
+    expect(abertos).toHaveLength(1);
+    expect(abertos[0]!.campos['texto']).toBe('feedback 1');
+    expect(Buffer.from(abertos[0]!.arquivos[0]!.bytes).toString()).toBe(PRINT);
+
+    // trancado: guarda selado na hora (a pública basta), mas só a senha lê
+    await dados.trancar();
+    expect(await os.guardarFeedback(feedback(2))).toEqual({ ok: true });
+    expect(readdirSync(feedbacks).filter((n) => n.endsWith('.cifrado'))).toHaveLength(2);
+    expect(await os.feedbacksGuardados()).toEqual([]);
+    nada(raiz);
+
+    // enviado: apagar pelo id de quando estava na memória tira o selado também
+    expect((await dados.abrir('senha dos testes')).ok).toBe(true);
+    await os.depoisDeAbrir();
+    const ids = (await os.feedbacksGuardados()).map((f) => f.id);
+    expect(ids).toHaveLength(2);
+    await os.apagarFeedback(ids[0]!.replace(/\.cifrado$/, '.memoria'));
+    await os.apagarFeedback('../../dados/cofre.db');
+    expect(await os.feedbacksGuardados()).toHaveLength(1);
+    expect(existsSync(join(os.pastaDoPendrive, 'dados', 'cofre.db'))).toBe(true);
+    await dados.trancar();
+  });
+
+  it('os .json em claro das versões 0.2.4 a 0.2.6 são selados quando a senha é dada; o selo.pub trocado volta', async () => {
+    const { raiz, os, dados, feedbacks } = await comPendrive();
+    expect((await dados.criarSenha('senha dos testes')).ok).toBe(true);
+    await os.depoisDeAbrir();
+    await dados.trancar();
+    mkdirSync(feedbacks, { recursive: true });
+    const antigo = { campos: { texto: 'antigo' }, arquivos: [{ campo: 'print', nome: 'tela.png', tipo: 'image/png', dados: Buffer.from(PRINT).toString('base64') }] };
+    writeFileSync(join(feedbacks, 'feedback-2026-11-25T10-00-00-000Z-abcd.json'), JSON.stringify(antigo));
+    // alguém troca a chave pública por outra (para ler os próximos): a senha a refaz
+    const pub = join(os.pastaDoPendrive, 'dados', ARQUIVO_DO_SELO);
+    const certa = readFileSync(pub, 'utf8');
+    writeFileSync(pub, novoPar().publica);
+    // trancado, o antigo ainda é lido (era assim) e segue para o envio
+    expect((await os.feedbacksGuardados()).map((f) => f.campos['texto'])).toEqual(['antigo']);
+
+    expect((await dados.abrir('senha dos testes')).ok).toBe(true);
+    await os.depoisDeAbrir();
+    expect(readFileSync(pub, 'utf8')).toBe(certa);
+    expect(readdirSync(feedbacks)).toEqual(['feedback-2026-11-25T10-00-00-000Z-abcd.cifrado']);
+    expect((await os.feedbacksGuardados()).map((f) => f.campos['texto'])).toEqual(['antigo']);
+    await dados.trancar();
+    nada(raiz);
+  });
+
+  it('o selo: só a privada do par abre; mexido, não abre', () => {
+    const par = novoPar();
+    const s = selar(par.publica, Buffer.from(PRINT));
+    expect(s.includes('capitulo')).toBe(false);
+    expect(abrirSelado(par.privada, s)?.toString()).toBe(PRINT);
+    expect(abrirSelado(novoPar().privada, s)).toBeNull();
+    const j = JSON.parse(s) as { dados: string };
+    const b = Buffer.from(j.dados, 'base64');
+    b[0] = b[0]! ^ 1;
+    expect(abrirSelado(par.privada, JSON.stringify({ ...j, dados: b.toString('base64') }))).toBeNull();
+    expect(abrirSelado(par.privada, 'lixo')).toBeNull();
+    expect(publicaDaPrivada(par.privada)).toBe(par.publica);
   });
 });

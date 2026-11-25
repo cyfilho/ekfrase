@@ -13,11 +13,17 @@
 # nova em /run/ekfrase/sessao/quedas). Ficam só os 5 boots mais novos. Sem a partição de dados,
 # não grava nada (nunca escreve em outro disco). Nada sai do pendrive: é para o Alcy plugar no
 # Windows e o Claude ler.
+# SEM REDES (Bloco F, 25/11/2026): a pasta fica em claro, então tudo passa pelo `ekfrase-sem-redes.pl`
+# antes de ir ao disco: os nomes das redes Wi-Fi (as conhecidas e as que estão à vista) viram <rede>, e os
+# endereços das placas (MAC, BSSID) viram xx:xx:xx:xx:xx:xx. Sem o filtro, não grava journal nem dmesg.
 set -u
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 BASE="/dados/Ekfrase Writer/.diagnostico"
 GUARDAR=5
 SESSAO=/run/ekfrase/sessao
+FILTRO=/usr/lib/ekfrase/ekfrase-sem-redes.pl
+REDES=/run/ekfrase/diagnostico-redes
+export REDES
 
 ID=$(tr -d '-' < /proc/sys/kernel/random/boot_id | cut -c1-8)
 PASTA="$BASE/$(date +%Y-%m-%d_%H%M%S)_$ID"
@@ -34,7 +40,8 @@ preparar() {
   cat > "$BASE/LEIA-ME.txt" <<'FIM'
 Diagnóstico do Ekfrase Writer OS: o que aconteceu em cada boot deste pendrive (o sistema, a placa de
 vídeo, a sessão). Uma pasta por boot; ficam as 5 mais novas. Não tem nenhum texto seu: os textos
-ficam cifrados em "Ekfrase Writer/dados". Pode apagar esta pasta quando quiser.
+ficam cifrados em "Ekfrase Writer/dados". Os nomes das redes Wi-Fi e os endereços das placas de rede
+saem daqui (aparecem como <rede> e xx:xx:xx:xx:xx:xx). Pode apagar esta pasta quando quiser.
 FIM
 }
 
@@ -51,8 +58,22 @@ placas() {
   ls -l /dev/dri 2>&1
 }
 
+# os nomes de rede que o NetworkManager conhece agora (perfis e as redes à vista), um por linha, só para o filtro
+nomes_de_rede() {
+  ( umask 077
+    { nmcli -g NAME connection show 2>/dev/null   # a casca dá à conexão o nome da rede (sistema.ts)
+      nmcli -g SSID device wifi list --rescan no 2>/dev/null
+    } | grep -v '^$' | sort -u > "$REDES.tmp" && mv -f "$REDES.tmp" "$REDES" )
+}
+
+# o filtro; sem perl ou sem o filtro, nada passa
+limpar() {
+  if [ -r "$FILTRO" ] && command -v perl >/dev/null 2>&1; then perl "$FILTRO"; else cat >/dev/null; echo "(sem o filtro de redes: não gravado)"; fi
+}
+
 fotografar() {
   preparar || return 0
+  nomes_de_rede
   {
     echo "motivo: $1"
     echo "agora: $(date -Is)  ligado há: $(cut -d' ' -f1 /proc/uptime) s"
@@ -83,10 +104,10 @@ fotografar() {
     echo
     echo "== serviços que falharam"
     systemctl --failed --no-pager --no-legend 2>&1
-  } > "$PASTA/resumo.txt.tmp" 2>&1
-  journalctl -b --no-pager -o short-monotonic 2>&1 | tail -n 40000 > "$PASTA/journal.txt.tmp"
-  journalctl -b --no-pager -o short-monotonic -u ekfrase-sessao.service 2>&1 | tail -n 8000 > "$PASTA/sessao.txt.tmp"
-  dmesg > "$PASTA/dmesg.txt.tmp" 2>&1
+  } 2>&1 | limpar > "$PASTA/resumo.txt.tmp"
+  journalctl -b --no-pager -o short-monotonic 2>&1 | tail -n 40000 | limpar > "$PASTA/journal.txt.tmp"
+  journalctl -b --no-pager -o short-monotonic -u ekfrase-sessao.service 2>&1 | tail -n 8000 | limpar > "$PASTA/sessao.txt.tmp"
+  dmesg 2>&1 | limpar > "$PASTA/dmesg.txt.tmp"
   for f in resumo journal sessao dmesg; do mv -f "$PASTA/$f.txt.tmp" "$PASTA/$f.txt"; done
   sync -f "$PASTA/resumo.txt" 2>/dev/null || sync
   echo "ekfrase-diagnostico: gravado ($1) em $PASTA"

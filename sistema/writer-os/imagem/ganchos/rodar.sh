@@ -32,6 +32,11 @@ done
 desmontar() { for m in "${MONTEI[@]}"; do umount -l "$m" || true; done; }
 trap desmontar EXIT
 
+# os pacotes da imagem (Bloco F), antes do 90-travas apagar o dpkg: pacote, versão, pacote-fonte, versão da fonte
+chroot "$R" /usr/bin/dpkg-query -W -f '${binary:Package}	${Version}	${source:Package}	${source:Version}
+' | LC_ALL=C sort > "$PACOTES"
+test -s "$PACOTES" || { echo "a lista dos pacotes saiu vazia"; exit 1; }
+
 for g in "$AQUI"/ganchos/[0-9][0-9]-*.sh; do
   echo "== gancho $(basename "$g")"
   chroot "$R" /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin VERSAO="$VERSAO" /bin/bash -s < "$g"
