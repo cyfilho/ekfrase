@@ -1,7 +1,7 @@
 {
   "name": "ekfrase-writer-casca",
   "productName": "Ekfrase Writer",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "description": "Ekfrase Writer no computador: a casca Electron (SQLite cifrado, espelho .md, travas)",

@@ -31,9 +31,11 @@ const TAMANHO_BOOT = 1400 * 1024 * 1024;
 
 export type TarefaComputador =
   | { tipo: 'preparar'; disco: number; serial: string; letra: string; bytes: number }
-  | { tipo: 'remover'; disco: number; serial: string; letra: string; copiarPara: string | null };
+  | { tipo: 'remover'; disco: number; serial: string; letra: string; copiarPara: string | null }
+  /** Só deixa o próximo ligar para o Writer OS (`bootsequence`, uma vez); quem reinicia é a janela (`shutdown /r`). */
+  | { tipo: 'reiniciar' };
 
-export type CodigoComputador = 'disco-mudou' | 'nao-gpt' | 'nao-encolhe' | 'pouco-livre' | 'sem-writer' | 'copia' | 'entrada' | 'remover' | 'falhou';
+export type CodigoComputador = 'disco-mudou' | 'nao-gpt' | 'nao-encolhe' | 'pouco-livre' | 'sem-writer' | 'copia' | 'entrada' | 'sem-entrada' | 'remover' | 'falhou';
 
 export class ErroComputador extends Error {
   readonly codigo: CodigoComputador;
@@ -132,7 +134,7 @@ export function computadorSimulado(tipo: string | undefined): InfoComputador {
 const aspas = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 /** O começo de todo script que muda o disco: o disco N ainda é o do sistema, com este número de série, e a letra é dele. */
-export function guardaDoSistema(t: Pick<TarefaComputador, 'disco' | 'serial' | 'letra'>, exigirSistema = true): string {
+export function guardaDoSistema(t: Pick<Extract<TarefaComputador, { disco: number }>, 'disco' | 'serial' | 'letra'>, exigirSistema = true): string {
   if (!Number.isInteger(t.disco) || t.disco < 0 || !/^[A-Z]$/.test(t.letra)) throw new ErroComputador('disco-mudou');
   return [
     `$ErrorActionPreference = 'Stop'`,
@@ -196,11 +198,11 @@ export interface OpcoesComputador {
   exigirSistema?: boolean;
   /** Só no simulado: nada roda, a resposta é a de sempre. */
   simulado?: boolean;
-  avisar?: (fase: 'preparar' | 'copiar' | 'entrada' | 'remover' | 'devolver') => void;
+  avisar?: (fase: 'preparar' | 'copiar' | 'entrada' | 'remover' | 'devolver' | 'reiniciar') => void;
 }
 
 /** O que o processo elevado faz com a tarefa do computador. `preparar` devolve o espaço livre que ficou. */
-export async function executarComputador(t: TarefaComputador, o: OpcoesComputador = {}): Promise<{ livre: number } | Removido> {
+export async function executarComputador(t: TarefaComputador, o: OpcoesComputador = {}): Promise<{ livre: number } | Removido | { guid: string }> {
   const exigir = o.exigirSistema !== false;
   if (t.tipo === 'preparar') {
     o.avisar?.('preparar');
@@ -208,7 +210,32 @@ export async function executarComputador(t: TarefaComputador, o: OpcoesComputado
     const livre = Number((await ps(scriptPreparar(t, exigir))).trim().split(/\s+/).pop() ?? 0);
     return { livre };
   }
+  if (t.tipo === 'reiniciar') return reiniciar(o);
   return remover(t, o, exigir);
+}
+
+/**
+ * Deixa o PRÓXIMO ligar para o Writer OS: acha o `{guid}` da entrada "Ekfrase Writer OS" no firmware e põe
+ * `bcdedit /set {fwbootmgr} bootsequence {guid}` (vale uma vez só; depois o computador volta à ordem de sempre).
+ * Quem reinicia é a janela, sem administrador (`shutdown /r /t 5`), para dar tempo do "Cancelar".
+ */
+async function reiniciar(o: OpcoesComputador): Promise<{ guid: string }> {
+  o.avisar?.('reiniciar');
+  if (o.simulado) return { guid: '{simulado}' };
+  let firmware: string;
+  try {
+    firmware = (await rodar('bcdedit.exe', ['/enum', 'firmware'], { windowsHide: true, timeout: 60_000 })).stdout;
+  } catch (e) {
+    throw new ErroComputador('entrada', String((e as Error)?.message ?? e).slice(0, 300));
+  }
+  const guid = entradasDoWriter(firmware)[0];
+  if (!guid) throw new ErroComputador('sem-entrada');
+  try {
+    await rodar('bcdedit.exe', ['/set', '{fwbootmgr}', 'bootsequence', guid], { windowsHide: true, timeout: 60_000 });
+  } catch (e) {
+    throw new ErroComputador('entrada', String((e as Error)?.message ?? e).slice(0, 300));
+  }
+  return { guid };
 }
 
 async function remover(t: Extract<TarefaComputador, { tipo: 'remover' }>, o: OpcoesComputador, exigir: boolean): Promise<Removido> {

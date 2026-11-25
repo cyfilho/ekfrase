@@ -23,7 +23,7 @@ declare global {
 }
 
 const ponte = window.gravador!;
-type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro' | 'remover' | 'removendo' | 'removido' | 'atualizacoes';
+type Passo = 'disco' | 'confirmar' | 'gravando' | 'pronto' | 'erro' | 'remover' | 'removendo' | 'removido' | 'reiniciar' | 'reiniciando' | 'atualizacoes';
 type Modo = 'criar' | 'atualizar';
 const MARCAS = ['lenovo', 'dell', 'hp', 'acer', 'asus', 'msi', 'samsung', 'outra'] as const;
 
@@ -67,7 +67,7 @@ function textoConteudo(d: DiscoNaTela): string {
 
 function textoProgresso(p: Progresso | null): string {
   if (!p) return t('gravador.fase.conferir');
-  if (p.fase === 'computador') return t(`gravador.pc.etapa.${p.etapa === 'preparar' || p.etapa === 'copiar' || p.etapa === 'entrada' || p.etapa === 'remover' || p.etapa === 'devolver' ? p.etapa : 'preparar'}`);
+  if (p.fase === 'computador') return t(`gravador.pc.etapa.${p.etapa === 'preparar' || p.etapa === 'copiar' || p.etapa === 'entrada' || p.etapa === 'remover' || p.etapa === 'devolver' || p.etapa === 'reiniciar' ? p.etapa : 'preparar'}`);
   const pct = p.total ? Math.floor(((p.feito ?? 0) / p.total) * 100) : null;
   if (p.fase === 'baixar' && p.total) return t('gravador.fase.baixar-quanto', { feito: tamanho(p.feito ?? 0), total: tamanho(p.total) });
   if ((p.fase === 'gravar' || p.fase === 'verificar') && pct != null) return t(`gravador.fase.${p.fase}-quanto`, { pct });
@@ -100,6 +100,9 @@ export function App() {
   const [preparado, setPreparado] = useState<ResultadoPreparar | null>(null);
   const [copiarTextos, setCopiarTextos] = useState(true);
   const [removido, setRemovido] = useState<Extract<ResultadoRemover, { ok: true }> | null>(null);
+  // "Reiniciar no Writer OS": a contagem (null = esperando a permissão de administrador) e o aviso de que cancelou
+  const [contagem, setContagem] = useState<number | null>(null);
+  const [reinicioCancelado, setReinicioCancelado] = useState(false);
   const titulo = useFocoNoTitulo(passo);
   // as atualizações do próprio Gravador (U2): a tela do botão ↻ e o aviso de baixo
   const at = useAtualizacoes();
@@ -214,6 +217,36 @@ export function App() {
     }
   }
 
+  async function reiniciar() {
+    setPasso('reiniciando');
+    setContagem(null);
+    setProgresso({ fase: 'permissao' });
+    setErro(null);
+    setReinicioCancelado(false);
+    const r = await ponte.reiniciar();
+    if (r.ok) {
+      setContagem(r.segundos);
+    } else {
+      setErro(r.erro === 'permissao-recusada' || r.erro === 'sem-pkexec' ? r.erro : `pc-${r.erro}`);
+      setDetalhe(r.detalhe ?? '');
+      setPasso('erro');
+    }
+  }
+
+  // a contagem do "Reiniciar no Writer OS": um segundo por vez, até zero (o Windows reinicia sozinho)
+  useEffect(() => {
+    if (passo !== 'reiniciando' || contagem === null || contagem <= 0) return;
+    const i = setTimeout(() => setContagem((c) => (c === null ? c : c - 1)), 1000);
+    return () => clearTimeout(i);
+  }, [passo, contagem]);
+
+  async function cancelarReinicio() {
+    await ponte.cancelarReinicio();
+    setContagem(null);
+    setReinicioCancelado(true);
+    setPasso('disco');
+  }
+
   function recomecar() {
     setPasso('disco');
     setPreparado(null);
@@ -265,7 +298,7 @@ export function App() {
         )}
         <TrocarTema />
       </header>
-      {passo !== 'remover' && passo !== 'removendo' && passo !== 'removido' && passo !== 'atualizacoes' && passos}
+      {passo !== 'remover' && passo !== 'removendo' && passo !== 'removido' && passo !== 'reiniciar' && passo !== 'reiniciando' && passo !== 'atualizacoes' && passos}
 
       {passo === 'atualizacoes' && at && (
         <main data-teste="passo-atualizacoes">
@@ -370,7 +403,15 @@ export function App() {
                     <button type="button" class="botao" onClick={() => setPasso('remover')} data-teste="ir-remover">
                       {t('gravador.remover.botao')}
                     </button>
+                    <button type="button" class="botao" onClick={() => setPasso('reiniciar')} data-teste="ir-reiniciar">
+                      {t('gravador.reiniciar.botao')}
+                    </button>
                   </div>
+                  {reinicioCancelado && (
+                    <p class="nota" data-teste="reinicio-cancelado" aria-live="polite">
+                      {t('gravador.reiniciar.cancelado')}
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -439,6 +480,51 @@ export function App() {
               {t('gravador.remover.confirmar')}
             </button>
           </div>
+        </main>
+      )}
+
+      {passo === 'reiniciar' && (
+        <main data-teste="passo-reiniciar">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.reiniciar.titulo')}
+          </h1>
+          <p>{t('gravador.reiniciar.texto')}</p>
+          <p class="perigo" data-teste="reiniciar-salve">
+            {t('gravador.reiniciar.salve')}
+          </p>
+          <p class="nota">{t('gravador.reiniciar.uma-vez')}</p>
+          <div class="acoes">
+            <button type="button" class="botao" onClick={() => setPasso('disco')} data-teste="reiniciar-voltar">
+              {t('gravador.cancelar')}
+            </button>
+            <button type="button" class="botao principal" onClick={() => void reiniciar()} data-teste="reiniciar">
+              {t('gravador.reiniciar.confirmar')}
+            </button>
+          </div>
+        </main>
+      )}
+
+      {passo === 'reiniciando' && (
+        <main data-teste="passo-reiniciando">
+          <h1 ref={titulo} tabIndex={-1}>
+            {t('gravador.reiniciar.reiniciando')}
+          </h1>
+          {contagem === null ? (
+            <p aria-live="polite" class="fase" data-teste="fase">
+              {progresso?.fase === 'permissao' ? t('gravador.fase.permissao') : textoProgresso(progresso)}
+            </p>
+          ) : (
+            <>
+              <p aria-live="polite" class="fase" data-teste="reiniciar-contagem">
+                {t('gravador.reiniciar.contagem', { count: contagem })}
+              </p>
+              <div class="acoes">
+                <button type="button" class="botao principal" onClick={() => void cancelarReinicio()} data-teste="reiniciar-cancelar">
+                  {t('gravador.cancelar')}
+                </button>
+              </div>
+            </>
+          )}
         </main>
       )}
 

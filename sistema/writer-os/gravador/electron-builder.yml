@@ -45,4 +45,4 @@ linux:
   icon: dist/icone.png
   category: Utility
   artifactName: Gravador-Writer-OS.AppImage
-  synopsis: Cria o pendrive do Ekfrase Writer OS
+  synopsis: Cria o pendrive que liga direto no Ekfrase Writer.

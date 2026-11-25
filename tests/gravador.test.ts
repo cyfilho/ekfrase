@@ -475,6 +475,9 @@ describe('este computador: preparar e remover o Writer OS (computador.ts, PLANO 
     const etapas: string[] = [];
     expect(await executarComputador({ tipo: 'remover', disco: 0, serial: 'S', letra: 'C', copiarPara: 'X:\\copia' }, { simulado: true, avisar: (e) => etapas.push(e) })).toEqual({ copiado: 'X:\\copia', espaco: 'devolvido' });
     expect(etapas).toEqual(['copiar', 'entrada', 'remover', 'devolver']);
+    const fase: string[] = [];
+    expect(await executarComputador({ tipo: 'reiniciar' }, { simulado: true, avisar: (e) => fase.push(e) })).toEqual({ guid: '{simulado}' });
+    expect(fase).toEqual(['reiniciar']);
     expect(computadorSimulado('writer').writer).toBe(true);
     expect(computadorSimulado(undefined).disponivel).toBe(false);
   });

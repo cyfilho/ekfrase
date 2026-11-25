@@ -207,5 +207,16 @@
   "atualizacoes.erro.sem-rede": "Sem internet (ou o servidor não respondeu). Tenta de novo sozinho mais tarde.",
   "atualizacoes.erro.lacre": "O arquivo não tem o lacre da Ekfrase, ou mudou no caminho. Nada foi instalado.",
   "atualizacoes.erro.sem-espaco": "Falta espaço neste computador para a versão nova.",
-  "atualizacoes.erro.falhou": "Algo deu errado. Nada foi instalado, e este Gravador continua como estava."
+  "atualizacoes.erro.falhou": "Algo deu errado. Nada foi instalado, e este Gravador continua como estava.",
+  "pc.etapa.reiniciar": "Deixando o próximo ligar para o Writer OS…",
+  "reiniciar.botao": "Reiniciar no Writer OS",
+  "reiniciar.titulo": "Reiniciar no Writer OS",
+  "reiniciar.texto": "O computador vai reiniciar agora e ligar direto no Writer OS que está instalado nele. Na vez seguinte, ele volta a ligar no Windows como sempre.",
+  "reiniciar.salve": "Salve e feche o que estiver aberto: o computador reinicia sozinho 5 segundos depois da permissão.",
+  "reiniciar.uma-vez": "O Windows pede a permissão de administrador uma vez. Nada é apagado nem mudado no disco.",
+  "reiniciar.confirmar": "Reiniciar agora",
+  "reiniciar.reiniciando": "Reiniciando no Writer OS…",
+  "reiniciar.contagem": "O computador reinicia em {count} s.",
+  "reiniciar.cancelado": "Reinício cancelado. Mas o próximo ligar, só ele, ainda vai para o Writer OS.",
+  "erro.pc-sem-entrada": "Não achei a entrada \"Ekfrase Writer OS\" no menu de ligar deste computador. Ligue pelo pendrive e escolha \"Instalar neste computador\" de novo, ou escolha o Writer OS no menu de boot (a tecla da marca)."
 }

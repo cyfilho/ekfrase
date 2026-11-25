@@ -30,7 +30,7 @@ import { listarDiscos, resumoDoConteudo, type Disco } from './nucleo/discos.ts';
 declare const __EKFRASE_CANAL__: string;
 import { API_GITHUB, type Canal, ErroOrigem, imagemDoArquivo, imagemDoLancamento, pastaCache, ultimoLancamento, type Buscar, type Etapa, type ImagemPronta, type Lancamento } from './nucleo/origem.ts';
 import { rodarTrabalhador } from './nucleo/trabalhador.ts';
-import { nomeNormalizado, type DiscoNaTela, type FaseTela, type InfoLancamento, type PedidoGravar, type Progresso, type ResultadoGravar, type ResultadoPreparar, type ResultadoRemover } from './ponte.ts';
+import { nomeNormalizado, SEGUNDOS_PARA_REINICIAR, type DiscoNaTela, type FaseTela, type InfoLancamento, type PedidoGravar, type Progresso, type ResultadoGravar, type ResultadoPreparar, type ResultadoReiniciar, type ResultadoRemover } from './ponte.ts';
 
 const rodar = promisify(execFile);
 const iTrabalhador = process.argv.indexOf('--ekfrase-trabalhador');
@@ -187,6 +187,52 @@ function iniciar(): void {
         return { ok: false, erro: 'falhou', detalhe: String((e as Error)?.message ?? e).slice(0, 300) };
       } finally {
         ocupado = false;
+      }
+    }),
+  );
+
+  // ---- "Reiniciar no Writer OS": o trabalhador elevado deixa o PRÓXIMO ligar para a entrada "Ekfrase Writer OS"
+  // (`bcdedit /set {fwbootmgr} bootsequence {guid}`, uma vez só); aqui, sem administrador, vem o `shutdown /r /t 5`
+  // (5 s para o Cancelar: `shutdown /a`). Simulado (roteiro): nada reinicia nem cancela de verdade.
+  ipcMain.handle(
+    'gravador:reiniciar',
+    tratar(async (): Promise<ResultadoReiniciar> => {
+      if (ocupado) return { ok: false, erro: 'ocupado' };
+      ocupado = true;
+      try {
+        const info = await lerComputador();
+        if (!info.disponivel || !info.windows) return { ok: false, erro: 'nao-windows' };
+        if (!info.writer) return { ok: false, erro: 'sem-writer' };
+        enviar({ fase: 'permissao' });
+        const r = await gravarElevado({
+          pedido: { computador: { tipo: 'reiniciar' }, protegidos: protegidos(), ...(SIMULADO ? { simulado: SIMULADO } : {}) },
+          executavel: process.execPath,
+          trabalhador: join(DIST, 'trabalhador.cjs'),
+          aviso: avisoDoTrabalhador,
+          semElevar: !!SIMULADO,
+        });
+        registro('reiniciar', JSON.stringify(r));
+        if (!r.ok) return { ok: false, erro: r.erro, detalhe: r.detalhe ?? '' };
+        if (!r.computador) return { ok: false, erro: 'falhou' };
+        if (!r.computador.ok) return { ok: false, erro: r.computador.erro, detalhe: r.computador.detalhe };
+        if (!SIMULADO) await rodar('shutdown.exe', ['/r', '/t', String(SEGUNDOS_PARA_REINICIAR)], { windowsHide: true, timeout: 30_000 });
+        return { ok: true, segundos: SEGUNDOS_PARA_REINICIAR };
+      } catch (e) {
+        return { ok: false, erro: 'falhou', detalhe: String((e as Error)?.message ?? e).slice(0, 300) };
+      } finally {
+        ocupado = false;
+      }
+    }),
+  );
+  ipcMain.handle(
+    'gravador:cancelar-reinicio',
+    tratar(async (): Promise<{ ok: boolean }> => {
+      if (SIMULADO) return { ok: true };
+      try {
+        await rodar('shutdown.exe', ['/a'], { windowsHide: true, timeout: 30_000 });
+        return { ok: true };
+      } catch {
+        return { ok: false };
       }
     }),
   );

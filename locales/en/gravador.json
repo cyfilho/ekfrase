@@ -207,5 +207,16 @@
   "atualizacoes.erro.sem-rede": "No internet (or the server did not answer). It will try again later on its own.",
   "atualizacoes.erro.lacre": "The file does not have the Ekfrase seal, or it changed on the way. Nothing was installed.",
   "atualizacoes.erro.sem-espaco": "There is not enough space on this computer for the new version.",
-  "atualizacoes.erro.falhou": "Something went wrong. Nothing was installed, and this Drive Creator stays as it was."
+  "atualizacoes.erro.falhou": "Something went wrong. Nothing was installed, and this Drive Creator stays as it was.",
+  "pc.etapa.reiniciar": "Setting the next start to Writer OS…",
+  "reiniciar.botao": "Restart into Writer OS",
+  "reiniciar.titulo": "Restart into Writer OS",
+  "reiniciar.texto": "This computer will restart now and boot straight into the Writer OS installed on it. The next time, it goes back to starting Windows as usual.",
+  "reiniciar.salve": "Save and close whatever is open: the computer restarts by itself 5 seconds after you allow it.",
+  "reiniciar.uma-vez": "Windows asks for administrator permission once. Nothing on the disk is erased or changed.",
+  "reiniciar.confirmar": "Restart now",
+  "reiniciar.reiniciando": "Restarting into Writer OS…",
+  "reiniciar.contagem": "The computer restarts in {count} s.",
+  "reiniciar.cancelado": "Restart cancelled. Still, the next start, and only that one, goes to Writer OS.",
+  "erro.pc-sem-entrada": "I could not find the \"Ekfrase Writer OS\" entry in this computer's boot menu. Boot from the USB drive and choose \"Install on this computer\" again, or pick Writer OS in the boot menu (your brand's key)."
 }

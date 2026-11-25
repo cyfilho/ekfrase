@@ -40,6 +40,12 @@ export type ResultadoPreparar = { ok: true; livre: number } | { ok: false; erro:
 
 export type ResultadoRemover = { ok: true; copiado: string | null; espaco: 'devolvido' | 'solto' } | { ok: false; erro: string; detalhe?: string };
 
+/** "Reiniciar no Writer OS": `segundos` = o tempo que a pessoa tem para cancelar. */
+export type ResultadoReiniciar = { ok: true; segundos: number } | { ok: false; erro: string; detalhe?: string };
+
+/** O `shutdown /r /t` do "Reiniciar no Writer OS" (o tempo do Cancelar). */
+export const SEGUNDOS_PARA_REINICIAR = 5;
+
 export interface PedidoGravar {
   modo: 'criar' | 'atualizar';
   disco: string;
@@ -62,6 +68,10 @@ export interface PonteGravador {
   computador(): Promise<InfoComputador>;
   /** Remove o Writer OS deste computador; `copiar` = os textos vão antes para os Documentos. */
   remover(copiar: boolean): Promise<ResultadoRemover>;
+  /** Reinicia o computador ligando no Writer OS (um UAC; depois `shutdown /r /t 5`). */
+  reiniciar(): Promise<ResultadoReiniciar>;
+  /** Cancela o reinício que `reiniciar` começou (`shutdown /a`). */
+  cancelarReinicio(): Promise<{ ok: boolean }>;
   discos(): Promise<DiscoNaTela[]>;
   lancamento(): Promise<InfoLancamento>;
   escolherImagem(): Promise<ImagemEscolhida>;
