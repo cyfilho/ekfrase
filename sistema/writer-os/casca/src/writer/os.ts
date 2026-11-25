@@ -35,6 +35,7 @@ import {
 import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { extname, join, sep } from 'node:path';
 import { gravarInteiro } from '../motor/pastas.ts';
+import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../motor/selo.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
 import { NOME_DA_PASTA, type DadosDoWriter } from './dados.ts';
 import type { Pagina } from './pagina.ts';
@@ -78,6 +79,22 @@ const IMPORTAVEIS = ['.ekfr', '.md', '.markdown', '.txt', '.zip'];
 const MAXIMO_ARQUIVO = 64 * 1024 * 1024;
 /** O feedback guardado sem internet: o print e os anexos, juntos (o servidor aceita até isto). */
 const MAXIMO_FEEDBACK = 20 * 1024 * 1024;
+/** A chave pública do selo dos feedbacks, ao lado dos bancos (`<pasta>/dados/selo.pub`); a privada é este segredo do cofre. */
+export const ARQUIVO_DO_SELO = 'selo.pub';
+const SEGREDO_DO_SELO = 'selo';
+/** Os feedbacks no disco: os selados (`.cifrado`) e os em claro das versões 0.2.4 a 0.2.6 (`.json`). */
+const FEEDBACK_NO_DISCO = /^feedback-[\w.-]+\.(json|cifrado)$/;
+
+/** O JSON de um feedback guardado, de volta ao formato da página. Estragado: `null`. */
+function lerFeedback(id: string, json: string): FeedbackGuardado | null {
+  try {
+    const j = JSON.parse(json) as { campos: Record<string, string>; arquivos: { campo: string; nome: string; tipo: string; dados: string }[] };
+    return { id, campos: j.campos, arquivos: j.arquivos.map((a) => ({ campo: a.campo, nome: a.nome, tipo: a.tipo, bytes: new Uint8Array(Buffer.from(a.dados, 'base64')) })) };
+  } catch {
+    return null;
+  }
+}
+
 /** Caracteres que um nome de arquivo não pode ter (nos pendrives FAT/exFAT e no Windows): barras, : * ? " < > | e controles. */
 const NOME_PROIBIDO = new RegExp(`[${String.fromCharCode(92, 92)}/:*?"<>|\\u0000-\\u001f]`, 'g');
 
@@ -470,16 +487,71 @@ export class WriterOS {
   }
 
   // ---------- feedback sem internet: guardado em `Ekfrase Writer/feedbacks`, enviado quando a internet volta ----------
+  // SELADO (Bloco F, 25/11): o feedback leva o print da tela, que pode mostrar o texto. Vai ao disco cifrado com a
+  // chave pública da pasta (`motor/selo.ts`), o que dá certo mesmo com os textos trancados; só a senha abre de novo.
+  // Sem a chave ainda (a pasta nunca foi aberta nesta versão, ou não há pasta), espera na memória e vai ao disco,
+  // selado, quando a senha é dada. Os `.json` em claro das versões 0.2.4 a 0.2.6 são selados nessa hora.
 
   private pastaDosFeedbacks(): string | null {
     const base = this.dados?.pastaDoApp;
     return base ? join(base, 'feedbacks') : null;
   }
 
+  private arquivoDoSelo(): string | null {
+    const base = this.dados?.pastaDoApp;
+    return base ? join(base, 'dados', ARQUIVO_DO_SELO) : null;
+  }
+
+  private publicaDoSelo(): string | null {
+    const f = this.arquivoDoSelo();
+    try {
+      return f && existsSync(f) ? readFileSync(f, 'utf8').trim() || null : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Com o cofre aberto: o par do selo existe (a privada no cofre, a pública ao lado dos bancos). */
+  private garantirSelo(): string | null {
+    const cofre = this.dados?.cofreAberto;
+    const f = this.arquivoDoSelo();
+    if (!cofre || !f) return null;
+    let privada = cofre.segredo(SEGREDO_DO_SELO);
+    let publica: string;
+    if (privada) {
+      publica = publicaDaPrivada(privada);
+    } else {
+      const par = novoPar();
+      cofre.porSegredo(SEGREDO_DO_SELO, par.privada);
+      privada = par.privada;
+      publica = par.publica;
+    }
+    try {
+      if (this.publicaDoSelo() !== publica) gravarInteiro(f, Buffer.from(publica));
+    } catch {
+      return null;
+    }
+    return privada;
+  }
+
+  /** O que espera na memória (sem a chave do selo): `<base>` → o JSON do feedback. */
+  private feedbacksNaMemoria = new Map<string, string>();
+
+  private quantosFeedbacks(pasta: string | null): number {
+    const noDisco = pasta && existsSync(pasta) ? readdirSync(pasta).filter((n) => FEEDBACK_NO_DISCO.test(n)).length : 0;
+    return noDisco + this.feedbacksNaMemoria.size;
+  }
+
+  /** Grava selado em `<base>.cifrado` (arquivo inteiro de uma vez, com `fsync`). */
+  private selarNoDisco(pasta: string, base: string, json: string, publica: string): void {
+    mkdirSync(pasta, { recursive: true });
+    gravarInteiro(join(pasta, `${base}.cifrado`), Buffer.from(selar(publica, Buffer.from(json))));
+  }
+
   async guardarFeedback(f: unknown): Promise<RespostaSistema> {
     const pasta = this.pastaDosFeedbacks();
     const v = f as { campos?: Record<string, unknown>; arquivos?: { campo?: unknown; nome?: unknown; tipo?: unknown; bytes?: unknown }[] } | null;
-    if (!pasta || !v || typeof v.campos !== 'object' || !v.campos) return { ok: false, erro: 'negado' };
+    if (!v || typeof v.campos !== 'object' || !v.campos) return { ok: false, erro: 'negado' };
     const campos: Record<string, string> = {};
     for (const [k, x] of Object.entries(v.campos)) if (typeof x === 'string' && k.length <= 40) campos[k] = x.slice(0, 6000);
     const arquivos: { campo: string; nome: string; tipo: string; dados: string }[] = [];
@@ -491,10 +563,12 @@ export class WriterOS {
       arquivos.push({ campo: a.campo.slice(0, 40), nome: a.nome.slice(0, 120), tipo: typeof a.tipo === 'string' ? a.tipo.slice(0, 80) : '', dados: Buffer.from(a.bytes).toString('base64') });
     }
     try {
-      mkdirSync(pasta, { recursive: true });
-      if (readdirSync(pasta).filter((n) => n.endsWith('.json')).length >= 100) return { ok: false, erro: 'grande' };
-      const id = `feedback-${new Date().toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 6)}.json`;
-      gravarInteiro(join(pasta, id), Buffer.from(JSON.stringify({ campos, arquivos })));
+      if (this.quantosFeedbacks(pasta) >= 100) return { ok: false, erro: 'grande' };
+      const base = `feedback-${new Date().toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 6)}`;
+      const json = JSON.stringify({ campos, arquivos });
+      const publica = this.publicaDoSelo();
+      if (pasta && publica) this.selarNoDisco(pasta, base, json, publica);
+      else this.feedbacksNaMemoria.set(base, json);
       return { ok: true };
     } catch {
       return { ok: false, erro: 'falhou' };
@@ -502,13 +576,21 @@ export class WriterOS {
   }
 
   async feedbacksGuardados(): Promise<FeedbackGuardado[]> {
-    const pasta = this.pastaDosFeedbacks();
-    if (!pasta || !existsSync(pasta)) return [];
     const lista: FeedbackGuardado[] = [];
-    for (const id of readdirSync(pasta).filter((n) => /^feedback-[\w.-]+\.json$/.test(n)).sort()) {
+    for (const [base, json] of this.feedbacksNaMemoria) {
+      const f = lerFeedback(`${base}.memoria`, json);
+      if (f) lista.push(f);
+    }
+    const pasta = this.pastaDosFeedbacks();
+    if (!pasta || !existsSync(pasta)) return lista;
+    const privada = this.dados?.cofreAberto?.segredo(SEGREDO_DO_SELO) ?? null;
+    for (const id of readdirSync(pasta).filter((n) => FEEDBACK_NO_DISCO.test(n)).sort()) {
       try {
-        const j = JSON.parse(readFileSync(join(pasta, id), 'utf8')) as { campos: Record<string, string>; arquivos: { campo: string; nome: string; tipo: string; dados: string }[] };
-        lista.push({ id, campos: j.campos, arquivos: j.arquivos.map((a) => ({ campo: a.campo, nome: a.nome, tipo: a.tipo, bytes: new Uint8Array(Buffer.from(a.dados, 'base64')) })) });
+        const conteudo = readFileSync(join(pasta, id), 'utf8');
+        // selado: só com a senha dada (trancado, fica para depois)
+        const json = id.endsWith('.cifrado') ? (privada ? abrirSelado(privada, conteudo)?.toString('utf8') : undefined) : conteudo;
+        const f = json ? lerFeedback(id, json) : null;
+        if (f) lista.push(f);
       } catch {
         // arquivo estragado: fica na pasta, não trava os outros
       }
@@ -516,9 +598,40 @@ export class WriterOS {
     return lista;
   }
 
+  /** Apaga o feedback que foi enviado, onde quer que esteja agora (memória, `.json` antigo ou selado). */
   async apagarFeedback(id: string): Promise<void> {
+    const m = /^(feedback-[\w.-]+)\.(json|cifrado|memoria)$/.exec(id);
+    if (!m) return;
+    const base = m[1]!;
+    this.feedbacksNaMemoria.delete(base);
     const pasta = this.pastaDosFeedbacks();
-    if (pasta && /^feedback-[\w.-]+\.json$/.test(id)) rmSync(join(pasta, id), { force: true });
+    if (pasta) for (const ext of ['json', 'cifrado']) rmSync(join(pasta, `${base}.${ext}`), { force: true });
+  }
+
+  /** A senha foi dada: o par do selo, o que esperava na memória vai ao disco selado, e os `.json` em claro são selados. */
+  private selarOsGuardados(): void {
+    if (!this.garantirSelo()) return;
+    const pasta = this.pastaDosFeedbacks();
+    const publica = this.publicaDoSelo();
+    if (!pasta || !publica) return;
+    for (const [base, json] of [...this.feedbacksNaMemoria]) {
+      try {
+        this.selarNoDisco(pasta, base, json, publica);
+        this.feedbacksNaMemoria.delete(base);
+      } catch {
+        // fica na memória
+      }
+    }
+    if (!existsSync(pasta)) return;
+    for (const id of readdirSync(pasta).filter((n) => /^feedback-[\w.-]+\.json$/.test(n))) {
+      try {
+        const json = readFileSync(join(pasta, id), 'utf8');
+        this.selarNoDisco(pasta, id.slice(0, -'.json'.length), json, publica);
+        rmSync(join(pasta, id), { force: true });
+      } catch {
+        // fica como estava
+      }
+    }
   }
 
   // ---------- o que a página guarda (localStorage): cifrado no cofre ----------
@@ -540,6 +653,7 @@ export class WriterOS {
 
   /** A senha foi dada: as redes voltam ao NetworkManager e o `localStorage` da página volta (uma vez por boot). */
   async depoisDeAbrir(): Promise<void> {
+    this.selarOsGuardados();
     for (const r of this.redesGuardadas()) await this.sistema.lembrarRede(r.ssid, r.senha);
     if (this.paginaVoltou) return;
     this.paginaVoltou = true;

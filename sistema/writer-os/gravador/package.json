@@ -10,7 +10,7 @@
   "homepage": "https://ekfrase.com/writer/os/",
   "main": "dist/main.cjs",
   "devDependencies": {
-    "electron": "45.3.1",
+    "electron": "45.5.0",
     "electron-builder": "26.18.0"
   }
 }

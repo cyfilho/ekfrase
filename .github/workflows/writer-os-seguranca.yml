@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# O AVISO DE SEGURANÇA do Writer OS (toda segunda-feira, ou à mão em Actions → "Writer OS: aviso de segurança" → Run).
+# O Writer OS não tem apt: cada correção chega só numa imagem nova. O seguranca.py confere a última imagem estável contra
+# o Debian (trixie-security, trixie-updates e a versão de ponto, pela lista de pacotes que o Release leva), o Electron da
+# casca contra o npm e a idade (30 dias). Algo pendente = abre ou atualiza UM aviso (issue, rótulo seguranca-writer-os)
+# com a lista e a linha pronta para um chat; nada pendente = fecha o aviso. Nada é montado nem publicado aqui: a versão
+# nova sai pela tag writer-os-v*, depois de um chat ver.
+name: "Writer OS: aviso de segurança"
+
+on:
+  schedule:
+    - cron: '17 9 * * 1'
+  # à mão, e pelo writer-os.yml logo depois do Release estável (o Release criado pelo CI não dispara o evento
+  # "release"): a imagem nova saiu, então confere de novo e fecha o aviso, se ela está em dia
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: writer-os-seguranca
+  cancel-in-progress: false
+
+jobs:
+  conferir:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: sistema/writer-os/imagem/seguranca.py
+          sparse-checkout-cone-mode: false
+      - name: Conferir a última imagem estável
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 sistema/writer-os/imagem/seguranca.py --repo "$GITHUB_REPOSITORY"

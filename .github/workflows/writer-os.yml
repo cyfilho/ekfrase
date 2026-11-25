@@ -109,6 +109,7 @@ jobs:
             sistema/writer-os/imagem/saida/*.vmlinuz
             sistema/writer-os/imagem/saida/*.initrd
             sistema/writer-os/imagem/saida/*.grub.cfg
+            sistema/writer-os/imagem/saida/*.pacotes.tsv
           if-no-files-found: error
           compression-level: 0
 
@@ -157,6 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       # só a imagem (com a atualização) e os Gravadores: os prints e a serial do QEMU ficam como artefato, fora do Release
       - uses: actions/download-artifact@v4
@@ -211,6 +213,8 @@ jobs:
               --notes "Versão de TESTE, para conferir num computador de verdade antes de publicar. O Gravador DESTA página baixa a imagem de teste; o Gravador do público ignora esta versão."
             exit 0
           fi
+          # o aviso de segurança confere a imagem nova (e fecha o aviso aberto, se ela está em dia); o trap roda depois do create
+          trap 'gh workflow run writer-os-seguranca.yml --repo "$GITHUB_REPOSITORY" --ref main || echo "::warning::o aviso de segurança não rodou"' EXIT
           gh release create "$GITHUB_REF_NAME" arquivos/* --repo "$GITHUB_REPOSITORY" \
             --title "Ekfrase Writer OS $versao" \
             --notes "Para criar o pendrive: baixe o Gravador (Windows: Gravador-Writer-OS.exe; Linux: Gravador-Writer-OS.AppImage), que baixa e confere a imagem sozinho. Para o Rufus ou o balenaEtcher: o .img.xz (confira o .sha256 e o lacre .minisig com a chave em sistema/writer-os/imagem/minisign.pub). Passo a passo em https://ekfrase.com/writer/os/"

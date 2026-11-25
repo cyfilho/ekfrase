@@ -44,6 +44,10 @@ apt-get install -y -qq --no-install-recommends mmdebstrap squashfs-tools dosfsto
 rm -rf "$TRAB"
 mkdir -p "$TRAB" "$SAIDA"
 RAIZ=$TRAB/raiz
+# a lista dos pacotes (Bloco F): o aviso semanal de segurança (seguranca.py) compara com o Debian; o rodar.sh a tira
+# antes dos ganchos, porque o 90-travas apaga o dpkg
+PACOTES=$TRAB/pacotes.tsv
+export PACOTES
 
 # o ekfrase-numlock (fonte/, C): compilado aqui, no mesmo trixie da imagem; o compilador NÃO entra na imagem
 echo "== o ekfrase-numlock"
@@ -114,6 +118,7 @@ cp "$TRAB/filesystem.squashfs" "$SAIDA/$NOME.squashfs"
 cp "$TRAB/vmlinuz" "$SAIDA/$NOME.vmlinuz"
 cp "$TRAB/initrd.img" "$SAIDA/$NOME.initrd"
 sed "s|@VERSAO@|$VERSAO|" "$AQUI/grub.cfg.modelo" > "$SAIDA/$NOME.grub.cfg"
+cp "$PACOTES" "$SAIDA/$NOME.pacotes.tsv"
 grep -q '@HASH@' "$SAIDA/$NOME.grub.cfg" || { echo "o grub.cfg da atualização perdeu o @HASH@"; exit 1; }
 
 if [ -n "${DONO:-}" ]; then chown -R "$DONO" "$SAIDA"; fi

@@ -68,7 +68,15 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
   dizer "renderer $(cat /run/ekfrase/sessao/renderer 2>/dev/null || echo '?')"
   dizer "quedas $(wc -l < /run/ekfrase/sessao/quedas 2>/dev/null || echo 0)"
   for _ in $(seq 1 60); do
-    if ls /dados/'Ekfrase Writer'/.diagnostico/*/resumo.txt >/dev/null 2>&1; then dizer "diagnostico ok"; exit 0; fi
+    if ls /dados/'Ekfrase Writer'/.diagnostico/*/resumo.txt >/dev/null 2>&1; then
+      # Bloco F: o endereço das placas de rede (o MAC) não pode estar no diagnóstico, que fica em claro
+      mac=0
+      for m in $(cat /sys/class/net/*/address 2>/dev/null | grep -v '^00:00:00:00:00:00$'); do
+        grep -rqiF "$m" /dados/'Ekfrase Writer'/.diagnostico/ && mac=$((mac + 1))
+      done
+      dizer "diagnostico mac $mac"
+      dizer "diagnostico ok"; exit 0
+    fi
     sleep 2
   done
   dizer "diagnostico falta"

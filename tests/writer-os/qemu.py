@@ -476,6 +476,7 @@ def teste_completo(imagem, pasta):
         ok(q.esperar('interno negado', b, 60) is not None, 'o disco interno (virtio) NÃO monta')
         ok(q.esperar('gravado 5', b, 60) is not None, 'o agente grava')
         ok(q.esperar('diagnostico ok', b, 240) is not None, 'o diagnóstico foi gravado na EKFRASE-DADOS (Ekfrase Writer/.diagnostico)')
+        ok(q.esperar('diagnostico mac 0', b, 5) is not None, 'o diagnóstico não tem o endereço (MAC) da placa de rede (Bloco F)')
         ok(q.esperar('quedas 0', b, 5) is not None, 'a sessão não caiu nenhuma vez')
         # o Num Lock (18/11): o ekfrase-numlock apertou numa tecla virtual e a luz do teclado do QEMU acendeu
         i = q.esperar(re.compile(r'^numlock '), b, 60)
