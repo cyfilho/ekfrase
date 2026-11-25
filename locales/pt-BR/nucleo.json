@@ -117,5 +117,6 @@
   "entrada.casa.titulo": "Continuar",
   "entrada.casa.texto": "Abra o {nome} e siga de onde parou.",
   "entrada.casa.botao": "Abrir o {nome}",
-  "familia.fim": "."
+  "familia.fim": ".",
+  "feedback.guardado": "Sem internet agora: o feedback ficou guardado neste aparelho e será enviado sozinho quando a internet voltar."
 }

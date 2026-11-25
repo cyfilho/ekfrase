@@ -50,6 +50,9 @@ fonts-dejavu-core
 # rede, discos, energia, hora
 network-manager
 wpasupplicant
+# o firewall (nftables, entrada negada: raiz/etc/nftables.conf); a rede por cabo vem do NetworkManager + firmware-realtek,
+# e os drivers r8169 e e1000e já estão no kernel
+nftables
 udisks2
 polkitd
 exfatprogs

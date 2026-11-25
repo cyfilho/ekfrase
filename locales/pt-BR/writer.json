@@ -433,7 +433,7 @@
   "os.memoria.guardar": "Guardar num pendrive",
   "os.memoria.levar": "Tudo o que está na memória vai para o disco escolhido. Depois a senha é pedida de novo (a mesma).",
   "os.wifi.titulo": "Wi-Fi",
-  "os.wifi.texto": "Com internet, os textos vão para a nuvem (se você tiver conta). Sem internet, o Writer funciona igual.",
+  "os.wifi.texto": "Com internet (Wi-Fi ou cabo), os textos vão para a nuvem (se você tiver conta). Sem internet, o Writer funciona igual.",
   "os.wifi.seguir": "Seguir (o Wi-Fi fica para depois)",
   "os.wifi.procurando": "Procurando redes…",
   "os.wifi.nenhuma": "Nenhuma rede Wi-Fi por perto.",
@@ -675,5 +675,12 @@
   "os.relogio.abrir": "Data e hora: abrir as configurações",
   "os.relogio.sincronizando": "Sincronizando a hora…",
   "bateria.fraca": "Bateria fraca ({n}%). Conecte o carregador.",
-  "bateria.muito-fraca": "Bateria quase no fim ({n}%). Conecte o carregador agora, ou o computador vai desligar."
+  "bateria.muito-fraca": "Bateria quase no fim ({n}%). Conecte o carregador agora, ou o computador vai desligar.",
+  "os.cabo.nome": "Cabo de rede",
+  "os.cabo.conectado": "conectado",
+  "os.cabo.plugado": "cabo ligado; toque para conectar",
+  "os.cabo.solto": "sem cabo ligado",
+  "os.cabo.conectando": "Conectando pelo cabo…",
+  "os.cabo.conectou": "Conectado pelo cabo.",
+  "os.cabo.erro": "Não deu para conectar pelo cabo. Confira se o cabo está bem encaixado nas duas pontas."
 }

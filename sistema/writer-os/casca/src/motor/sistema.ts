@@ -18,7 +18,7 @@
  * Duas versões: `SistemaLinux` (a de verdade) e `SistemaSimulado` (para os testes e os prints fora do
  * pendrive, no Windows também). Nenhum comando passa por shell: `execFile` com a lista de argumentos.
  */
-import type { Bateria, DiscoInterno, DiscoUSB, ErroInstalar, InfoInstalacao, PassoInstalar, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
+import type { Bateria, Cabo, DiscoInterno, DiscoUSB, ErroInstalar, InfoInstalacao, PassoInstalar, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
 import { execFile } from 'node:child_process';
 import { connect } from 'node:net';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -76,6 +76,9 @@ export interface Sistema {
   /** Uma rede guardada no cofre volta ao NetworkManager (as conexões dele vivem na memória). */
   lembrarRede(ssid: string, senha: string | null): Promise<void>;
   esquecer(ssid: string): Promise<void>;
+  /** A internet por cabo (Ethernet), ou `null` se não há placa. */
+  cabo(): Promise<Cabo | null>;
+  conectarCabo(): Promise<RespostaSistema>;
   bateria(): Promise<Bateria | null>;
   brilho(passo?: number): Promise<number | null>;
   usarFuso(id: string): Promise<boolean>;
@@ -251,6 +254,16 @@ function rodar(programa: string, args: string[], tempo = 20000): Promise<Saida> 
   });
 }
 
+/** O cabo a partir das placas (`[dispositivo, estado]` do `nmcli device status`): sem placa = `null`. */
+export function estadoDoCabo(placas: [string, string][]): Cabo | null {
+  if (!placas.length) return null;
+  return {
+    conectado: placas.some(([, e]) => e.startsWith('connected')),
+    // `unavailable` = sem cabo (ou o dispositivo desligado): o resto é "plugado"
+    plugado: placas.some(([, e]) => e !== 'unavailable' && e !== 'unmanaged'),
+  };
+}
+
 /** Uma linha do `nmcli -t` (os `:` dentro dos campos vêm como `\:`). */
 export function camposNmcli(linha: string): string[] {
   const saida: string[] = [];
@@ -348,6 +361,28 @@ export class SistemaLinux implements Sistema {
 
   async esquecer(ssid: string): Promise<void> {
     await rodar('nmcli', ['connection', 'delete', 'id', ssid]);
+  }
+
+  /** As placas de rede por cabo que o NetworkManager vê: `[dispositivo, estado]`. */
+  private async placasDeCabo(): Promise<[string, string][]> {
+    const r = await rodar('nmcli', ['-t', '-f', 'DEVICE,TYPE,STATE', 'device', 'status']);
+    return r.out
+      .split(String.fromCharCode(10))
+      .map(camposNmcli)
+      .filter((c) => c[1] === 'ethernet' && !!c[0])
+      .map((c) => [c[0] ?? '', c[2] ?? ''] as [string, string]);
+  }
+
+  async cabo(): Promise<Cabo | null> {
+    return estadoDoCabo(await this.placasDeCabo());
+  }
+
+  async conectarCabo(): Promise<RespostaSistema> {
+    const placas = await this.placasDeCabo();
+    const alvo = placas.find(([, e]) => e !== 'unavailable') ?? placas[0];
+    if (!alvo) return { ok: false, erro: 'falhou' };
+    const r = await rodar('nmcli', ['--wait', '30', 'device', 'connect', alvo[0]], 40000);
+    return r.ok ? { ok: true } : { ok: false, erro: /not available|no carrier|unavailable/i.test(r.err) ? 'falhou' : 'negado' };
   }
 
   async bateria(): Promise<Bateria | null> {
@@ -628,6 +663,22 @@ export class SistemaSimulado implements Sistema {
 
   async lembrarRede(ssid: string, senha: string | null): Promise<void> {
     this.conhecidas.set(ssid, senha);
+  }
+
+  /** O cabo simulado (`EKFRASE_CASCA_OS_CABO`): `nenhum` (sem placa; o padrão), `solto` (sem cabo plugado) ou `ligado`. */
+  private caboSimulado: 'nenhum' | 'solto' | 'plugado' | 'ligado' = process.env['EKFRASE_CASCA_OS_CABO'] === 'ligado' ? 'ligado' : process.env['EKFRASE_CASCA_OS_CABO'] === 'plugado' ? 'plugado' : process.env['EKFRASE_CASCA_OS_CABO'] === 'solto' ? 'solto' : 'nenhum';
+
+  async cabo(): Promise<Cabo | null> {
+    if (this.caboSimulado === 'nenhum') return null;
+    return { conectado: this.caboSimulado === 'ligado', plugado: this.caboSimulado !== 'solto' };
+  }
+
+  async conectarCabo(): Promise<RespostaSistema> {
+    if (this.caboSimulado === 'plugado' || this.caboSimulado === 'ligado') {
+      this.caboSimulado = 'ligado';
+      return { ok: true };
+    }
+    return { ok: false, erro: 'falhou' };
   }
 
   async esquecer(ssid: string): Promise<void> {

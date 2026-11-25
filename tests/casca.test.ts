@@ -15,7 +15,7 @@ import { Cofre } from '../sistema/writer-os/casca/src/motor/cofre.ts';
 import { caminhoSeguro, EspelhoDePasta, LISTA } from '../sistema/writer-os/casca/src/motor/espelho.ts';
 import { lerMarcador, pastaDoApp } from '../sistema/writer-os/casca/src/motor/pastas.ts';
 import { destinoDaApi } from '../sistema/writer-os/casca/src/motor/destino.ts';
-import { escolherLuz, lerConsulta, lerLinhaInstalar, SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
+import { escolherLuz, estadoDoCabo, lerConsulta, lerLinhaInstalar, SistemaSimulado } from '../sistema/writer-os/casca/src/motor/sistema.ts';
 import { teclaProibida } from '../sistema/writer-os/casca/src/motor/teclas.ts';
 import { lerEfi } from '../sistema/writer-os/casca/src/writer/agente-teste.ts';
 import { DadosDoWriter, NOME_DA_PASTA } from '../sistema/writer-os/casca/src/writer/dados.ts';
@@ -328,6 +328,32 @@ describe('Writer OS: o brilho e o Num Lock (pedidos de 18/11)', () => {
     os.sessaoPronta();
     expect(readFileSync(join(raiz, 'run', 'sessao', 'pronta'), 'utf8')).toMatch(/^\d+ \d+\n$/);
     rmSync(raiz, { recursive: true, force: true });
+  });
+});
+describe('Writer OS: a internet por cabo (Bloco D)', () => {
+  it('lê o estado das placas do nmcli: sem placa, sem cabo, cabo sem endereço e cabo conectado', () => {
+    expect(estadoDoCabo([])).toBeNull();
+    expect(estadoDoCabo([['enp3s0', 'unavailable']])).toEqual({ conectado: false, plugado: false });
+    expect(estadoDoCabo([['enp3s0', 'disconnected']])).toEqual({ conectado: false, plugado: true });
+    expect(estadoDoCabo([['enp3s0', 'connecting (getting IP configuration)']])).toEqual({ conectado: false, plugado: true });
+    expect(estadoDoCabo([['enp3s0', 'connected']])).toEqual({ conectado: true, plugado: true });
+  });
+
+  it('o simulado: sem placa por padrão; com o cabo plugado, "conectar" liga', async () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-cabo-'));
+    expect(await new SistemaSimulado(raiz, false).cabo()).toBeNull();
+    process.env['EKFRASE_CASCA_OS_CABO'] = 'plugado';
+    try {
+      const s = new SistemaSimulado(raiz, false);
+      expect(await s.cabo()).toEqual({ conectado: false, plugado: true });
+      expect(await s.conectarCabo()).toEqual({ ok: true });
+      expect(await s.cabo()).toEqual({ conectado: true, plugado: true });
+      process.env['EKFRASE_CASCA_OS_CABO'] = 'solto';
+      expect(await new SistemaSimulado(raiz, false).conectarCabo()).toMatchObject({ ok: false });
+    } finally {
+      delete process.env['EKFRASE_CASCA_OS_CABO'];
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 });
 describe('Writer OS: instalar no computador (PLANO §8c, fase 3d)', () => {

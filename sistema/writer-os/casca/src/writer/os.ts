@@ -28,6 +28,7 @@ import {
   type PassoInstalar,
   type RespostaCasca,
   type RespostaInstalar,
+  type FeedbackGuardado,
   type RespostaSistema,
   type SobreOS,
 } from '@ekfrase/writer-nucleo';
@@ -75,6 +76,8 @@ export function tecladoEmUso(env: NodeJS.ProcessEnv = process.env): string {
 const IMPORTAVEIS = ['.ekfr', '.md', '.markdown', '.txt', '.zip'];
 /** O maior arquivo que passa pela ponte (a bomba de zip é barrada de novo no núcleo). */
 const MAXIMO_ARQUIVO = 64 * 1024 * 1024;
+/** O feedback guardado sem internet: o print e os anexos, juntos (o servidor aceita até isto). */
+const MAXIMO_FEEDBACK = 20 * 1024 * 1024;
 /** Caracteres que um nome de arquivo não pode ter (nos pendrives FAT/exFAT e no Windows): barras, : * ? " < > | e controles. */
 const NOME_PROIBIDO = new RegExp(`[${String.fromCharCode(92, 92)}/:*?"<>|\\u0000-\\u001f]`, 'g');
 
@@ -464,6 +467,58 @@ export class WriterOS {
   async esquecer(ssid: string): Promise<void> {
     await this.sistema.esquecer(String(ssid));
     this.guardarRedes(this.redesGuardadas().filter((x) => x.ssid !== ssid));
+  }
+
+  // ---------- feedback sem internet: guardado em `Ekfrase Writer/feedbacks`, enviado quando a internet volta ----------
+
+  private pastaDosFeedbacks(): string | null {
+    const base = this.dados?.pastaDoApp;
+    return base ? join(base, 'feedbacks') : null;
+  }
+
+  async guardarFeedback(f: unknown): Promise<RespostaSistema> {
+    const pasta = this.pastaDosFeedbacks();
+    const v = f as { campos?: Record<string, unknown>; arquivos?: { campo?: unknown; nome?: unknown; tipo?: unknown; bytes?: unknown }[] } | null;
+    if (!pasta || !v || typeof v.campos !== 'object' || !v.campos) return { ok: false, erro: 'negado' };
+    const campos: Record<string, string> = {};
+    for (const [k, x] of Object.entries(v.campos)) if (typeof x === 'string' && k.length <= 40) campos[k] = x.slice(0, 6000);
+    const arquivos: { campo: string; nome: string; tipo: string; dados: string }[] = [];
+    let total = 0;
+    for (const a of Array.isArray(v.arquivos) ? v.arquivos.slice(0, 6) : []) {
+      if (!(a.bytes instanceof Uint8Array) || typeof a.campo !== 'string' || typeof a.nome !== 'string') return { ok: false, erro: 'negado' };
+      total += a.bytes.byteLength;
+      if (total > MAXIMO_FEEDBACK) return { ok: false, erro: 'grande' };
+      arquivos.push({ campo: a.campo.slice(0, 40), nome: a.nome.slice(0, 120), tipo: typeof a.tipo === 'string' ? a.tipo.slice(0, 80) : '', dados: Buffer.from(a.bytes).toString('base64') });
+    }
+    try {
+      mkdirSync(pasta, { recursive: true });
+      if (readdirSync(pasta).filter((n) => n.endsWith('.json')).length >= 100) return { ok: false, erro: 'grande' };
+      const id = `feedback-${new Date().toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 6)}.json`;
+      gravarInteiro(join(pasta, id), Buffer.from(JSON.stringify({ campos, arquivos })));
+      return { ok: true };
+    } catch {
+      return { ok: false, erro: 'falhou' };
+    }
+  }
+
+  async feedbacksGuardados(): Promise<FeedbackGuardado[]> {
+    const pasta = this.pastaDosFeedbacks();
+    if (!pasta || !existsSync(pasta)) return [];
+    const lista: FeedbackGuardado[] = [];
+    for (const id of readdirSync(pasta).filter((n) => /^feedback-[\w.-]+\.json$/.test(n)).sort()) {
+      try {
+        const j = JSON.parse(readFileSync(join(pasta, id), 'utf8')) as { campos: Record<string, string>; arquivos: { campo: string; nome: string; tipo: string; dados: string }[] };
+        lista.push({ id, campos: j.campos, arquivos: j.arquivos.map((a) => ({ campo: a.campo, nome: a.nome, tipo: a.tipo, bytes: new Uint8Array(Buffer.from(a.dados, 'base64')) })) });
+      } catch {
+        // arquivo estragado: fica na pasta, não trava os outros
+      }
+    }
+    return lista;
+  }
+
+  async apagarFeedback(id: string): Promise<void> {
+    const pasta = this.pastaDosFeedbacks();
+    if (pasta && /^feedback-[\w.-]+\.json$/.test(id)) rmSync(join(pasta, id), { force: true });
   }
 
   // ---------- o que a página guarda (localStorage): cifrado no cofre ----------

@@ -276,6 +276,24 @@ export interface RedeWifi {
   conectada: boolean;
 }
 
+/** A internet por cabo (Ethernet): `null` quando o computador não tem placa de rede por cabo. */
+export interface Cabo {
+  /** O cabo está ligado e a rede por ele tem endereço (internet pronta). */
+  conectado: boolean;
+  /** O cabo está plugado no computador (mesmo que ainda sem endereço). */
+  plugado: boolean;
+}
+
+/** Um feedback guardado no aparelho, esperando a internet voltar (`Ekfrase Writer/feedbacks`). */
+export interface FeedbackGuardado {
+  /** O nome do arquivo (`feedback-<data>-<n>.json`). */
+  id: string;
+  /** Os campos de texto do formulário. */
+  campos: Record<string, string>;
+  /** O print e os anexos. */
+  arquivos: { campo: string; nome: string; tipo: string; bytes: Uint8Array }[];
+}
+
 /** Um disco ligado por USB (pendrive, SSD portátil, HD externo), menos o de boot (PLANO §6.1b). */
 export interface DiscoUSB {
   /** O dispositivo (`/dev/sdb1`). */
@@ -343,6 +361,14 @@ export interface PonteSistema {
   redes(): Promise<RedeWifi[]>;
   conectar(ssid: string, senha: string | null): Promise<RespostaSistema>;
   esquecer(ssid: string): Promise<void>;
+  /** A internet por cabo: `null` se não há placa de rede por cabo. */
+  cabo(): Promise<Cabo | null>;
+  /** Liga a internet por cabo (o NetworkManager já liga sozinho; isto só tenta de novo). */
+  conectarCabo(): Promise<RespostaSistema>;
+  /** Guarda um feedback no aparelho, para enviar quando a internet voltar. */
+  guardarFeedback(f: Omit<FeedbackGuardado, 'id'>): Promise<RespostaSistema>;
+  feedbacksGuardados(): Promise<FeedbackGuardado[]>;
+  apagarFeedback(id: string): Promise<void>;
   bateria(): Promise<Bateria | null>;
   /** O brilho (0 a 100), ou `null` se a tela não deixa. Com `passo` (+10, −10), muda antes de responder. */
   brilho(passo?: number): Promise<number | null>;
