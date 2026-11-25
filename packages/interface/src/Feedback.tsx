@@ -128,7 +128,7 @@ function JanelaFeedback({ t, app, print, falhou, fechar }: { t: T; app: string; 
     setEnviando(true);
     const r = await enviarFeedback(d);
     setEnviando(false);
-    if (r.ok) return setPronto(r.numero);
+    if (r.ok) return setPronto(r.guardado ? 'guardado' : r.numero);
     if (r.erro === 'limite') return setErro(t('nucleo.feedback.erro.limite', { hora: String(r['volta_em'] ?? '') }));
     const conhecidos = ['vazio', 'tipo', 'grande', 'email', 'muitos', 'rede'];
     setErro(t(conhecidos.includes(r.erro) ? `nucleo.feedback.erro.${r.erro}` : 'nucleo.erro.servidor', { n: MAX_ANEXOS }));
@@ -138,7 +138,7 @@ function JanelaFeedback({ t, app, print, falhou, fechar }: { t: T; app: string; 
     return (
       <Janela titulo={t('nucleo.feedback.titulo')} fechar={fechar} t={t}>
         <p class="ekf-ok" role="status">
-          {t('nucleo.feedback.obrigado', { numero: pronto })}
+          {pronto === 'guardado' ? t('nucleo.feedback.guardado') : t('nucleo.feedback.obrigado', { numero: pronto })}
         </p>
         <div class="ekf-linha">
           <button type="button" class="ekf-botao principal" onClick={fechar}>

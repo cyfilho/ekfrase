@@ -14,7 +14,7 @@
  * Toda tela tem `data-teste` (o agente de teste conta qual está aberta) e o foco começa na opção
  * padrão: Enter segue em frente (o CI digita pelo QMP do QEMU).
  */
-import { INSTALAR_MAXIMO, INSTALAR_MINIMO, nomeConfere, nomeDoDisco, tipoDaParte, type Bateria, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type MarcaComputador, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
+import { INSTALAR_MAXIMO, INSTALAR_MINIMO, nomeConfere, nomeDoDisco, tipoDaParte, type Bateria, type Cabo, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type MarcaComputador, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
 import { FormConta, IconeEngrenagem, Janela, ponte, useConta } from '@ekfrase/interface';
 import type { ComponentChildren, TargetedKeyboardEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -799,8 +799,9 @@ function LevarDaMemoria({ fechar }: { fechar: () => void }) {
 // ---------- Wi-Fi ----------
 
 /** A lista de redes; `aoMudar` recebe a lista a cada leitura (o primeiro uso troca "Seguir" por "Concluir"). */
-function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[]) => void } = {}) {
+function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[], cabo: Cabo | null) => void } = {}) {
   const [redes, setRedes] = useState<RedeWifi[] | null>(null);
+  const [cabo, setCabo] = useState<Cabo | null>(null);
   const [escolhida, setEscolhida] = useState<RedeWifi | null>(null);
   const [senha, setSenha] = useState('');
   const [recado, setRecado] = useState<{ texto: string; erro: boolean } | null>(null);
@@ -819,10 +820,19 @@ function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[]) => void } = {})
       [...(raiz.current?.querySelectorAll<HTMLElement>('[data-teste="os-rede"]') ?? [])].find((b) => b.dataset['ssid'] === ssid)?.focus();
     }, 0);
   const ler = () =>
-    void os.redes().then((lista) => {
+    void Promise.all([os.redes(), os.cabo()]).then(([lista, c]) => {
       setRedes(lista);
-      aoMudar?.(lista);
+      setCabo(c);
+      aoMudar?.(lista, c);
     });
+  const ligarCabo = async () => {
+    setOcupado(true);
+    setRecado({ texto: t('writer.os.cabo.conectando'), erro: false });
+    const r = await os.conectarCabo();
+    setOcupado(false);
+    setRecado(r.ok ? { texto: t('writer.os.cabo.conectou'), erro: false } : { texto: t('writer.os.cabo.erro'), erro: true });
+    ler();
+  };
   useEffect(ler, []);
   const conectar = async (rede: RedeWifi, comSenha: string | null) => {
     setOcupado(true);
@@ -846,7 +856,7 @@ function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[]) => void } = {})
   return (
     <div class="redes-os" data-teste="os-redes" ref={raiz}>
       {redes === null && <p aria-busy="true">{t('writer.os.wifi.procurando')}</p>}
-      {redes && !redes.length && <p class="dica">{t('writer.os.wifi.nenhuma')}</p>}
+      {redes && !redes.length && !cabo && <p class="dica">{t('writer.os.wifi.nenhuma')}</p>}
       {/* a senha da rede escolhida fica logo ACIMA da lista (pedido do Alcy em 18/11): à vista, sem rolar */}
       {escolhida && (
         <form
@@ -880,6 +890,14 @@ function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[]) => void } = {})
         </form>
       )}
       <div class="acoes-coluna" role="list">
+        {cabo && (
+          <div class="linha-rede" role="listitem">
+            <button type="button" class="botao" disabled={ocupado || cabo.conectado} onClick={() => void ligarCabo()} aria-pressed={cabo.conectado} data-teste="os-cabo">
+              {t('writer.os.cabo.nome')}
+              <small>{` · ${t(cabo.conectado ? 'writer.os.cabo.conectado' : cabo.plugado ? 'writer.os.cabo.plugado' : 'writer.os.cabo.solto')}`}</small>
+            </button>
+          </div>
+        )}
         {(redes ?? []).map((r) => (
           <div class="linha-rede" role="listitem" key={r.ssid}>
             <button type="button" class="botao" disabled={ocupado} onClick={() => tocar(r)} aria-pressed={r.conectada} data-ssid={r.ssid} data-teste="os-rede">
@@ -935,7 +953,7 @@ function WifiPrimeiroUso() {
           </button>
         )}
       </div>
-      <ListaRedes aoMudar={(redes) => setConectado(redes.some((r) => r.conectada))} />
+      <ListaRedes aoMudar={(redes, cabo) => setConectado(redes.some((r) => r.conectada) || !!cabo?.conectado)} />
     </Moldura>
   );
 }

@@ -117,5 +117,6 @@
   "entrada.casa.titulo": "Continue",
   "entrada.casa.texto": "Open {nome} and pick up where you left off.",
   "entrada.casa.botao": "Open {nome}",
-  "familia.fim": " family."
+  "familia.fim": " family.",
+  "feedback.guardado": "No internet right now: your feedback was saved on this device and will be sent automatically when the internet is back."
 }

@@ -122,7 +122,71 @@ export async function sair(): Promise<void> {
 // ---------- feedback ----------
 
 export const limiteFeedback = () => pedir<{ restam: number | null; volta_em: string | null }>('GET', 'feedback/limite');
-export const enviarFeedback = (dados: FormData) => pedir<{ numero: string }>('POST', 'feedback', dados);
+/**
+ * Onde guardar o feedback quando não há internet (o Writer OS: `Ekfrase Writer/feedbacks`, no pendrive/SSD). Sem isto
+ * (o site), o aviso de "sem rede" aparece como sempre.
+ */
+export interface FilaDeFeedback {
+  guardar(campos: Record<string, string>, arquivos: { campo: string; nome: string; tipo: string; bytes: Uint8Array }[]): Promise<boolean>;
+  listar(): Promise<{ id: string; campos: Record<string, string>; arquivos: { campo: string; nome: string; tipo: string; bytes: Uint8Array }[] }[]>;
+  apagar(id: string): Promise<void>;
+}
+
+let fila: FilaDeFeedback | null = null;
+let avisoDaFila: ((pendentes: number) => void) | null = null;
+
+/** Liga a fila e passa a reenviar sozinho o que ficou guardado (ao ligar, a cada volta da internet e de minuto em minuto). */
+export function usarFilaDeFeedback(f: FilaDeFeedback): void {
+  fila = f;
+  void enviarGuardados();
+  addEventListener('online', () => void enviarGuardados());
+  setInterval(() => void enviarGuardados(), 60_000);
+}
+
+export const aoMudarFilaDeFeedback = (f: ((pendentes: number) => void) | null) => void (avisoDaFila = f);
+
+let reenviando = false;
+
+/** Envia o que ficou guardado, um por um, na ordem. Para no primeiro que falhar por falta de internet. Devolve quantos enviou. */
+export async function enviarGuardados(): Promise<number> {
+  if (!fila || reenviando) return 0;
+  reenviando = true;
+  let enviados = 0;
+  try {
+    for (const g of await fila.listar()) {
+      const d = new FormData();
+      for (const [k, v] of Object.entries(g.campos)) d.append(k, v);
+      for (const a of g.arquivos) d.append(a.campo, new Blob([new Uint8Array(a.bytes)], { type: a.tipo }), a.nome);
+      const r = await bruto<{ numero: string }>('POST', 'feedback', d);
+      if (r.ok || (!r.ok && !['rede', 'servidor', 'limite', 'csrf'].includes(r.erro))) {
+        // chegou, ou o servidor recusou de vez (vazio, tipo, grande…): não adianta guardar de novo
+        await fila.apagar(g.id);
+        enviados++;
+      } else if (!r.ok && r.erro === 'csrf') {
+        await eu();
+        break;
+      } else break;
+    }
+    avisoDaFila?.((await fila.listar()).length);
+  } finally {
+    reenviando = false;
+  }
+  return enviados;
+}
+
+export async function enviarFeedback(dados: FormData): Promise<Resposta<{ numero: string; guardado?: boolean }>> {
+  const r = await pedir<{ numero: string }>('POST', 'feedback', dados);
+  if (r.ok || r.erro !== 'rede' || !fila) return r;
+  const campos: Record<string, string> = {};
+  const arquivos: { campo: string; nome: string; tipo: string; bytes: Uint8Array }[] = [];
+  for (const [k, v] of dados.entries()) {
+    if (typeof v === 'string') campos[k] = v;
+    else arquivos.push({ campo: k, nome: v.name, tipo: v.type, bytes: new Uint8Array(await v.arrayBuffer()) });
+  }
+  if (!(await fila.guardar(campos, arquivos))) return r;
+  void fila.listar().then((l) => avisoDaFila?.(l.length));
+  return { ok: true, numero: '', guardado: true };
+}
 
 // ---------- documentos na nuvem ----------
 

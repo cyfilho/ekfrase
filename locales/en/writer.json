@@ -433,7 +433,7 @@
   "os.memoria.guardar": "Keep them on a drive",
   "os.memoria.levar": "Everything in memory goes to the chosen drive. Then the password is asked again (the same one).",
   "os.wifi.titulo": "Wi-Fi",
-  "os.wifi.texto": "With internet, your texts go to the cloud (if you have an account). Without internet, Writer works the same.",
+  "os.wifi.texto": "With internet (Wi-Fi or cable), your texts go to the cloud (if you have an account). Without internet, Writer works just the same.",
   "os.wifi.seguir": "Continue (Wi-Fi can wait)",
   "os.wifi.procurando": "Looking for networks…",
   "os.wifi.nenhuma": "No Wi-Fi networks nearby.",
@@ -675,5 +675,12 @@
   "os.relogio.abrir": "Date and time: open the settings",
   "os.relogio.sincronizando": "Syncing the time…",
   "bateria.fraca": "Low battery ({n}%). Plug in the charger.",
-  "bateria.muito-fraca": "Battery almost empty ({n}%). Plug in the charger now, or the computer will shut down."
+  "bateria.muito-fraca": "Battery almost empty ({n}%). Plug in the charger now, or the computer will shut down.",
+  "os.cabo.nome": "Network cable",
+  "os.cabo.conectado": "connected",
+  "os.cabo.plugado": "cable plugged in; tap to connect",
+  "os.cabo.solto": "no cable plugged in",
+  "os.cabo.conectando": "Connecting by cable…",
+  "os.cabo.conectou": "Connected by cable.",
+  "os.cabo.erro": "Could not connect by cable. Check that the cable is plugged in firmly at both ends."
 }
