@@ -7,6 +7,8 @@ const ponte: PonteGravador = {
   estado: () => ipcRenderer.invoke('gravador:estado'),
   computador: () => ipcRenderer.invoke('gravador:computador'),
   remover: (copiar) => ipcRenderer.invoke('gravador:remover', copiar === true),
+  reiniciar: () => ipcRenderer.invoke('gravador:reiniciar'),
+  cancelarReinicio: () => ipcRenderer.invoke('gravador:cancelar-reinicio'),
   discos: () => ipcRenderer.invoke('gravador:discos'),
   lancamento: () => ipcRenderer.invoke('gravador:lancamento'),
   escolherImagem: () => ipcRenderer.invoke('gravador:escolher-imagem'),

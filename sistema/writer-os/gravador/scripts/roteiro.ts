@@ -263,6 +263,20 @@ try {
   await p.waitForSelector('[data-teste="ir-remover"]', { timeout: 20_000 });
   ok(true, 'com o Writer OS instalado, aparece "Remover o Writer OS deste computador"');
   ok(!(await p.$('[data-teste="preparar"]')), 'e não aparece o "preparar"');
+  // "Reiniciar no Writer OS": o aviso, o UAC (aqui simulado), a contagem e o Cancelar (nada reinicia de verdade)
+  ok(await ate('ir-reiniciar'), 'Tab chega em "Reiniciar no Writer OS"');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="passo-reiniciar"]');
+  ok(await p.isVisible('[data-teste="reiniciar-salve"]'), 'avisa para salvar e fechar o que está aberto');
+  await foto('5b-reiniciar');
+  ok(await ate('reiniciar'), 'Tab chega em "Reiniciar agora"');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="reiniciar-contagem"], [data-teste="passo-erro"]', { timeout: 30_000 });
+  ok(await p.isVisible('[data-teste="reiniciar-contagem"]'), `depois da permissão, a contagem (${(await p.textContent('[data-teste="erro"]').catch(() => '')) ?? ''})`);
+  ok(await ate('reiniciar-cancelar'), 'Tab chega em Cancelar');
+  await p.keyboard.press('Enter');
+  await p.waitForSelector('[data-teste="reinicio-cancelado"]', { timeout: 10_000 });
+  ok(true, 'cancelou: volta ao começo e diz que só o próximo ligar vai ao Writer OS');
   ok(await ate('ir-remover'), 'Tab chega em "Remover o Writer OS deste computador"');
   await p.keyboard.press('Enter');
   await p.waitForSelector('[data-teste="passo-remover"]');
