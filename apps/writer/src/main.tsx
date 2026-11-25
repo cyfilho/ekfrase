@@ -12,11 +12,11 @@ import '@ekfrase/nucleo/estilo/tokens.css';
 import '@ekfrase/nucleo/estilo/base.css';
 import './tema.css';
 import './writer.css';
-import { aplicarTema, iniciarIdioma, temaAtual } from '@ekfrase/nucleo';
+import { aplicarTema, definirTemaPadrao, iniciarIdioma, temaAtual } from '@ekfrase/nucleo';
 import { capturarLinks, chegouAgora, entradaDoApp, entradaPedida, linksDoApp, migrarHashAntigo, noApp, paginaDoApp, partesDoEndereco } from '@ekfrase/interface';
 import { render } from 'preact';
 import { App } from './App.tsx';
-import { naCasca } from './computador/casca.ts';
+import { naCasca, noOS } from './computador/casca.ts';
 import { tr } from './textos.ts';
 
 // marca a visita já ao abrir (ir do castelo para cá não conta como chegar por link direto)
@@ -35,6 +35,7 @@ migrarHashAntigo('writer', (resto) => {
 // os <a href="/writer/..."> trocam de tela sem recarregar
 capturarLinks(linksDoApp('writer'));
 iniciarIdioma(tr);
+if (noOS) definirTemaPadrao('escuro'); // Writer OS: sempre começa no noturno (pedido do Alcy, 20/11/2026)
 aplicarTema(temaAtual());
 render(<App />, document.getElementById('app')!);
 

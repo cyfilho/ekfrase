@@ -105,7 +105,7 @@
   "estante.ideias": "Ideias",
   "estante.ideias-soltas": "Ideias soltas",
   "estante.vazia": "Nenhuma história ainda. Comece com Nova história.",
-  "estante.editada": "mexida {quando}",
+  "estante.editada": "editada {quando}",
   "estante.ir": "Ir para a estante",
   "estante.sem-conta": "Você está escrevendo sem conta: tudo fica só neste aparelho. Entre na conta Ekfrase (no topo) para guardar na nuvem e abrir em outros aparelhos.",
   "estante.sem-conta.os": "Você está escrevendo sem conta: nada vai para a nuvem. Para guardar na nuvem e abrir em outros aparelhos, entre na conta Ekfrase pelo menu do sistema (a engrenagem, no alto).",
@@ -162,7 +162,7 @@
   "ficha.publico": "Público",
   "ficha.meta_palavras": "Meta de palavras da história",
   "ficha.trocar-capa": "Trocar a capa",
-  "ficha.editada": "Ficha mexida em {quando}.",
+  "ficha.editada": "Ficha editada em {quando}.",
   "escrever.rotulo": "Texto da cena {titulo}",
   "escrever.dica": "Escreva aqui. Dois hifens viram travessão.",
   "modo.maquina": "Máquina de escrever",
@@ -671,5 +671,9 @@
   "atualizacoes.situacao.pronta.pc": "Atualização pronta: a versão {nova} vale na próxima vez que você abrir o Writer.",
   "atualizacoes.modo.automaticas.dica.pc": "Baixa sozinha, confere o lacre da Ekfrase e vale na próxima vez que você abrir o Writer. Nunca fecha no meio da escrita.",
   "atualizacoes.erro.sem-espaco.pc": "Falta espaço neste computador para a versão nova.",
-  "atualizacoes.reiniciar": "Reiniciar agora"
+  "atualizacoes.reiniciar": "Reiniciar agora",
+  "os.relogio.abrir": "Data e hora: abrir as configurações",
+  "os.relogio.sincronizando": "Sincronizando a hora…",
+  "bateria.fraca": "Bateria fraca ({n}%). Conecte o carregador.",
+  "bateria.muito-fraca": "Bateria quase no fim ({n}%). Conecte o carregador agora, ou o computador vai desligar."
 }

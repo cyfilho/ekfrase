@@ -192,6 +192,11 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(sj['uso'] === 'pendrive', `"Só pelo pendrive" fica lembrado no sistema.json (${String(sj['uso'])})`);
   r.ok(await esperarRelato(raiz1, 'lugar usb'), 'o agente: ligou pelo pendrive (lugar usb)');
   r.ok(!!(await p.$('[data-teste="os-relogio"]')), 'a estante também mostra o relógio');
+  // tocar na data e na hora abre as configurações de data e hora (20/11)
+  await p.click('[data-teste="os-relogio"]');
+  r.ok(await r.esperar('os-painel-fuso', 5000), 'tocar na data e hora abre as configurações de data e hora');
+  await p.keyboard.press('Escape');
+  await p.keyboard.press('Escape');
   r.ok(existsSync(join(raiz1, 'dados', 'Ekfrase Writer', 'dados', 'cofre.db')), 'os textos estão na partição de dados (a mesma pasta do computador)');
 
   // as abas do topo: "Início" antes de todas (18/11)

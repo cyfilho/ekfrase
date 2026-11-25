@@ -35,6 +35,7 @@ import { ir, lerRota, useRota, type Rota } from './rotas.ts';
 import { t, tr, textoDoErro } from './textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, camadaAberta, focarTela } from './ui.tsx';
 import { naCasca, noOS } from './computador/casca.ts';
+import { AlertaDeBateria } from './bateria.tsx';
 import { PendriveOS } from './computador/PendriveOS.tsx';
 import { AvisoDeAtualizacao } from './computador/Atualizacoes.tsx';
 import { BotaoSistema, EntrarOS, MenuSistema, PortaoOS, RelogioOS, SistemaForaDoApp, useAvisoDeBrilho } from './computador/SistemaOS.tsx';
@@ -63,6 +64,7 @@ export function App() {
           <AppDoWriter />
         </PortaoOS>
         <RelogioOS />
+        <AlertaDeBateria />
         <AvisoDeAtualizacao />
       </>
     );
@@ -74,6 +76,7 @@ export function App() {
       </PortaoDaCasca>
       {/* no computador (U2): o mesmo aviso discreto das atualizações (fora da casca, nada aparece) */}
       <AvisoDeAtualizacao />
+      <AlertaDeBateria />
     </>
   );
 }
@@ -270,7 +273,7 @@ function Casca() {
       {aberta === 'ajustes' && <Ajustes fechar={fechar} />}
       {aberta === 'ideia' && <IdeiaRapida fechar={fechar} />}
       {aberta === 'levar' && <Levar fechar={fechar} />}
-      {aberta === 'sistema' && <MenuSistema fechar={fechar} />}
+      {(aberta === 'sistema' || aberta === 'hora') && <MenuSistema fechar={fechar} {...(aberta === 'hora' ? { secaoInicial: 'fuso' as const } : {})} />}
       {aberta === 'conta' && <EntrarOS fechar={fechar} />}
       {noOS && <PendriveOS />}
       <Confirmacoes />

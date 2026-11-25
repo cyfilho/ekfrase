@@ -671,5 +671,9 @@
   "atualizacoes.situacao.pronta.pc": "Update ready: version {nova} takes effect the next time you open Writer.",
   "atualizacoes.modo.automaticas.dica.pc": "Downloads on its own, checks the Ekfrase seal and takes effect the next time you open Writer. It never closes while you write.",
   "atualizacoes.erro.sem-espaco.pc": "There is not enough space on this computer for the new version.",
-  "atualizacoes.reiniciar": "Restart now"
+  "atualizacoes.reiniciar": "Restart now",
+  "os.relogio.abrir": "Date and time: open the settings",
+  "os.relogio.sincronizando": "Syncing the time…",
+  "bateria.fraca": "Low battery ({n}%). Plug in the charger.",
+  "bateria.muito-fraca": "Battery almost empty ({n}%). Plug in the charger now, or the computer will shut down."
 }

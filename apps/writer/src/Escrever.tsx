@@ -22,8 +22,9 @@ import { SeletorStatus } from './SeletorStatus.tsx';
 import { alternar, alternarTitulo, criarEditor, type Editor } from './editor.ts';
 import { pulsar, useSessao, useVivo } from './estado.ts';
 import { IconeEngrenagem, IconeLampada, IconeLupa, IconeNotas, IconeRelogio, IconeVoltar } from './icones.tsx';
+import { NivelDeBateria } from './bateria.tsx';
 import { noOS } from './computador/casca.ts';
-import { BotaoSistema } from './computador/SistemaOS.tsx';
+import { BotaoSistema, RelogioOS } from './computador/SistemaOS.tsx';
 import { Nuvem } from './Nuvem.tsx';
 import { pedir, useHistoriaDeAgora } from './pedidos.ts';
 import { mudarPrefs, usePrefs } from './prefs.ts';
@@ -408,8 +409,15 @@ function Folha({ cena, palavrasDoDia, metaDoDia, maquina, foco, semMenus, letra,
         </span>
         {soMemoria && <span class="selo-memoria">{t('writer.nuvem.selo-memoria')}</span>}
         <Nuvem />
-        {/* no Writer OS a data e a hora ficam no canto de todas as telas (RelogioOS) */}
-        {!noOS && <time class="relogio">{agora}</time>}
+        {/* no Writer OS a data e a hora ficam no canto das outras telas; aqui, no meio do rodapé (RelogioOS) */}
+        {noOS ? (
+          <RelogioOS embutido />
+        ) : (
+          <>
+            <time class="relogio">{agora}</time>
+            <NivelDeBateria />
+          </>
+        )}
       </footer>
 
       {notas && <NotasDaCena cena={cena} fechar={() => setNotas(false)} />}
