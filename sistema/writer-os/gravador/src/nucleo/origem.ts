@@ -5,8 +5,10 @@
  *
  * - do Release mais novo do Writer OS no repositório público (`cyfilho/ekfrase`, tag `writer-os-v*`):
  *   o `.img.xz`, o `.sha256` e o `.minisig`. Baixa com RETOMADA (a internet caiu: continua de onde
- *   parou) para a pasta do Gravador (`%LOCALAPPDATA%\Ekfrase\Gravador` ou `~/.cache/ekfrase-gravador`),
- *   que serve de cache na próxima vez. O download SEMPRE exige o lacre válido.
+ *   parou) para a pasta do Gravador (`%LOCALAPPDATA%\Ekfrase\Gravador` ou `~/.cache/ekfrase-gravador`).
+ *   NÃO HÁ CACHE (Bloco E, 20/11/2026): toda gravação baixa de novo e quem chama apaga a pasta ao terminar
+ *   (`apagarDownload`), dê certo ou errado; só o `.parte` de um download que caiu fica, para retomar. O download
+ *   SEMPRE exige o lacre válido.
  * - ou de um arquivo que a pessoa já tem ("Já tenho a imagem"): o `.sha256` e o `.minisig` ao lado,
  *   se houver. Lacre presente e errado, ou SHA-256 diferente = recusa. Sem lacre = aceita, mas só com o
  *   aviso vermelho e a confirmação escrita (quem faz o próprio Writer OS consegue gravar).
@@ -74,7 +76,7 @@ const baixarTexto = (buscar: Buscar, url: string) => comoOrigem(() => baixarText
  */
 export const baixarArquivo = (buscar: Buscar, url: string, destino: string, o: OpcoesBaixar = {}): Promise<void> => comoOrigem(() => baixarComRetomada(buscar, url, destino, { agente: AGENTE, ...o }));
 
-/** A pasta do Gravador (o cache da imagem). */
+/** A pasta do Gravador (o download da imagem, só enquanto grava; os ajustes). */
 export function pastaCache(): string {
   if (process.platform === 'win32') return join(process.env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'), 'Ekfrase', 'Gravador');
   return join(process.env['XDG_CACHE_HOME'] || join(homedir(), '.cache'), 'ekfrase-gravador');
@@ -116,12 +118,10 @@ export async function imagemDoLancamento(buscar: Buscar, l: Lancamento, o: { pas
   const minisig = await baixarTexto(buscar, l.minisig);
   if (!shaEsperado) throw new ErroOrigem('sha-diferente', 'o .sha256 do Release não tem um hash');
   const conferir = async () => hashesDoArquivo(arquivo, (feito) => o.aviso?.({ etapa: 'conferir', feito, total: statSync(arquivo).size }));
-  let h = existsSync(arquivo) ? await conferir() : null;
-  if (!h || h.sha256 !== shaEsperado) {
-    await rm(arquivo, { force: true });
-    await baixarArquivo(buscar, l.imagem.url, arquivo, { tamanho: l.imagem.tamanho || undefined, aoBaixar: (feito, total) => o.aviso?.({ etapa: 'baixar', feito, total }), sinal: o.sinal });
-    h = await conferir();
-  }
+  // sem cache: uma imagem inteira que sobrou de antes não vale; só o `.parte` (download que caiu) é retomado
+  await rm(arquivo, { force: true });
+  await baixarArquivo(buscar, l.imagem.url, arquivo, { tamanho: l.imagem.tamanho || undefined, aoBaixar: (feito, total) => o.aviso?.({ etapa: 'baixar', feito, total }), sinal: o.sinal });
+  const h = await conferir();
   if (h.sha256 !== shaEsperado) {
     await rm(arquivo, { force: true });
     throw new ErroOrigem('sha-diferente');
@@ -135,6 +135,14 @@ export async function imagemDoLancamento(buscar: Buscar, l: Lancamento, o: { pas
   // as versões antigas saem do cache
   for (const p of readdirSync(raiz)) if (p !== l.tag && p.startsWith(PREFIXO_TAG)) rmSync(join(raiz, p), { recursive: true, force: true });
   return { arquivo, nome: basename(arquivo), sha256: h.sha256, minisig, lacre: 'ekfrase', comentario: r.comentario, versao: l.versao };
+}
+
+/** Apaga o que o download deixou (a imagem; o `.parte` só fica se o download caiu no meio) da pasta do Release: chamar ao terminar a gravação, dê certo ou errado. */
+export function apagarDownload(l: Pick<Lancamento, 'tag'>, pasta = pastaCache()): void {
+  const dir = join(pasta, l.tag);
+  for (const f of existsSync(dir) ? readdirSync(dir) : []) if (!f.endsWith('.parte')) rmSync(join(dir, f), { recursive: true, force: true });
+  // um download que caiu no meio deixa o `.parte` para retomar; sem ele, a pasta inteira vai
+  if (existsSync(dir) && readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true });
 }
 
 /** "Já tenho a imagem": confere o arquivo e o que estiver ao lado dele. */
