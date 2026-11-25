@@ -7,7 +7,7 @@ import { useEffect } from 'preact/hooks';
  * qualquer tela pede, a casca (App.tsx) abre. E a história em que a pessoa está agora, para a ideia
  * rápida já nascer ligada a ela.
  */
-export type Pedido = 'paleta' | 'atalhos' | 'ajustes' | 'ideia' | 'levar' | 'sistema' | 'conta';
+export type Pedido = 'paleta' | 'atalhos' | 'ajustes' | 'ideia' | 'levar' | 'sistema' | 'conta' | 'hora';
 
 const ouvintes = new Set<(p: Pedido) => void>();
 

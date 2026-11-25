@@ -252,6 +252,18 @@ input {
   width: 100%;
 }
 
+/* Seleção e caixa de marcar pequenas, como num formulário comum (pedido do Alcy, 20/11/2026):
+   o `input` acima não pode esticar a bolinha. */
+input[type='radio'],
+input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  min-height: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--foco, currentColor);
+}
+
 /* ---------- botões ---------- */
 .botao {
   display: inline-flex;

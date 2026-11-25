@@ -39,9 +39,16 @@ export function iniciarIdioma(tr: Tradutor): void {
 
 export type Tema = 'claro' | 'escuro' | 'sistema';
 
+let temaPadrao: Tema = 'sistema';
+
+/** O tema de quem ainda não escolheu (o Writer OS e o Gravador começam no escuro). A escolha gravada vale mais. */
+export function definirTemaPadrao(tema: Tema): void {
+  temaPadrao = tema;
+}
+
 export function temaAtual(): Tema {
   const v = ler(CHAVE_TEMA);
-  return v === 'claro' || v === 'escuro' ? v : 'sistema';
+  return v === 'claro' || v === 'escuro' ? v : temaPadrao;
 }
 
 /** O tema que está na tela agora: a escolha da pessoa ou, sem escolha, o do aparelho. */

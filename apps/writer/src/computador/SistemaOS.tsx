@@ -20,6 +20,7 @@ import type { ComponentChildren, TargetedKeyboardEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { IconeLigar } from '../icones.tsx';
 import { teclaDe } from '../comandos.ts';
+import { NivelDeBateria } from '../bateria.tsx';
 import { aoPedido, pedir } from '../pedidos.ts';
 import { t, tr } from '../textos.ts';
 import { Avisos, Camada, Confirmacoes, avisar, confirmar, focaveis } from '../ui.tsx';
@@ -143,26 +144,64 @@ function EscolherFuso() {
   return (
     <Moldura titulo={t('writer.os.fuso.titulo')} teste="os-fuso" foco={lista ? 'fuso' : 'carregando'}>
       <p>{t('writer.os.fuso.texto')}</p>
-      {lista && <Escolhas opcoes={lista} atual={null} nome={nomeDoFuso} escolher={(id) => void os.usarFuso(id).then(mudarEstadoOS)} teste="os-fuso" />}
+      {lista && <Escolhas opcoes={lista} atual={null} nome={nomeDoFuso} escolher={(id) => void trocarFuso(id)} teste="os-fuso" />}
     </Moldura>
   );
 }
 
 // ---------- a hora e a data (pedido do Alcy em 18/11: em todas as telas, depois do boot) ----------
 
-const formatarRelogio = (d: Date, idioma: string): { hora: string; data: string } => ({
-  hora: d.toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit' }),
-  data: d.toLocaleDateString(idioma, { weekday: 'short', day: 'numeric', month: 'short' }),
-});
+/** O fuso de antes da escolha do primeiro uso: Brasília (o mesmo padrão da imagem). */
+const FUSO_PADRAO = 'America/Sao_Paulo';
+
+const formatarRelogio = (d: Date, idioma: string, fuso: string): { hora: string; data: string } => {
+  // a página não relê o fuso do sistema (o Chromium o guarda desde que abriu): a hora sai com o fuso escolhido
+  const timeZone = fuso;
+  try {
+    return {
+      hora: d.toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit', timeZone }),
+      data: d.toLocaleDateString(idioma, { weekday: 'short', day: 'numeric', month: 'short', timeZone }),
+    };
+  } catch {
+    return { hora: d.toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit' }), data: d.toLocaleDateString(idioma, { weekday: 'short', day: 'numeric', month: 'short' }) };
+  }
+};
+
+// trocar o fuso: o ícone girando ("sincronizando") até a hora nova valer (pedido do Alcy em 20/11)
+let sincronizando = false;
+const ouvintesSinc = new Set<() => void>();
+const mudarSinc = (v: boolean) => {
+  sincronizando = v;
+  for (const f of [...ouvintesSinc]) f();
+};
+
+/** Troca o fuso do sistema; o relógio mostra o ícone girando até a hora nova aparecer. */
+export async function trocarFuso(id: string): Promise<void> {
+  mudarSinc(true);
+  try {
+    mudarEstadoOS(await os.usarFuso(id));
+  } finally {
+    // dá um respiro para a hora nova já estar na tela quando o ícone some
+    setTimeout(() => mudarSinc(false), 1200);
+  }
+}
 
 /**
- * O relógio do Writer OS: a data e a hora, fixos no canto de baixo de TODAS as telas (o primeiro uso, a senha, o app e
- * a folha). Muda no começo de cada minuto; o idioma é o da pessoa. A folha deixa de mostrar o relógio dela no OS.
+ * O relógio do Writer OS: a data e a hora (no fuso escolhido, Brasília antes da escolha), a bateria ao lado
+ * (FB-0031) e, ao tocar, as configurações de data e hora. Em todas as telas, fixo no canto de baixo; na folha
+ * de escrever (`embutido`) ele mora no rodapé, no meio, e some junto com os menus.
  */
-export function RelogioOS() {
+export function RelogioOS({ embutido = false }: { embutido?: boolean }) {
+  const osEstado = useEstadoOS();
+  const fuso = osEstado?.fuso ?? FUSO_PADRAO;
   const [agora, setAgora] = useState(() => new Date());
   const [, setV] = useState(0);
   useEffect(() => tr.aoTrocar(() => setV((n) => n + 1)), []);
+  useEffect(() => {
+    const f = () => setV((n) => n + 1);
+    ouvintesSinc.add(f);
+    return () => void ouvintesSinc.delete(f);
+  }, []);
   useEffect(() => {
     let relogio: ReturnType<typeof setTimeout>;
     const proximo = () => {
@@ -173,12 +212,29 @@ export function RelogioOS() {
     proximo();
     return () => clearTimeout(relogio);
   }, []);
-  const { hora, data } = formatarRelogio(agora, tr.idioma());
+  // só um relógio por tela: o do canto se esconde enquanto a folha mostra o do rodapé
+  useEffect(() => {
+    if (!embutido) return;
+    document.documentElement.classList.add('relogio-no-rodape');
+    return () => document.documentElement.classList.remove('relogio-no-rodape');
+  }, [embutido]);
+  const { hora, data } = formatarRelogio(agora, tr.idioma(), fuso);
+  const abrir = () => pedir('hora');
   return (
-    <time class="relogio-os" dateTime={agora.toISOString()} aria-label={t('writer.os.relogio', { data, hora })} data-teste="os-relogio">
-      <span class="relogio-os-data">{data}</span>
-      <span class="relogio-os-hora">{hora}</span>
-    </time>
+    <button
+      type="button"
+      class={`relogio-os${embutido ? ' embutido' : ''}`}
+      onClick={abrir}
+      title={t('writer.os.relogio.abrir')}
+      aria-label={t('writer.os.relogio', { data, hora })}
+      data-teste={embutido ? 'os-relogio-rodape' : 'os-relogio'}
+    >
+      {sincronizando && <span class="relogio-os-girando" role="status" aria-label={t('writer.os.relogio.sincronizando')} data-teste="os-relogio-sinc" />}
+      <time dateTime={agora.toISOString()}>
+        <span class="relogio-os-data">{data}</span> <span class="relogio-os-hora">{hora}</span>
+      </time>
+      <NivelDeBateria />
+    </button>
   );
 }
 
@@ -585,11 +641,11 @@ export function BotaoSistema({ tamanho }: { tamanho?: number } = {}) {
  * Writer (só existem com os textos abertos). Sem isto, quem não entrou no app não tinha como desligar (Alcy, 18/11).
  */
 export function SistemaForaDoApp() {
-  const [aberta, setAberta] = useState<'sistema' | 'conta' | null>(null);
+  const [aberta, setAberta] = useState<'sistema' | 'conta' | 'hora' | null>(null);
   useEffect(
     () =>
       aoPedido((p) => {
-        if (p === 'sistema' || p === 'conta') setAberta(p);
+        if (p === 'sistema' || p === 'conta' || p === 'hora') setAberta(p);
       }),
     [],
   );
@@ -605,7 +661,7 @@ export function SistemaForaDoApp() {
   const fechar = () => setAberta(null);
   return (
     <>
-      {aberta === 'sistema' && <MenuSistema fechar={fechar} semAjustes />}
+      {(aberta === 'sistema' || aberta === 'hora') && <MenuSistema fechar={fechar} semAjustes {...(aberta === 'hora' ? { secaoInicial: 'fuso' as const } : {})} />}
       {aberta === 'conta' && <EntrarOS fechar={fechar} />}
       <Confirmacoes />
       <Avisos />
@@ -919,8 +975,8 @@ function andarPeloMenu(e: TargetedKeyboardEvent<HTMLElement>): void {
  * Sobre) e os Ajustes do Writer. Cada parte abre dentro do próprio menu; Esc volta ao menu, e no menu, fecha.
  * Tudo pelo teclado: setas, Enter, Esc (e Tab, que gira dentro).
  */
-export function MenuSistema({ fechar, semAjustes = false }: { fechar: () => void; semAjustes?: boolean }) {
-  const [secao, setSecao] = useState<SecaoOS | null>(null);
+export function MenuSistema({ fechar, semAjustes = false, secaoInicial = null }: { fechar: () => void; semAjustes?: boolean; secaoInicial?: SecaoOS | null }) {
+  const [secao, setSecao] = useState<SecaoOS | null>(secaoInicial);
   // a volta de uma parte põe o foco no item dela
   const [ultimo, setUltimo] = useState('os-desligar');
   const [recado, setRecado] = useState<string | null>(null);
@@ -1067,6 +1123,8 @@ function ContaNoServidor() {
       <h3>{t('writer.os.menu.conta-titulo')}</h3>
       {conta ? (
         <>
+          {/* Sem conta, o formulário de entrar já traz a escolha do servidor (`definirAntesDoEntrar`): uma só. */}
+          <EscolhaServidor />
           <p>{t('writer.os.menu.conta', { nome: conta.nome })}</p>
           <div class="acoes-linha">
             <button type="button" class="botao" onClick={() => void ponte.sair()} data-teste="os-servidor-sair">
@@ -1167,7 +1225,7 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
         <Secao titulo={t('writer.os.fuso.titulo')} teste="os-painel-fuso">
           <label class="campo">
             <span>{t('writer.os.fuso.rotulo')}</span>
-            <select value={osEstado?.fuso ?? ''} onChange={(e) => void os.usarFuso(e.currentTarget.value).then(mudarEstadoOS)} data-teste="os-painel-fuso-lista">
+            <select value={osEstado?.fuso ?? ''} onChange={(e) => void trocarFuso(e.currentTarget.value)} data-teste="os-painel-fuso-lista">
               {fusos.map((id) => (
                 <option key={id} value={id}>
                   {nomeDoFuso(id)}
@@ -1180,7 +1238,6 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
     case 'servidor':
       return (
         <Secao titulo={t('writer.os.servidor.titulo')} teste="os-painel-servidor">
-          <EscolhaServidor />
           <ContaNoServidor />
         </Secao>
       );

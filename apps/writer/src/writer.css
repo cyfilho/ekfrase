@@ -1106,7 +1106,8 @@ a.linha-titulo:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* o relógio do Writer OS: a data e a hora no canto de baixo de todas as telas (pedido do Alcy em 18/11) */
+/* o relógio do Writer OS: a data, a hora e a bateria no canto de baixo de todas as telas (pedido do Alcy em 18/11);
+   é um botão: tocar abre a data e a hora das configurações. Na folha de escrever ele mora no rodapé (`.embutido`). */
 .relogio-os {
   position: fixed;
   right: 0.5rem;
@@ -1114,20 +1115,95 @@ a.linha-titulo:hover {
   z-index: 60;
   display: flex;
   gap: 0.5rem;
-  align-items: baseline;
+  align-items: center;
   padding: 0.15rem 0.6rem;
   background: var(--papel-forte);
   color: var(--tinta);
   border: var(--px) solid var(--borda);
   box-shadow: 2px 2px 0 var(--sombra);
+  font: inherit;
   font-size: 0.85rem;
   line-height: 1.4;
-  pointer-events: none;
+  cursor: pointer;
   font-variant-numeric: tabular-nums;
+}
+
+.relogio-os.embutido {
+  position: static;
+  z-index: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+.relogio-os.embutido:hover,
+.relogio-os.embutido:focus-visible {
+  color: var(--tinta);
+  text-decoration: underline;
+}
+
+/* na folha, o relógio do rodapé basta */
+.relogio-no-rodape .relogio-os:not(.embutido) {
+  display: none;
 }
 
 .relogio-os-hora {
   font-weight: 700;
+}
+
+/* trocou o fuso: o ícone gira até a hora nova aparecer */
+.relogio-os-girando {
+  width: 0.8em;
+  height: 0.8em;
+  border: var(--px) solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: relogio-gira 0.9s steps(8) infinite;
+}
+
+@keyframes relogio-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relogio-os-girando {
+    animation-duration: 3s;
+  }
+}
+
+/* o nível da bateria ao lado da hora (FB-0031) */
+.bateria-nivel {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.bateria-nivel.baixa {
+  color: var(--erro);
+  font-weight: 700;
+}
+
+.bateria-icone {
+  display: inline-block;
+  width: 1.1em;
+  height: 0.6em;
+  padding: 1px;
+  border: var(--px) solid currentColor;
+}
+
+.bateria-icone > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+
+.bateria-nivel.carregando .bateria-icone {
+  border-style: dashed;
 }
 
 /* as atualizações (DEC-P072): o aviso discreto no canto, acima do relógio; nunca pega o foco */
@@ -1168,7 +1244,6 @@ a.linha-titulo:hover {
 }
 
 /* o que mora no pé da tela não fica embaixo do relógio */
-.no-os .folha-rodape,
 .no-os .ekf-rodape,
 .no-os .tela-casca {
   padding-bottom: 2.5rem;
