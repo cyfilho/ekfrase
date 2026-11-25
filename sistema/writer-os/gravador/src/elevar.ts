@@ -13,7 +13,7 @@
  */
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +33,26 @@ export interface OpcoesElevar {
   semElevar?: boolean;
 }
 
+/** As pastas `ekfrase-gravador-*` que sobraram de uma gravação que travou ou foi morta (Bloco E): com mais de 1 hora, saem. */
+export function limparTemporarios(raiz = tmpdir(), idadeMs = 3_600_000): void {
+  try {
+    for (const n of readdirSync(raiz)) {
+      if (!n.startsWith('ekfrase-gravador-')) continue;
+      const p = join(raiz, n);
+      try {
+        const st = statSync(p);
+        if (st.isDirectory() && Date.now() - st.mtimeMs > idadeMs) rmSync(p, { recursive: true, force: true });
+      } catch {
+        /* em uso ou sem permissão: fica */
+      }
+    }
+  } catch {
+    /* sem temporário legível */
+  }
+}
+
 export async function gravarElevado(o: OpcoesElevar): Promise<Resultado> {
+  limparTemporarios();
   const pasta = mkdtempSync(join(tmpdir(), 'ekfrase-gravador-'));
   const token = randomBytes(24).toString('hex');
   const canal = process.platform === 'win32' ? `\\\\.\\pipe\\ekfrase-gravador-${randomBytes(12).toString('hex')}` : join(pasta, 'canal');
