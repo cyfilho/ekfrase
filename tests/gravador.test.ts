@@ -7,7 +7,7 @@
  * O mesmo contra discos virtuais de verdade (loop no Linux, VHD no Windows) e a imagem de verdade:
  * tests/gravador/disco-virtual.ts, no CI do Writer OS.
  */
-import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, utimesSync, openSync, readFileSync, readSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,10 +19,11 @@ import { computadorSimulado, entradasDoWriter, executarComputador, GB, guardaDoS
 import { discosDoLinux, discosDoWindows, MINIMO_DISCO, type Disco } from '../sistema/writer-os/gravador/src/nucleo/discos.ts';
 import { lerBpb, traduzir4k } from '../sistema/writer-os/gravador/src/nucleo/fat4k.ts';
 import { bytesParaGuid, crc32, guidParaBytes, lerGpt, montarGpt, NOME_BOOT, NOME_DADOS, TIPO } from '../sistema/writer-os/gravador/src/nucleo/gpt.ts';
+import { limparTemporarios } from '../sistema/writer-os/gravador/src/elevar.ts';
 import { executar, type Ambiente, type Aviso, type Tarefa } from '../sistema/writer-os/gravador/src/nucleo/gravar.ts';
 import { Fluxo } from '../sistema/writer-os/gravador/src/nucleo/imagem.ts';
 import { conferirAssinatura, hashesDoArquivo, lerChavePublica } from '@ekfrase/atualizacoes';
-import { baixarArquivo, imagemDoArquivo, ultimoLancamento, type Buscar } from '../sistema/writer-os/gravador/src/nucleo/origem.ts';
+import { apagarDownload, baixarArquivo, imagemDoArquivo, ultimoLancamento, type Buscar } from '../sistema/writer-os/gravador/src/nucleo/origem.ts';
 import { arquivosTeste, assinadorTeste, comprimirXz, fat32, imagemTeste, lerDaFat, MIB, sha256 } from './gravador/imagem-teste.ts';
 
 const FIX = fileURLToPath(new URL('./gravador/fixtures/', import.meta.url));
@@ -480,5 +481,45 @@ describe('este computador: preparar e remover o Writer OS (computador.ts, PLANO 
     expect(fase).toEqual(['reiniciar']);
     expect(computadorSimulado('writer').writer).toBe(true);
     expect(computadorSimulado(undefined).disponivel).toBe(false);
+  });
+});
+
+describe('sem cache da imagem (Bloco E, 20/11/2026)', () => {
+  it('apagarDownload tira a imagem e a pasta; só o .parte de um download que caiu fica, para retomar', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfr-sem-cache-'));
+    try {
+      const completo = join(raiz, 'writer-os-v1.0.0');
+      mkdirSync(completo);
+      writeFileSync(join(completo, 'ekfrase-writer-os-1.0.0.img.xz'), 'x');
+      apagarDownload({ tag: 'writer-os-v1.0.0' }, raiz);
+      expect(existsSync(completo)).toBe(false);
+      const caiu = join(raiz, 'writer-os-v1.0.1');
+      mkdirSync(caiu);
+      writeFileSync(join(caiu, 'ekfrase-writer-os-1.0.1.img.xz.parte'), 'x');
+      apagarDownload({ tag: 'writer-os-v1.0.1' }, raiz);
+      expect(existsSync(join(caiu, 'ekfrase-writer-os-1.0.1.img.xz.parte'))).toBe(true);
+      expect(() => apagarDownload({ tag: 'writer-os-v9' }, raiz)).not.toThrow();
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it('as pastas ekfrase-gravador-* velhas do temporário saem; as novas e as dos outros ficam', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfr-tmp-'));
+    try {
+      const velha = join(raiz, 'ekfrase-gravador-aaa');
+      const nova = join(raiz, 'ekfrase-gravador-bbb');
+      const outra = join(raiz, 'outra-coisa');
+      for (const d of [velha, nova, outra]) mkdirSync(d);
+      const antes = new Date(Date.now() - 2 * 3_600_000);
+      utimesSync(velha, antes, antes);
+      utimesSync(outra, antes, antes);
+      limparTemporarios(raiz);
+      expect(existsSync(velha)).toBe(false);
+      expect(existsSync(nova)).toBe(true);
+      expect(existsSync(outra)).toBe(true);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 });

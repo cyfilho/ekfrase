@@ -28,7 +28,7 @@ import { Atualizador, CHAVE_EKFRASE, ehVersao, lerModo, limparVelho, trocarNoLug
 import { computadorSimulado, GB, infoDoComputador, recusaDoPreparar, TAMANHOS_GB, type InfoComputador, type Removido, type TarefaComputador } from './nucleo/computador.ts';
 import { listarDiscos, resumoDoConteudo, type Disco } from './nucleo/discos.ts';
 declare const __EKFRASE_CANAL__: string;
-import { API_GITHUB, type Canal, ErroOrigem, imagemDoArquivo, imagemDoLancamento, pastaCache, ultimoLancamento, type Buscar, type Etapa, type ImagemPronta, type Lancamento } from './nucleo/origem.ts';
+import { API_GITHUB, apagarDownload, type Canal, ErroOrigem, imagemDoArquivo, imagemDoLancamento, pastaCache, ultimoLancamento, type Buscar, type Etapa, type ImagemPronta, type Lancamento } from './nucleo/origem.ts';
 import { rodarTrabalhador } from './nucleo/trabalhador.ts';
 import { nomeNormalizado, SEGUNDOS_PARA_REINICIAR, type DiscoNaTela, type FaseTela, type InfoLancamento, type PedidoGravar, type Progresso, type ResultadoGravar, type ResultadoPreparar, type ResultadoReiniciar, type ResultadoRemover } from './ponte.ts';
 
@@ -294,6 +294,7 @@ function iniciar(): void {
       ocupado = true;
       registro('gravar', p.modo, p.disco, p.origem);
       cancelar = new AbortController();
+      let baixado: Lancamento | null = null;
       try {
         const d = ultimaLista.find((x) => x.id === p.disco);
         if (!d) return { ok: false, erro: 'disco-sumiu' };
@@ -304,6 +305,7 @@ function iniciar(): void {
         if (p.origem === 'release') {
           const l = await acharLancamento();
           if (!l) return { ok: false, erro: 'sem-release' };
+          baixado = l;
           img = await imagemDoLancamento(buscar, l, { pasta: CACHE, aviso: etapa, sinal: cancelar.signal, chave: CHAVE });
         } else {
           if (!escolhida) return { ok: false, erro: 'sem-imagem' };
@@ -340,6 +342,14 @@ function iniciar(): void {
         registro('erro', e);
         return { ok: false, erro: e instanceof ErroOrigem ? e.codigo : 'escrita', detalhe: String((e as Error)?.stack ?? e).slice(0, 600) };
       } finally {
+        // Bloco E: a imagem baixada não fica (dê certo ou errado); só o `.parte` de um download que caiu sobra, para retomar
+        if (baixado) {
+          try {
+            apagarDownload(baixado, CACHE);
+          } catch {
+            /* o que não saiu fica para a próxima limpeza */
+          }
+        }
         ocupado = false;
         cancelar = null;
       }
