@@ -67,8 +67,19 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-x86 ovmf dosfstools gdisk ntfs-3g minisign
+      # a VPN de empresa (W5a, docs/writer/PLANO.md §7): dois ocserv de verdade aqui no runner, que a máquina virtual
+      # alcança pelo guestfwd do QEMU (o qemu.py, teste_vpn_empresa); senhas e certificado sorteados, só para o teste
+      - name: A VPN de empresa do teste (dois ocserv)
+        run: |
+          sudo apt-get install -y -qq ocserv
+          sudo bash tests/writer-os/ocserv.sh "$RUNNER_TEMP/ocserv"
+          echo "EKFRASE_QEMU_VPN=$RUNNER_TEMP/ocserv/vpn-empresa.json" >> "$GITHUB_ENV"
       - run: df -h / "$PWD"
       - run: python3 tests/writer-os/qemu.py --imagem "sistema/writer-os/imagem/saida/ekfrase-writer-os-$VERSAO-teste.img" --prints prints-writer-os
+      # o lado do servidor da VPN de empresa (o que o ocserv viu: o login, o túnel, por que recusou)
+      - name: O que o ocserv do teste viu
+        if: always()
+        run: sudo journalctl --no-pager -o short-monotonic -t ocserv -t ocserv-sm 2>/dev/null | tail -n 120 || true
       # os prints e a serial de cada máquina virtual (para entender uma falha sem rodar de novo)
       - uses: actions/upload-artifact@v4
         if: always()

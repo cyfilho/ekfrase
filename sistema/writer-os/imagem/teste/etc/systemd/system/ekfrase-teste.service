@@ -15,6 +15,9 @@ ExecStartPre=/bin/sh -c 'modprobe qemu_fw_cfg 2>/dev/null; if [ -e /sys/firmware
 # a atualização (qemu.py teste_atualizar/teste_voltar, docs/ATUALIZACOES.md §4): o "GitHub" do teste (opt/ekfrase/atualizacoes,
 # o endereço do servidor no computador que roda o QEMU) e, no teste da volta, que a casca NÃO confirme a cópia nova
 ExecStartPre=/bin/sh -c 'if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/atualizacoes/raw ]; then head -c 200 /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/atualizacoes/raw > /run/ekfrase/teste/atualizacoes; chmod 0644 /run/ekfrase/teste/atualizacoes; fi; if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/nao-confirmar ]; then touch /run/ekfrase/teste/nao-confirmar; fi'
+# a VPN de empresa (qemu.py teste_vpn_empresa, W5a): o ocserv do computador que roda o QEMU (opt/ekfrase/vpn-empresa, um
+# JSON com o servidor, os usuários e as senhas de TESTE) vai ao agente de teste da casca, que lê como writer
+ExecStartPre=/bin/sh -c 'if [ -e /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/vpn-empresa/raw ]; then head -c 4000 /sys/firmware/qemu_fw_cfg/by_name/opt/ekfrase/vpn-empresa/raw > /run/ekfrase/teste/vpn-empresa; chown 1000:1000 /run/ekfrase/teste/vpn-empresa; chmod 0600 /run/ekfrase/teste/vpn-empresa; fi'
 ExecStart=/usr/lib/ekfrase/teste/relato.sh
 
 [Install]
