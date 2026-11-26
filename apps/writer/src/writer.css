@@ -2053,6 +2053,9 @@ kbd {
 }
 
 /* a VPN do Writer OS (PLANO §7): a parte "VPN" do menu do sistema e o cadeado ao lado da bateria */
+.vpn-impressao {
+  overflow-wrap: anywhere;
+}
 .lista-vpn {
   display: grid;
   gap: 0.6rem;
