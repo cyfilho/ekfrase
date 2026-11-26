@@ -25,6 +25,10 @@
  *    o `.ovpn` com `up`, ligar (o OpenVPN pede usuário e senha: `vpn123`), o cadeado ao lado da bateria, desligar,
  *    fechar e abrir: as duas voltam do cofre, e a senha guardada liga sem perguntar (`percorrerVpn`).
  *
+ * 7. A VPN de empresa (W5a-2): "Adicionar VPN de empresa" (AnyConnect, GlobalProtect, Fortinet) contra o simulado: liga ao
+ *    adicionar, o código do segundo fator (o errado e o certo), a impressão e "Confiar neste certificado", o aviso do
+ *    login pelo navegador (`sso`), o endereço que não serve; no outro boot voltam do cofre (`percorrerVpnEmpresa`).
+ *
  * Os prints de cada tela vão para `EKFRASE_PRINTS_OS` (se houver). Roda por `npm run teclado -- --so-os`.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -178,7 +182,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(await engrenagemNaPonta(p), 'na tela inicial, a engrenagem é o último botão do topo (a ponta direita)');
   await r.tecla('Control+Alt+s');
   if (await r.esperar('menu-sistema', 5000)) {
-    r.ok(await r.focoEm('os-desligar'), 'na tela inicial, Ctrl+Alt+S abre o menu com o foco em Desligar');
+    r.ok(await r.focoChega('os-desligar'), 'na tela inicial, Ctrl+Alt+S abre o menu com o foco em Desligar');
     r.ok(!(await p.$('[data-teste="os-menu-ajustes"]')), 'fora do app o menu não tem os Ajustes do Writer');
     await foto(p, '07b-menu-na-entrada');
     await r.tecla('Escape');
@@ -219,7 +223,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   r.ok(menu, 'Ctrl+Alt+S abre o menu do sistema');
   if (menu) {
     await r.passo('o foco começa no menu', 'menu-sistema');
-    r.ok(await r.focoEm('os-desligar'), 'o foco começa em Desligar, no alto do menu');
+    r.ok(await r.focoChega('os-desligar'), 'o foco começa em Desligar, no alto do menu');
     const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
     r.ok(itens[0] === 'os-desligar' && itens[1] === 'os-reiniciar' && itens[2] === 'os-conta-entrar', `Desligar e Reiniciar em cima, depois a conta (${itens.join(', ')})`);
     for (const s of ['os-menu-wifi', 'os-menu-energia', 'os-menu-teclado', 'os-menu-fuso', 'os-menu-servidor', 'os-menu-discos', 'os-menu-sobre', 'os-menu-ajustes']) r.ok(itens.includes(s), `o menu tem "${s}"`);
@@ -235,9 +239,9 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     }
     // as setas andam pelo menu, em roda
     await r.tecla('ArrowDown');
-    r.ok(await r.focoEm('os-reiniciar'), 'seta para baixo: Reiniciar');
+    r.ok(await r.focoChega('os-reiniciar'), 'seta para baixo: Reiniciar');
     await r.tecla('ArrowUp', 2);
-    r.ok(await r.focoEm(itens[itens.length - 1] ?? ''), 'seta para cima no primeiro: vai ao último');
+    r.ok(await r.focoChega(itens[itens.length - 1] ?? ''), 'seta para cima no primeiro: vai ao último');
     // Bateria e tela: setas até ele, Enter
     for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-energia')); i++) await r.tecla('ArrowDown');
     await r.tecla('Enter');
@@ -262,7 +266,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       for (let i = 0; i < 6 && !(await naCasa()); i++) await r.tecla('Shift+Tab');
       await r.tecla('Enter');
       if (await r.esperar('os-rede-senha', 3000)) {
-        r.ok(await r.focoEm('os-rede-senha'), 'escolher a rede põe o foco na senha');
+        r.ok(await r.focoChega('os-rede-senha'), 'escolher a rede põe o foco na senha');
         const acima = await p.evaluate(() => {
           const senha = document.querySelector('[data-teste="os-rede-senha"]');
           const rede = document.querySelector('[data-teste="os-rede"]');
@@ -375,18 +379,18 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   await r.tecla('Control+Alt+s');
   if (await r.esperar('menu-sistema', 5000)) {
     await r.tecla('End');
-    r.ok(await r.focoEm('os-menu-instalar'), 'End no menu: "Instalar neste computador"');
+    r.ok(await r.focoChega('os-menu-instalar'), 'End no menu: "Instalar neste computador"');
     await r.tecla('Enter');
     if (await r.esperar('os-instalar-botao', 8000)) {
       await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-botao', null, { timeout: 5000 }).catch(() => undefined);
       await r.passo('instalar: o foco visível em "Instalar"');
-      r.ok(await r.focoEm('os-instalar-botao'), 'o foco começa em "Instalar"');
+      r.ok(await r.focoChega('os-instalar-botao'), 'o foco começa em "Instalar"');
       r.ok(await p.isChecked('[data-teste="os-instalar-levar"]'), '"Levar os textos deste pendrive" vem marcado (há textos)');
       r.ok(!!(await p.$('[data-teste="os-instalar-barra"]')), 'a barra do disco aparece');
       await foto(p, '15-instalar');
       await r.tecla('Enter');
       r.ok(await r.esperar('os-instalado', 15000), 'instalou: a tela final com o tutorial');
-      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoEm('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
+      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoChega('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
       r.ok(!!(await p.$('[data-teste="os-tutorial"]')) && !!(await p.$('[data-teste="os-relogio"]')), 'a tela final tem o tutorial e o relógio');
       // W3f: a tecla do tutorial é a da marca do computador (o simulado é um Lenovo: F12), e o instalar ao lado não apaga
       const tecla = await p.evaluate(() => [document.querySelector('[data-teste="os-tutorial"]')?.getAttribute('data-marca'), document.querySelector('[data-teste="os-tutorial-tecla"]')?.textContent]);
@@ -412,7 +416,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     if (await r.esperar('menu-sistema', 5000)) {
       r.ok(!(await p.$('[data-teste="os-menu-instalar"]')), 'ligado pelo disco, o menu não tem "Instalar neste computador"');
       await r.tecla('End');
-      r.ok(await r.focoEm('os-menu-tutorial'), 'o último item é "Como ligar no Writer OS"');
+      r.ok(await r.focoChega('os-menu-tutorial'), 'o último item é "Como ligar no Writer OS"');
       await r.tecla('Enter');
       r.ok(await r.esperar('os-painel-tutorial', 5000), 'o tutorial abre dentro do menu');
       await foto(p, '17-tutorial-no-menu');
@@ -445,7 +449,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
         await r.tecla('Enter');
         r.ok(await r.esperar('os-apagar-nome', 3000), 'escolhido o disco, aparece o campo do nome');
         await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-apagar-nome', null, { timeout: 3000 }).catch(() => undefined);
-        r.ok(await r.focoEm('os-apagar-nome'), 'o foco vai para o nome do disco');
+        r.ok(await r.focoChega('os-apagar-nome'), 'o foco vai para o nome do disco');
         const vermelho = await p.evaluate(() => {
           const w = document.querySelector('[data-teste="os-apagar-parte-windows"]');
           const erro = getComputedStyle(document.documentElement).getPropertyValue('--erro').trim();
@@ -459,7 +463,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     await r.tabAte('os-instalar-voltar');
     if (await r.esperar('os-instalar-voltar', 3000)) {
       await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-instalar-voltar', null, { timeout: 5000 }).catch(() => undefined);
-      r.ok(await r.focoEm('os-instalar-voltar'), 'sem espaço: o foco está em Voltar');
+      r.ok(await r.focoChega('os-instalar-voltar'), 'sem espaço: o foco está em Voltar');
       await r.tecla('Enter');
     }
   }
@@ -505,7 +509,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       r.ok(!!(await p.$('[data-teste="os-apagar-parte-linux"]')) && !(await p.$('[data-teste="os-apagar-parte-windows"]')), 'a lista mostra o Linux e nenhum Windows');
       await r.tecla('Enter');
       await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-apagar-nome', null, { timeout: 3000 }).catch(() => undefined);
-      r.ok(await r.focoEm('os-apagar-nome'), 'o foco vai para o nome do disco');
+      r.ok(await r.focoChega('os-apagar-nome'), 'o foco vai para o nome do disco');
       // o nome errado: nada acontece além do aviso
       await p.keyboard.type('outro disco');
       await r.tecla('Enter');
@@ -518,7 +522,7 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
       await r.tecla('Enter');
       r.ok(await r.esperar('os-instalado', 15000), 'apagou e instalou: a tela final');
       r.ok(!!(await p.$('[data-teste="os-instalado-todo"]')) && !(await p.$('[data-teste="os-tutorial"]')), 'no disco todo, o Writer OS liga sozinho: sem o tutorial do F12');
-      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoEm('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
+      if (await r.esperar('os-instalado-desligar', 3000)) r.ok(await r.focoChega('os-instalado-desligar'), 'na tela final, o foco está em Desligar');
       r.ok(await esperarRelato(raiz3, 'instalar ok'), 'o agente: instalar ok');
       await foto(p, '19-apagou-instalado');
     } else r.ok(false, '"Outras opções" e o disco, pelo teclado');
@@ -534,6 +538,9 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
 
   // ================= 6. a VPN (PLANO §7) =================
   await percorrerVpn(abrir, base, comum, falar, foto, somar);
+
+  // ================= 7. a VPN de empresa (PLANO §7) =================
+  await percorrerVpnEmpresa(abrir, base, comum, falar, foto, somar);
 
   return { passos, falhas };
 }
@@ -612,7 +619,7 @@ async function percorrerAtualizacoes(abrir: Abrir, base: string, comum: Record<s
       if (await r.esperar('os-painel-atualizacoes', 5000)) {
         await p.waitForTimeout(300);
         await r.passo('a parte "Atualizações": o foco no ajuste de agora', 'menu-sistema');
-        r.ok(await r.focoEm('atualizacoes-modo-automaticas'), 'o foco começa em "Automáticas (recomendado)", o padrão');
+        r.ok(await r.focoChega('atualizacoes-modo-automaticas'), 'o foco começa em "Automáticas (recomendado)", o padrão');
         r.ok(((await p.textContent('[data-teste="atualizacoes-versao"]')) ?? '').includes('0.2.0'), 'mostra a versão de agora');
         r.ok(!!(await p.$('[data-teste="atualizacoes-situacao-pronta"]')), 'mostra que a 0.2.1 está pronta');
         await foto(p, '21-atualizacoes');
@@ -635,7 +642,7 @@ async function percorrerAtualizacoes(abrir: Abrir, base: string, comum: Record<s
         await foto(p, '22-atualizacao-disponivel');
         if (await r.tabAte('atualizacoes-instalar')) await r.tecla('Enter');
         r.ok(await r.esperar('atualizacoes-situacao-pronta', 15000), 'Instalar: a 0.2.2 baixa, confere e fica pronta');
-        r.ok(await r.focoEm('atualizacoes-procurar'), 'depois do Instalar, o foco continua no mesmo botão (agora "Procurar agora")');
+        r.ok(await r.focoChega('atualizacoes-procurar'), 'depois do Instalar, o foco continua no mesmo botão (agora "Procurar agora")');
         r.ok(await esperarRelato(raiz, 'atualizacao pronta 0.2.2 -'), 'o agente: atualizacao pronta 0.2.2');
         await r.tecla('Escape');
         r.ok((await r.esperar('os-menu-atualizacoes', 3000)) && (await r.focoEm('os-menu-atualizacoes')), 'Esc volta ao menu, no item "Atualizações"');
@@ -731,7 +738,7 @@ async function percorrerPortal(abrir: Abrir, base: string, comum: Record<string,
       r.ok(aviso, 'conectado numa rede com portal: aparece "Esta rede pede login numa página"');
       if (aviso) {
         await p.waitForTimeout(200);
-        r.ok(await r.focoEm('os-portal-abrir'), 'o foco vai no botão "Abrir a página de login"');
+        r.ok(await r.focoChega('os-portal-abrir'), 'o foco vai no botão "Abrir a página de login"');
         await r.passo('o aviso do portal', 'menu-sistema');
         await foto(p, '30-portal-aviso');
         await r.tecla('Enter');
@@ -832,7 +839,12 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
       );
   /** Tab (até 20) até o foco chegar no botão `teste` da VPN `nome`. */
   const irAte = async (nome: string, teste: string) => {
-    for (let i = 0; i < 20 && (await foco()) !== `${nome}|${teste}`; i++) await r.tecla('Tab');
+    for (let i = 0; i < 20 && (await foco()) !== `${nome}|${teste}`; i++) {
+      const antes = await foco();
+      await r.tecla('Tab');
+      // no Linux do CI o foco anda um quadro depois da tecla: sem esperar, o laço apertava Tab de novo e passava do alvo
+      await p.waitForFunction((a) => `${document.activeElement?.closest('[data-teste="os-vpn"]')?.getAttribute('data-nome') ?? ''}|${document.activeElement?.getAttribute('data-teste') ?? ''}` !== a, antes, { timeout: 1000, polling: 30 }).catch(() => undefined);
+    }
     return (await foco()) === `${nome}|${teste}`;
   };
   const ligada = (nome: string) => p.evaluate((n) => document.querySelector(`[data-teste="os-vpn"][data-nome="${n}"]`)?.getAttribute('data-ligada') === 'sim', nome);
@@ -878,7 +890,7 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
   if (await abrirVpn()) {
     r.ok(await r.esperar('os-vpn-nenhuma', 3000), 'a parte "VPN" diz que ainda não há nenhuma');
     await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-importar', null, { timeout: 3000 }).catch(() => undefined);
-    r.ok(await r.focoEm('os-vpn-importar'), 'sem VPN, o foco começa em "Importar o arquivo da VPN"');
+    r.ok(await r.focoChega('os-vpn-importar'), 'sem VPN, o foco começa em "Importar o arquivo da VPN"');
     await r.passo('a parte "VPN"', 'menu-sistema');
     await foto(p, '40-vpn-vazia');
 
@@ -910,9 +922,28 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
 
     // ligar o OpenVPN: o usuário e a senha (a errada, depois a certa)
     r.ok(await irAte('empresa', 'os-vpn-ligar'), 'o Tab chega no Ligar da "empresa"');
+    // diagnóstico (o Linux do CI perdia o foco aqui): quem chama focus() e para onde o foco vai
+    await p.evaluate(() => {
+      const w = window as unknown as { __foco?: string[] };
+      w.__foco = [];
+      const orig = HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus = function (...a: []) {
+        w.__foco?.push(`focus() em ${this.getAttribute('data-teste') ?? this.tagName} por ${(new Error().stack ?? '').split('\n').slice(2, 4).join(' < ').replace(/\s+/g, ' ')}`);
+        return orig.apply(this, a);
+      };
+      document.addEventListener('focusin', (e) => w.__foco?.push(`focusin ${(e.target as HTMLElement).getAttribute?.('data-teste') ?? '?'}`), true);
+      document.addEventListener('focusout', (e) => w.__foco?.push(`focusout ${(e.target as HTMLElement).getAttribute?.('data-teste') ?? '?'}`), true);
+    });
     await r.tecla('Enter');
     if (await r.esperar('os-vpn-usuario', 3000)) {
-      r.ok(await r.focoEm('os-vpn-usuario'), 'o OpenVPN pede o usuário, com o foco nele');
+      const noUsuario = await p
+        .waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-usuario', null, { timeout: 5000 })
+        .then(
+          () => true,
+          () => false,
+        );
+      r.ok(noUsuario, 'o OpenVPN pede o usuário, com o foco nele');
+      if (!noUsuario) falar(`diagnóstico do foco:\n${((await p.evaluate(() => (window as unknown as { __foco?: string[] }).__foco ?? [])) as string[]).join('\n')}`);
       const acima = await p.evaluate(() => {
         const campo = document.querySelector('[data-teste="os-vpn-usuario"]');
         const lista = document.querySelector('[data-teste="os-vpn"]');
@@ -921,16 +952,32 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
       r.ok(acima, 'o usuário e a senha ficam acima da lista');
       await p.keyboard.type('ana');
       await r.tecla('Tab');
-      r.ok(await r.focoEm('os-vpn-senha'), 'Tab: a senha');
+      const naSenha = await p
+        .waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-senha', null, { timeout: 5000 })
+        .then(
+          () => true,
+          () => false,
+        );
+      r.ok(naSenha, `Tab: a senha (foco em ${await foco()})`);
       await p.keyboard.type('errada');
       await foto(p, '43-vpn-senha');
       await r.tecla('Enter');
       const errada = (await r.esperar('os-vpn-erro', 5000)) ? ((await p.textContent('[data-teste="os-vpn-erro"]')) ?? '') : '';
       r.ok(errada.includes('senha'), `a senha errada: o aviso (${errada})`);
       await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-senha', null, { timeout: 3000 }).catch(() => undefined);
-      r.ok(await r.focoEm('os-vpn-senha'), 'o foco volta à senha, para digitar de novo');
+      r.ok(await r.focoChega('os-vpn-senha'), 'o foco volta à senha, para digitar de novo');
       r.ok(!(await ligada('empresa')), 'com a senha errada, a "empresa" não liga');
+      // o campo guarda a senha errada (o app a deixa selecionada, mas a seleção chega depois do aviso): apaga tudo antes de digitar
+      await r.tecla('Control+a');
+      await r.tecla('Backspace');
       await p.keyboard.type('vpn123');
+      const valor = await p
+        .waitForFunction(() => (document.querySelector('[data-teste="os-vpn-senha"]') as HTMLInputElement | null)?.value === 'vpn123', null, { timeout: 2000 })
+        .then(
+          () => 'vpn123',
+          () => p.evaluate(() => `${(document.querySelector('[data-teste="os-vpn-senha"]') as HTMLInputElement | null)?.value} (botão ${(document.querySelector('[data-teste="os-vpn-senha-ligar"]') as HTMLButtonElement | null)?.disabled ? 'desligado' : 'ligado'}, foco ${document.activeElement?.getAttribute('data-teste')})`),
+        );
+      r.ok(valor === 'vpn123', `a senha certa está no campo (${valor})`);
       await r.tecla('Enter');
       r.ok(await esperarFoco('empresa|os-vpn-desligar'), `a senha certa: ligou, com o foco no Desligar dela (${await foco()})`);
       r.ok(!(await p.$('[data-teste="os-vpn-usuario"]')), 'os campos do usuário e da senha somem');
@@ -987,7 +1034,7 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
     await r.tecla('Enter');
     if (await r.esperar('confirmar', 3000)) {
       await foto(p, '45-vpn-esquecer');
-      r.ok(await r.focoEm('confirmar-sim'), 'Esquecer pergunta antes (o foco em "Esquecer")');
+      r.ok(await r.focoChega('confirmar-sim'), 'Esquecer pergunta antes (o foco em "Esquecer")');
       await r.tecla('Enter');
       await p.waitForFunction(() => document.querySelectorAll('[data-teste="os-vpn"]').length === 1, null, { timeout: 5000 }).catch(() => undefined);
       const ficou = await p.$$eval('[data-teste="os-vpn"]', (l) => l.map((e) => e.getAttribute('data-nome') ?? ''));
@@ -1000,4 +1047,168 @@ async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, st
   } else r.ok(false, 'o menu do sistema abre a parte "VPN" (outro boot)');
   await app.fechar();
   somar(r);
+}
+
+/**
+ * 7. A VPN de empresa (PLANO §7, W5a-2): "Adicionar VPN de empresa" pelo teclado, contra o sistema simulado: `vpn.exemplo.local`
+ * (senha `vpn123`; o usuário `dois` pede o código `123456`), `autoassinado.exemplo.local` (pede para confiar na impressão)
+ * e `sso.exemplo.local` (só pelo navegador). Liga ao adicionar; o cadeado; o código errado e o certo; a impressão e
+ * "Confiar neste certificado"; o aviso do `sso`; o endereço que não serve; no outro boot, voltam do cofre (a que pediu
+ * código pergunta de novo e não liga sozinha).
+ */
+async function percorrerVpnEmpresa(abrir: Abrir, base: string, comum: Record<string, string>, falar: (l: string) => void, foto: (p: Page, nome: string) => Promise<void>, somar: (r: Roteiro) => void): Promise<void> {
+  const raiz = join(base, 'vpn-empresa');
+  mkdirSync(join(raiz, 'dados', 'Ekfrase Writer'), { recursive: true });
+  writeFileSync(join(raiz, 'dados', 'Ekfrase Writer', 'sistema.json'), JSON.stringify({ idioma: 'pt-BR', teclado: 'br', fuso: 'America/Sao_Paulo', wifiVisto: true, espelho: 'nao', uso: 'pendrive' }));
+  const env = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz, EKFRASE_CASCA_OS_DADOS: 'pendrive', EKFRASE_CASCA_OS_TESTE: '1', EKFRASE_CASCA_PERFIL: join(raiz, 'perfil') };
+
+  falar('— a VPN de empresa: adicionar, ligar, o código, o certificado, o login pelo navegador');
+  let app = await abrir(env);
+  let p = await app.pagina();
+  let r = new Roteiro(p, falar);
+  const nomes = () => p.$$eval('[data-teste="os-vpn"]', (l) => l.map((e) => e.getAttribute('data-nome') ?? ''));
+  const ligada = (nome: string) => p.evaluate((n) => document.querySelector(`[data-teste="os-vpn"][data-nome="${n}"]`)?.getAttribute('data-ligada') === 'sim', nome);
+  const cadeado = () => p.evaluate(() => document.querySelector('[data-teste="os-vpn-cadeado"]')?.getAttribute('aria-label') ?? null);
+  const textoDe = async (teste: string) => ((await p.textContent(`[data-teste="${teste}"]`).catch(() => '')) ?? '');
+  const esperarLigada = (nome: string) =>
+    p.waitForFunction((n) => document.querySelector(`[data-teste="os-vpn"][data-nome="${n}"]`)?.getAttribute('data-ligada') === 'sim', nome, { timeout: 8000 }).then(
+      () => true,
+      () => false,
+    );
+  const abrirVpn = async (): Promise<boolean> => {
+    await r.tecla('Control+Alt+s');
+    if (!(await r.esperar('menu-sistema', 5000))) return false;
+    const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
+    for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-vpn')); i++) await r.tecla('ArrowDown');
+    await r.tecla('Enter');
+    return r.esperar('os-painel-vpn', 5000);
+  };
+  /** O botão "Adicionar VPN de empresa" → o servidor, o usuário e a senha, tudo digitado; Enter envia. */
+  const adicionar = async (servidor: string, usuario: string, senha: string): Promise<boolean> => {
+    if (!(await r.focoEm('os-vpn-empresa')) && !(await r.tabAte('os-vpn-empresa', 30))) return false;
+    await r.tecla('Enter');
+    if (!(await r.esperar('os-vpn-empresa-form', 3000))) return false;
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-empresa-servidor', null, { timeout: 3000 }).catch(() => undefined);
+    if (!(await r.focoEm('os-vpn-empresa-servidor'))) return false;
+    // no Linux do CI o foco anda um quadro depois do Tab: espera chegar em cada campo antes de digitar nele
+    const campo = (teste: string) => p.waitForFunction((x) => document.activeElement?.getAttribute('data-teste') === x, teste, { timeout: 3000, polling: 30 }).then(() => true, () => false);
+    await p.keyboard.type(servidor);
+    await r.tecla('Tab');
+    if (!(await campo('os-vpn-usuario'))) return false;
+    await p.keyboard.type(usuario);
+    await r.tecla('Tab');
+    if (!(await campo('os-vpn-senha'))) return false;
+    await p.keyboard.type(senha);
+    await r.tecla('Enter');
+    return true;
+  };
+
+  r.ok(await r.esperar('casca-criar-senha', 10000), 'com o primeiro uso respondido, abre na senha nova');
+  await p.keyboard.type(SENHA);
+  if (await r.tabAte('casca-senha-repetir')) await p.keyboard.type(SENHA);
+  await r.tecla('Enter');
+  await p.waitForTimeout(500);
+  if (await abrirVpn()) {
+    r.ok(await r.esperar('os-vpn-nenhuma', 3000), 'a parte "VPN" diz que ainda não há nenhuma');
+    r.ok(await r.tabAte('os-vpn-empresa', 10), 'o Tab chega em "Adicionar VPN de empresa"');
+    await r.tecla('Enter');
+    r.ok(await r.esperar('os-vpn-empresa-form', 3000), 'o formulário abre');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-empresa-servidor', null, { timeout: 3000 }).catch(() => undefined);
+    r.ok(await r.focoChega('os-vpn-empresa-servidor'), `o foco começa no servidor (${await p.evaluate(() => document.activeElement?.getAttribute('data-teste') ?? document.activeElement?.tagName)})`);
+    const tipos = await p.$$eval('[data-teste="os-vpn-empresa-tipo"] option', (l) => l.map((o) => (o as HTMLOptionElement).value).join(','));
+    r.ok(tipos === 'anyconnect,gp,fortinet', `o tipo oferece AnyConnect, GlobalProtect e Fortinet (${tipos})`);
+    await foto(p, '46-vpn-empresa-formulario');
+    r.ok(await r.tabAte('os-vpn-empresa-cancelar', 12), 'o Tab chega no Cancelar do formulário');
+    await r.tecla('Enter');
+    r.ok(!(await p.$('[data-teste="os-vpn-empresa-form"]')), 'cancelar fecha o formulário sem criar nada');
+    r.ok((await nomes()).length === 0, 'cancelar não criou VPN');
+
+    // o endereço que não serve: o aviso, e o formulário continua
+    r.ok(await adicionar('isto nao e endereco', 'ana', 'vpn123'), 'preencher com um endereço que não serve');
+    const ruim = (await r.esperar('os-vpn-erro', 5000)) ? await textoDe('os-vpn-erro') : '';
+    r.ok(ruim.includes('endereço'), `o endereço que não serve é dito (${ruim})`);
+    r.ok(!!(await p.$('[data-teste="os-vpn-empresa-form"]')) && (await nomes()).length === 0, 'o formulário fica aberto e nada foi criado');
+    r.ok(await r.focoChega('os-vpn-empresa-servidor'), 'o foco volta ao servidor');
+    await p.keyboard.press('Control+a');
+    await p.keyboard.type('vpn.exemplo.local');
+    r.ok(await r.tabAte('os-vpn-senha', 4), 'Tab até a senha');
+    await r.tecla('Enter');
+
+    // a VPN simples: adiciona e liga
+    const a = (await esperarVpn(p, 1))[0] ?? '';
+    r.ok(a !== '' && (await esperarLigada(a)), `adicionada e ligada ao mesmo tempo (${a})`);
+    r.ok((await cadeado())?.includes(a) === true, `o cadeado aparece (${await cadeado()})`);
+    r.ok((await textoDe('os-vpn')).includes('AnyConnect') && (await textoDe('os-vpn')).includes('vpn.exemplo.local'), 'a lista diz o tipo e o servidor');
+    r.ok(!(await p.$('[data-teste="os-vpn-empresa-form"]')), 'o formulário fechou');
+    await foto(p, '47-vpn-empresa-ligada');
+
+    // o segundo fator
+    r.ok(await adicionar('vpn.exemplo.local', 'dois', 'vpn123'), 'adicionar a VPN do usuário "dois"');
+    r.ok(await r.esperar('os-vpn-codigo-form', 8000), 'o servidor pediu o código: o campo "Código" aparece');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-codigo', null, { timeout: 3000 }).catch(() => undefined);
+    r.ok(await r.focoChega('os-vpn-codigo'), 'o foco vai ao código');
+    await foto(p, '48-vpn-empresa-codigo');
+    await p.keyboard.type('000000');
+    await r.tecla('Enter');
+    r.ok(((await r.esperar('os-vpn-erro', 5000)) ? await textoDe('os-vpn-erro') : '').includes('senha'), 'o código errado é recusado');
+    r.ok(!!(await p.$('[data-teste="os-vpn-codigo-form"]')) && (await r.focoEm('os-vpn-codigo')), 'o campo do código continua, com o foco');
+    await p.keyboard.press('Control+a');
+    await p.keyboard.type('123456');
+    await r.tecla('Enter');
+    const b = (await nomes()).find((n) => n !== a) ?? '';
+    r.ok(b !== '' && (await esperarLigada(b)), `o código certo liga (${b})`);
+    r.ok(!(await ligada(a)) && !(await p.$('[data-teste="os-vpn-codigo-form"]')), 'a anterior desligou (uma por vez) e o campo do código sumiu');
+
+    // o certificado que o sistema não conhece
+    r.ok(await adicionar('autoassinado.exemplo.local', 'eva', 'vpn123'), 'adicionar a VPN do servidor de certificado próprio');
+    r.ok(await r.esperar('os-vpn-certificado', 8000), 'o sistema não conhece o certificado: o aviso aparece');
+    const imp = await textoDe('os-vpn-impressao');
+    r.ok(imp === 'pin-sha256:EkfraseWriterOSsimuladoAutoassinado01234567=', `a impressão para conferir com a TI (${imp})`);
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-confiar', null, { timeout: 3000 }).catch(() => undefined);
+    r.ok(await r.focoChega('os-vpn-confiar'), 'o foco vai ao "Confiar neste certificado"');
+    await foto(p, '49-vpn-empresa-certificado');
+    await r.tecla('Enter');
+    const c = (await nomes()).find((n) => n !== a && n !== b) ?? '';
+    r.ok(c !== '' && (await esperarLigada(c)), `confiou: a VPN liga (${c})`);
+    r.ok(!(await p.$('[data-teste="os-vpn-certificado"]')), 'o aviso do certificado sumiu');
+
+    // o login só pelo navegador
+    r.ok(await adicionar('sso.exemplo.local', 'ana', 'vpn123'), 'adicionar a VPN que só aceita o navegador');
+    const sso = (await r.esperar('os-vpn-erro', 8000)) ? await textoDe('os-vpn-erro') : '';
+    r.ok(sso.includes('navegador'), `o aviso do login pelo navegador (${sso})`);
+    await foto(p, '50-vpn-empresa-sso');
+    // um servidor que não responde
+    r.ok(await adicionar('sumiu.exemplo.local', 'ana', 'vpn123'), 'adicionar uma VPN de servidor que não responde');
+    const fora = await r.esperar('os-vpn-erro', 8000).then(async (ok) => (ok ? ((await p.textContent('[data-teste="os-vpn-erro"]')) ?? '') : ''));
+    r.ok(fora.includes('servidor'), `o servidor que não responde é dito (${fora})`);
+    await r.tecla('Escape');
+    await r.tecla('Escape');
+  } else r.ok(false, 'o menu do sistema abre a parte "VPN"');
+  await app.fechar();
+  somar(r);
+
+  // ---- outro boot: voltam do cofre; a que pediu código pergunta de novo
+  falar('— a VPN de empresa, outro boot: voltaram do cofre');
+  app = await abrir({ ...env, EKFRASE_CASCA_PERFIL: join(raiz, 'perfil-2') });
+  p = await app.pagina();
+  r = new Roteiro(p, falar);
+  r.ok(await r.esperar('casca-abrir', 10000), 'no outro boot, a senha');
+  await p.keyboard.type(SENHA);
+  await r.tecla('Enter');
+  await p.waitForTimeout(500);
+  if (await abrirVpn()) {
+    await p.waitForSelector('[data-teste="os-vpn"]', { timeout: 5000 }).catch(() => undefined);
+    const todas = await nomes();
+    r.ok(todas.length === 5, `as cinco VPNs de empresa voltaram do cofre (${todas.join(', ')})`);
+    await r.tecla('Escape');
+    await r.tecla('Escape');
+  } else r.ok(false, 'o menu do sistema abre a parte "VPN" (outro boot)');
+  await app.fechar();
+  somar(r);
+}
+
+/** Espera a lista ter `n` VPNs e devolve os nomes. */
+async function esperarVpn(p: Page, n: number): Promise<string[]> {
+  await p.waitForFunction((k) => document.querySelectorAll('[data-teste="os-vpn"]').length >= k, n, { timeout: 8000 }).catch(() => undefined);
+  return p.$$eval('[data-teste="os-vpn"]', (l) => l.map((e) => e.getAttribute('data-nome') ?? ''));
 }
