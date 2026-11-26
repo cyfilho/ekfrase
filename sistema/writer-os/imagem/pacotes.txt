@@ -49,6 +49,9 @@ fonts-dejavu-core
 
 # rede, discos, energia, hora
 network-manager
+# a VPN (PLANO §7): o OpenVPN e o plugin dele (o WireGuard já está no kernel e no NetworkManager)
+network-manager-openvpn
+openvpn
 wpasupplicant
 # o firewall (nftables, entrada negada: raiz/etc/nftables.conf); a rede por cabo vem do NetworkManager + firmware-realtek,
 # e os drivers r8169 e e1000e já estão no kernel

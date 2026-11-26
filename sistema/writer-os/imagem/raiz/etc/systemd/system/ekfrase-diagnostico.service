@@ -15,6 +15,12 @@ Nice=10
 IOSchedulingClass=idle
 Restart=on-failure
 RestartSec=10
+# Achado 2 da revisão de segurança (25/11): root, mas só lê o sistema e grava em /dados e /run/ekfrase.
+ProtectSystem=strict
+ReadWritePaths=-/dados /run/ekfrase
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target

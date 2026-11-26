@@ -41,7 +41,8 @@ relatar() {
 }
 
 mkdir -p "$RUN/ram"
-mountpoint -q "$RUN/ram" || mount -t tmpfs -o size=256M,mode=0700,uid=$WRITER,gid=$WRITER,nosuid,nodev,noexec tmpfs "$RUN/ram"
+# nosymfollow (revisão de segurança, achado 1): o kernel não segue link nenhum aqui dentro, nem para o root
+mountpoint -q "$RUN/ram" || mount -t tmpfs -o size=256M,mode=0700,uid=$WRITER,gid=$WRITER,nosuid,nodev,noexec,nosymfollow tmpfs "$RUN/ram"
 
 udevadm settle -t 30 || true
 
@@ -98,27 +99,35 @@ case "$TIPO_FS" in
   exfat)
     # tirar o pendrive no susto deixa o exFAT "sujo": conserta antes de montar
     fsck.exfat -y "$PARTE" >/dev/null 2>&1 || true
-    mount -t exfat -o uid=$WRITER,gid=$WRITER,fmask=0077,dmask=0077,noexec,nosuid,nodev,noatime "$PARTE" "$DADOS" || relatar sem-dados nao-monta
+    mount -t exfat -o uid=$WRITER,gid=$WRITER,fmask=0077,dmask=0077,noexec,nosuid,nodev,noatime,nosymfollow "$PARTE" "$DADOS" || relatar sem-dados nao-monta
     ;;
   ext4)
     e2fsck -p "$PARTE" >/dev/null 2>&1 || true
-    mount -t ext4 -o noexec,nosuid,nodev,noatime "$PARTE" "$DADOS" || relatar sem-dados nao-monta
+    mount -t ext4 -o noexec,nosuid,nodev,noatime,nosymfollow "$PARTE" "$DADOS" || relatar sem-dados nao-monta
     chown $WRITER:$WRITER "$DADOS"
     chmod 0700 "$DADOS"
     ;;
   *) relatar sem-dados nao-monta ;;
 esac
 
-if ! (touch "$DADOS/.ekfrase-grava" && rm -f "$DADOS/.ekfrase-grava"); then
+# A PARTIÇÃO É DO WRITER (no ext4, ele pode deixar links nela; achado 1 da revisão de segurança): o root nunca segue
+# um nome que já estava lá. O nosymfollow da montagem já barra; aqui vai a segunda camada.
+GRAVA=$(mktemp -p "$DADOS" .ekfrase-grava.XXXXXX 2>/dev/null) && rm -f -- "$GRAVA" || {
+  umount "$DADOS" || true
+  relatar sem-dados nao-grava
+}
+PASTA_APP="$DADOS/Ekfrase Writer"
+if [ -L "$PASTA_APP" ] || { [ -e "$PASTA_APP" ] && [ ! -d "$PASTA_APP" ]; }; then
+  echo "ekfrase-dados: '$PASTA_APP' não é uma pasta de verdade (link?): a partição fica de fora"
   umount "$DADOS" || true
   relatar sem-dados nao-grava
 fi
-mkdir -p "$DADOS/Ekfrase Writer"
-[ "$TIPO_FS" = exfat ] || chown $WRITER:$WRITER "$DADOS/Ekfrase Writer"
+mkdir -p -- "$PASTA_APP"
+[ "$TIPO_FS" = exfat ] || chown -h "$WRITER:$WRITER" -- "$PASTA_APP"
 
 # o fuso do primeiro uso (o /etc está na memória: volta ao padrão a cada boot)
-SJ="$DADOS/Ekfrase Writer/sistema.json"
-if [ -f "$SJ" ]; then
+SJ="$PASTA_APP/sistema.json"
+if [ -f "$SJ" ] && [ ! -L "$SJ" ]; then
   FUSO=$(grep -o '"fuso"[[:space:]]*:[[:space:]]*"[A-Za-z0-9_+/-]*"' "$SJ" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
   case "$FUSO" in
     '' | *..*) ;;

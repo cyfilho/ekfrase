@@ -2051,3 +2051,41 @@ kbd {
   width: 100%;
   text-align: left;
 }
+
+/* a VPN do Writer OS (PLANO §7): a parte "VPN" do menu do sistema e o cadeado ao lado da bateria */
+.lista-vpn {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vpn-os {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border: var(--px) solid var(--borda);
+}
+
+.vpn-os[data-ligada='sim'] {
+  border-color: var(--tinta);
+}
+
+.vpn-os .acoes-linha {
+  margin: 0;
+}
+
+.vpn-os-nome {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vpn-os-nome small {
+  opacity: 0.8;
+}
+
+.vpn-cadeado {
+  display: inline-flex;
+  align-items: center;
+}

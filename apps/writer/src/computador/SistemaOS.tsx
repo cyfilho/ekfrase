@@ -14,7 +14,7 @@
  * Toda tela tem `data-teste` (o agente de teste conta qual está aberta) e o foco começa na opção
  * padrão: Enter segue em frente (o CI digita pelo QMP do QEMU).
  */
-import { INSTALAR_MAXIMO, INSTALAR_MINIMO, nomeConfere, nomeDoDisco, tipoDaParte, type Bateria, type Cabo, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type MarcaComputador, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
+import { INSTALAR_MAXIMO, INSTALAR_MINIMO, nomeConfere, nomeDoDisco, tipoDaParte, type Bateria, type Cabo, type Conectividade, type DiscoInterno, type DiscoUSB, type InfoInstalacao, type MarcaComputador, type PassoInstalar, type PonteSistema, type RedeWifi, type RespostaCasca, type SobreOS } from '@ekfrase/writer-nucleo';
 import { FormConta, IconeEngrenagem, Janela, ponte, useConta } from '@ekfrase/interface';
 import type { ComponentChildren, TargetedKeyboardEvent } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -27,6 +27,7 @@ import { Avisos, Camada, Confirmacoes, avisar, confirmar, focaveis } from '../ui
 import { atualizacoesDaCasca, ParteAtualizacoes } from './Atualizacoes.tsx';
 import { casca, gravarAgora, mudarEstado, mudarEstadoOS, noOS, sistemaOS, useEstadoCasca, useEstadoOS } from './casca.ts';
 import { EscolhaServidor, Moldura, PerguntaEspelho, Senha, textoDoErroCasca } from './Telas.tsx';
+import { CadeadoDaVpn, ParteVpn, useVpnLigada } from './VpnOS.tsx';
 
 /** O sistema (só é usado com `noOS`; cada tela é desenhada só dentro do `PortaoOS`). */
 const os = sistemaOS as PonteSistema;
@@ -219,6 +220,9 @@ export function RelogioOS({ embutido = false }: { embutido?: boolean }) {
     return () => document.documentElement.classList.remove('relogio-no-rodape');
   }, [embutido]);
   const { hora, data } = formatarRelogio(agora, tr.idioma(), fuso);
+  // a VPN ligada: o cadeado pequeno ao lado da bateria (PLANO §7)
+  const vpn = useVpnLigada();
+  const rotulo = t('writer.os.relogio', { data, hora });
   const abrir = () => pedir('hora');
   return (
     <button
@@ -226,13 +230,14 @@ export function RelogioOS({ embutido = false }: { embutido?: boolean }) {
       class={`relogio-os${embutido ? ' embutido' : ''}`}
       onClick={abrir}
       title={t('writer.os.relogio.abrir')}
-      aria-label={t('writer.os.relogio', { data, hora })}
+      aria-label={vpn ? `${rotulo} · ${t('writer.os.vpn.cadeado', { nome: vpn })}` : rotulo}
       data-teste={embutido ? 'os-relogio-rodape' : 'os-relogio'}
     >
       {sincronizando && <span class="relogio-os-girando" role="status" aria-label={t('writer.os.relogio.sincronizando')} data-teste="os-relogio-sinc" />}
       <time dateTime={agora.toISOString()}>
         <span class="relogio-os-data">{data}</span> <span class="relogio-os-hora">{hora}</span>
       </time>
+      <CadeadoDaVpn nome={vpn} />
       <NivelDeBateria />
     </button>
   );
@@ -819,12 +824,47 @@ function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[], cabo: Cabo | nu
       if (document.activeElement && document.activeElement !== document.body && document.activeElement.isConnected) return;
       [...(raiz.current?.querySelectorAll<HTMLElement>('[data-teste="os-rede"]') ?? [])].find((b) => b.dataset['ssid'] === ssid)?.focus();
     }, 0);
+  // a internet de verdade, com uma rede conectada (PLANO §7, o portal cativo): `portal` = a rede pede login numa página
+  const [internet, setInternet] = useState<Conectividade | null>(null);
+  const botaoPortal = useRef<HTMLButtonElement>(null);
+  // a página de login apareceu: o foco vai no botão de abri-la (menos com a senha de uma rede sendo digitada)
+  useLayoutEffect(() => {
+    if (internet === 'portal' && !escolhida) botaoPortal.current?.focus();
+  }, [internet]);
+  const perguntarInternet = (lista: RedeWifi[], c: Cabo | null) => {
+    if (!lista.some((r) => r.conectada) && !c?.conectado) {
+      setInternet(null);
+      return;
+    }
+    void os
+      .internet()
+      .then(setInternet)
+      .catch(() => setInternet(null));
+  };
   const ler = () =>
     void Promise.all([os.redes(), os.cabo()]).then(([lista, c]) => {
       setRedes(lista);
       setCabo(c);
       aoMudar?.(lista, c);
+      perguntarInternet(lista, c);
     });
+  /** O foco, perdido (o botão sumiu ou ficou desligado), volta à rede conectada. */
+  const focarConectada = () =>
+    setTimeout(() => {
+      if (document.activeElement && document.activeElement !== document.body && document.activeElement.isConnected) return;
+      const conectada = [...(raiz.current?.querySelectorAll<HTMLElement>('[aria-pressed="true"]') ?? [])][0];
+      (conectada ?? raiz.current?.querySelector<HTMLElement>('[data-teste="os-redes-procurar"]'))?.focus();
+    }, 0);
+  const abrirPortal = async () => {
+    setOcupado(true);
+    setRecado({ texto: t('writer.os.portal.aberta'), erro: false });
+    const c = await os.abrirPortal().catch((): Conectividade => 'desconhecida');
+    setOcupado(false);
+    setInternet(c);
+    setRecado(c === 'internet' ? { texto: t('writer.os.portal.conectou'), erro: false } : c === 'portal' ? { texto: t('writer.os.portal.ainda'), erro: false } : null);
+    if (c === 'portal') setTimeout(() => botaoPortal.current?.focus(), 0);
+    else focarConectada();
+  };
   const ligarCabo = async () => {
     setOcupado(true);
     setRecado({ texto: t('writer.os.cabo.conectando'), erro: false });
@@ -888,6 +928,19 @@ function ListaRedes({ aoMudar }: { aoMudar?: (redes: RedeWifi[], cabo: Cabo | nu
             </button>
           </div>
         </form>
+      )}
+      {internet === 'portal' && (
+        <div class="acoes-coluna" data-teste="os-portal">
+          <p>{t('writer.os.portal.pede')}</p>
+          <button type="button" class="botao principal" ref={botaoPortal} disabled={ocupado} onClick={() => void abrirPortal()} data-teste="os-portal-abrir">
+            {t('writer.os.portal.abrir')}
+          </button>
+        </div>
+      )}
+      {internet === 'sem' && (
+        <p class="dica" role="status" data-teste="os-sem-internet">
+          {t('writer.os.portal.sem')}
+        </p>
       )}
       <div class="acoes-coluna" role="list">
         {cabo && (
@@ -961,10 +1014,12 @@ function WifiPrimeiroUso() {
 // ---------- o menu do sistema (§6.4) ----------
 
 /** As partes do sistema que o menu abre (PLANO §6.4); cada uma é uma tela dentro do próprio menu. */
-type SecaoOS = 'wifi' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'atualizacoes' | 'sobre' | 'tutorial';
+type SecaoOS = 'wifi' | 'vpn' | 'energia' | 'teclado' | 'fuso' | 'servidor' | 'discos' | 'atualizacoes' | 'sobre' | 'tutorial';
 const TITULO_TUTORIAL = 'writer.os.menu.tutorial';
 const SECOES: readonly { id: Exclude<SecaoOS, 'tutorial'>; titulo: string }[] = [
   { id: 'wifi', titulo: 'writer.os.wifi.titulo' },
+  // a VPN (PLANO §7, W4): logo depois do Wi-Fi
+  { id: 'vpn', titulo: 'writer.os.vpn.titulo' },
   { id: 'energia', titulo: 'writer.os.energia.titulo' },
   { id: 'teclado', titulo: 'writer.os.teclado.titulo' },
   { id: 'fuso', titulo: 'writer.os.fuso.titulo' },
@@ -989,7 +1044,7 @@ function andarPeloMenu(e: TargetedKeyboardEvent<HTMLElement>): void {
 /**
  * O MENU DO SISTEMA do Writer OS (pedido do Alcy em 18/11), no estilo do Menu Iniciar: preso ao canto de cima,
  * abre pela engrenagem do topo ou por Ctrl+Alt+S. Em cima, Desligar e Reiniciar; depois a conta (quem entrou, com
- * Sair; ou Entrar); depois as partes do sistema (Wi-Fi, bateria e tela, teclado, fuso, servidor, pendrives,
+ * Sair; ou Entrar); depois as partes do sistema (Wi-Fi, VPN, bateria e tela, teclado, fuso, servidor, pendrives,
  * Sobre) e os Ajustes do Writer. Cada parte abre dentro do próprio menu; Esc volta ao menu, e no menu, fecha.
  * Tudo pelo teclado: setas, Enter, Esc (e Tab, que gira dentro).
  */
@@ -1205,6 +1260,8 @@ function ParteDoSistema({ secao, recado }: { secao: SecaoOS; recado: (texto: str
           <ListaRedes />
         </Secao>
       );
+    case 'vpn':
+      return <ParteVpn />;
     case 'energia':
       return (
         <Secao titulo={t('writer.os.energia.titulo')} teste="os-painel-energia">

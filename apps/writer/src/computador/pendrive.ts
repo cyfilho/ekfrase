@@ -3,7 +3,8 @@
 /**
  * IMPORTAR e SALVAR no Writer OS (PLANO §6.5 item 5, §7): sem o seletor de arquivos do Linux, a tela do
  * app (`PendriveOS.tsx`) mostra os pendrives e as pastas. Este arquivo é só o pedido: quem precisa de
- * um arquivo (Arquivos.tsx, `baixar` do ui.tsx) chama `importarDoPendrive` ou `salvarNoPendrive` e espera;
+ * um arquivo (Arquivos.tsx, `baixar` do ui.tsx, a parte "VPN" do menu) chama `importarDoPendrive`, `salvarNoPendrive`
+ * ou `escolherVpnNoPendrive` e espera;
  * a tela, montada uma vez no `App`, responde.
  */
 
@@ -14,7 +15,9 @@ export interface ArquivoLido {
 
 export type PedidoDePendrive =
   | { tipo: 'importar'; resolver: (r: ArquivoLido[] | null) => void }
-  | { tipo: 'salvar'; nome: string; bytes: Uint8Array; resolver: (r: boolean) => void };
+  | { tipo: 'salvar'; nome: string; bytes: Uint8Array; resolver: (r: boolean) => void }
+  /** O arquivo de uma VPN (PLANO §7): só `.conf` e `.ovpn` aparecem, e um só é escolhido. */
+  | { tipo: 'vpn'; resolver: (r: ArquivoLido | null) => void };
 
 let atual: PedidoDePendrive | null = null;
 const ouvintes = new Set<() => void>();
@@ -50,11 +53,20 @@ export function salvarNoPendrive(bytes: Uint8Array, nome: string): Promise<boole
   });
 }
 
+/** Abre a tela dos pendrives para escolher o arquivo de uma VPN (`.conf` ou `.ovpn`); `null` = a pessoa desistiu. */
+export function escolherVpnNoPendrive(): Promise<ArquivoLido | null> {
+  return new Promise((resolver) => {
+    fecharPedido();
+    atual = { tipo: 'vpn', resolver };
+    avisar();
+  });
+}
+
 /** A tela fechou (ou veio outro pedido): quem esperava recebe "desistiu". */
 export function fecharPedido(): void {
   const p = atual;
   atual = null;
-  if (p?.tipo === 'importar') p.resolver(null);
+  if (p?.tipo === 'importar' || p?.tipo === 'vpn') p.resolver(null);
   else if (p?.tipo === 'salvar') p.resolver(false);
   avisar();
 }
@@ -64,6 +76,7 @@ export function terminarPedido(r: ArquivoLido[] | boolean): void {
   const p = atual;
   atual = null;
   if (p?.tipo === 'importar') p.resolver(Array.isArray(r) ? r : null);
+  else if (p?.tipo === 'vpn') p.resolver(Array.isArray(r) ? (r[0] ?? null) : null);
   else if (p?.tipo === 'salvar') p.resolver(r === true);
   avisar();
 }

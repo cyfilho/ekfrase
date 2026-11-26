@@ -158,6 +158,7 @@ export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoW
       }
     } else dizer('usb sem-disco');
     dizer(`interno ${await o.sistema.montarInterno()}`);
+    if (o.os) await conferirVpn(o.os, o.sistema, dizer);
 
     // o laço: cada linha "gravado N" só sai depois de o banco confirmar a gravação
     for (let i = 0; i < VOLTAS && o.dados.aberta; i++) {
@@ -170,4 +171,30 @@ export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoW
   }
 
   return dizer;
+}
+
+/** O `.conf` de WireGuard da imagem de teste (o `zz-teste.squashfs`): chaves de mentira, um servidor que não existe. */
+export const VPN_DE_TESTE = '/usr/share/ekfrase/teste/vpn-teste.conf';
+
+/**
+ * A VPN (PLANO §7): no 1º boot, importa o `.conf` de teste (pelo `ekfrase-vpn.service`, como a tela faz) e conta o dono
+ * da conexão (`user:writer`); nos outros, conta as que voltaram do cofre. No simulado não há o arquivo (o roteiro da
+ * VPN é o `casca-os.spec.ts`).
+ */
+async function conferirVpn(os: WriterOS, sistema: Sistema, dizer: (l: string) => void): Promise<void> {
+  if (sistema.simulado) return;
+  await Promise.race([os.vpnsVoltaram, new Promise((ok) => setTimeout(ok, 30000))]);
+  const antes = await os.vpns();
+  dizer(`vpns ${antes.length}`);
+  if (antes.length) return;
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(VPN_DE_TESTE);
+  } catch {
+    dizer('vpn sem-arquivo');
+    return;
+  }
+  const r = await os.importarVpn('ekfrase-teste.conf', new Uint8Array(bytes));
+  dizer(`vpn importar ${r.ok ? 'ok' : r.erro}`);
+  if (r.ok) dizer(`vpn dono ${(await sistema.donoDaConexao(r.nome)) ?? '?'}`);
 }

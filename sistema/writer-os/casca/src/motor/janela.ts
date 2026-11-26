@@ -91,23 +91,52 @@ export function ehDoApp(url: string, host: string, esquema = 'app'): boolean {
   }
 }
 
+/**
+ * A ÚNICA exceção à regra de não navegar, presa a uma SESSÃO (PLANO §7: só a janela do portal cativo, `portal.ts`, que
+ * tem uma sessão só dela, em memória). O resto das travas vale igual nela: teclas, DevTools, `<webview>`, janela nova.
+ */
+export interface NavegacaoPermitida {
+  /** A página principal (`principal`) ou um quadro pode ir a este endereço? */
+  navegar(url: string, principal: boolean): boolean;
+  /** A página pediu uma janela nova (que é sempre negada): aqui se decide se ela abre na MESMA janela. */
+  janelaNova(url: string): void;
+}
+
+const excecoes = new WeakMap<Session, NavegacaoPermitida>();
+
+/** Liga a exceção para os `webContents` desta sessão (nunca a da página do app). */
+export function permitirNavegacao(sessao: Session, regra: NavegacaoPermitida): void {
+  excecoes.set(sessao, regra);
+}
+
+const excecaoDe = (wc: WebContents): NavegacaoPermitida | undefined => {
+  try {
+    return excecoes.get(wc.session);
+  } catch {
+    return undefined;
+  }
+};
+
 /** Trava um `webContents` (a janela, e qualquer outro que apareça). */
 export function travarConteudo(wc: WebContents, devTools = false): void {
-  // navegar: NUNCA (as telas do app trocam de endereço por `history.pushState`, que não navega; recarregar é só pelo processo principal)
-  const naoNavegar = (e: { preventDefault(): void }, url: string) => {
+  // navegar: NUNCA (as telas do app trocam de endereço por `history.pushState`, que não navega; recarregar é só pelo
+  // processo principal). A exceção é lida na hora, pela sessão: só a janela do portal tem uma.
+  const naoNavegar = (e: { preventDefault(): void; isMainFrame?: boolean }, url: string) => {
+    if (excecaoDe(wc)?.navegar(url, e.isMainFrame !== false)) return;
     e.preventDefault();
     anotar({ tipo: 'navegar', alvo: url });
   };
   wc.on('will-navigate', naoNavegar);
   wc.on('will-redirect', naoNavegar);
   wc.on('will-frame-navigate', (e) => {
-    if (!e.isMainFrame) {
-      e.preventDefault();
-      anotar({ tipo: 'navegar', alvo: e.url });
-    }
+    if (e.isMainFrame) return;
+    if (excecaoDe(wc)?.navegar(e.url, false)) return;
+    e.preventDefault();
+    anotar({ tipo: 'navegar', alvo: e.url });
   });
   // nenhuma janela nova (window.open, target=_blank, Shift+clique…): e nada abre "lá fora"
   wc.setWindowOpenHandler(({ url }) => {
+    excecaoDe(wc)?.janelaNova(url);
     anotar({ tipo: 'janela', alvo: url });
     return { action: 'deny' };
   });

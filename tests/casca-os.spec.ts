@@ -17,6 +17,14 @@
  * 4. As atualizações (DEC-P072, U1): um "GitHub" local; automáticas, o aviso do canto, a parte "Atualizações" do
  *    menu, "Perguntar antes" e Instalar (`percorrerAtualizacoes`).
  *
+ * 5. O portal cativo (PLANO §7, W4): um portal de mentira (`/nm` redireciona a `/entrar` até o formulário ser enviado;
+ *    a página tem um link para `localhost`, outro site, que é barrado): conecta na "Biblioteca", o aviso aparece com o
+ *    foco no botão, a janela abre, o link não sai, entrar faz a janela fechar sozinha (`percorrerPortal`).
+ *
+ * 6. A VPN (PLANO §7, W4): importar um `.conf` e um `.ovpn` do pendrive simulado OUTRO pela tela dos pendrives, recusar
+ *    o `.ovpn` com `up`, ligar (o OpenVPN pede usuário e senha: `vpn123`), o cadeado ao lado da bateria, desligar,
+ *    fechar e abrir: as duas voltam do cofre, e a senha guardada liga sem perguntar (`percorrerVpn`).
+ *
  * Os prints de cada tela vão para `EKFRASE_PRINTS_OS` (se houver). Roda por `npm run teclado -- --so-os`.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -34,6 +42,8 @@ const SENHA = 'escrever2026';
 export interface SessaoOS {
   pagina(): Promise<Page>;
   fechar(): Promise<void>;
+  /** O Electron (as outras janelas, como a do portal cativo, e o processo principal). */
+  electron?: ElectronApplication;
 }
 type Abrir = (env: Record<string, string>) => Promise<SessaoOS>;
 
@@ -62,7 +72,7 @@ export const abrirComElectron =
   (lancar: (env: Record<string, string>) => Promise<ElectronApplication>): Abrir =>
   async (env) => {
     const app = await lancar(env);
-    return { pagina: () => janela(app), fechar: () => fechar(app) };
+    return { pagina: () => janela(app), fechar: () => fechar(app), electron: app };
   };
 
 const lerRelato = (raiz: string): string => {
@@ -519,6 +529,12 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
   // ================= 4. as atualizações (DEC-P072, U1) =================
   await percorrerAtualizacoes(abrir, base, comum, falar, foto, somar);
 
+  // ================= 5. o portal cativo (PLANO §7) =================
+  await percorrerPortal(abrir, base, comum, falar, foto, somar);
+
+  // ================= 6. a VPN (PLANO §7) =================
+  await percorrerVpn(abrir, base, comum, falar, foto, somar);
+
   return { passos, falhas };
 }
 
@@ -632,4 +648,356 @@ async function percorrerAtualizacoes(abrir: Abrir, base: string, comum: Record<s
   } finally {
     servidor.close();
   }
+}
+
+/**
+ * 5. O portal cativo (PLANO §7, W4): o sistema simulado com `EKFRASE_CASCA_OS_PORTAL` pergunta ao portal de mentira se
+ * há internet (`/nm`: redireciona a `/entrar` até o formulário ser enviado; depois, `X-NetworkManager-Status: online`).
+ * Conecta na "Biblioteca" pelo menu, o aviso aparece com o foco no botão, Enter abre a janela presa ao site do portal; o
+ * link para `localhost` (outro site) não sai; entrar faz a janela fechar sozinha e o foco voltar à rede.
+ */
+async function percorrerPortal(abrir: Abrir, base: string, comum: Record<string, string>, falar: (l: string) => void, foto: (p: Page, nome: string) => Promise<void>, somar: (r: Roteiro) => void): Promise<void> {
+  const prints = process.env['EKFRASE_PRINTS_OS'];
+  let entrou = false;
+  let saiuDoPortal = false;
+  let porta = 0;
+  const servidor = createServer((q, s) => {
+    // o link "de fora" aponta para localhost: se o pedido chegar aqui, a janela deixou sair para outro site
+    if ((q.headers.host ?? '').startsWith('localhost')) saiuDoPortal = true;
+    const caminho = (q.url ?? '').split('?')[0];
+    if (caminho === '/nm') {
+      if (entrou) s.writeHead(204, { 'X-NetworkManager-Status': 'online' });
+      else s.writeHead(302, { location: `http://127.0.0.1:${porta}/entrar` });
+      s.end();
+      return;
+    }
+    if (caminho === '/entrar' && q.method === 'POST') {
+      q.resume();
+      q.on('end', () => {
+        entrou = true;
+        s.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        s.end('<!doctype html><title>Bem-vindo</title><p id="ok">Bem-vindo à rede da Biblioteca.</p>');
+      });
+      return;
+    }
+    if (caminho === '/entrar') {
+      s.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      s.end(
+        '<!doctype html><title>Wi-Fi da Biblioteca</title><h1>Wi-Fi da Biblioteca</h1>' +
+          `<p><a id="fora" href="http://localhost:${porta}/fora">Conheça o nosso site</a></p>` +
+          '<form method="post" action="/entrar"><label>Quarto <input id="quarto" name="quarto"></label> <button id="entrar">Entrar</button></form>',
+      );
+      return;
+    }
+    s.writeHead(404);
+    s.end();
+  });
+  await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+  const ad = servidor.address();
+  porta = typeof ad === 'object' && ad ? ad.port : 0;
+  try {
+    const raiz = join(base, 'portal');
+    // o primeiro uso já respondido (só a senha nova): o que interessa aqui é o Wi-Fi do menu
+    mkdirSync(join(raiz, 'dados', 'Ekfrase Writer'), { recursive: true });
+    writeFileSync(join(raiz, 'dados', 'Ekfrase Writer', 'sistema.json'), JSON.stringify({ idioma: 'pt-BR', teclado: 'br', fuso: 'America/Sao_Paulo', wifiVisto: true, espelho: 'nao', uso: 'pendrive' }));
+    const env = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz, EKFRASE_CASCA_OS_DADOS: 'pendrive', EKFRASE_CASCA_OS_TESTE: '1', EKFRASE_CASCA_PERFIL: join(raiz, 'perfil'), EKFRASE_CASCA_OS_PORTAL: `http://127.0.0.1:${porta}` };
+    const app = await abrir(env);
+    const electron = app.electron;
+    if (!electron) {
+      falar('  (esta casca não dá acesso às outras janelas: pula o portal)');
+      await app.fechar();
+      return;
+    }
+    falar('— o portal cativo: o aviso, a janela presa ao site, o link barrado, entrar e fechar sozinha');
+    const p = await app.pagina();
+    const r = new Roteiro(p, falar);
+    r.ok(await r.esperar('casca-criar-senha', 10000), 'com o primeiro uso respondido, abre na senha nova');
+    await p.keyboard.type(SENHA);
+    if (await r.tabAte('casca-senha-repetir')) await p.keyboard.type(SENHA);
+    await r.tecla('Enter');
+    await p.waitForTimeout(500);
+    await r.tecla('Control+Alt+s');
+    if (await r.esperar('menu-sistema', 5000)) {
+      const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
+      for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-wifi')); i++) await r.tecla('ArrowDown');
+      await r.tecla('Enter');
+      const naBiblioteca = () => p.evaluate(() => (document.activeElement?.textContent ?? '').startsWith('Biblioteca'));
+      if ((await r.esperar('os-rede', 5000)) && (await r.tabAte('os-rede'))) {
+        for (let i = 0; i < 6 && !(await naBiblioteca()); i++) await r.tecla('Tab');
+        r.ok(await naBiblioteca(), 'o Tab chega na rede "Biblioteca" (aberta)');
+        await r.tecla('Enter');
+      } else r.ok(false, 'a lista de redes aparece no menu');
+      const aviso = await r.esperar('os-portal-abrir', 10000);
+      r.ok(aviso, 'conectado numa rede com portal: aparece "Esta rede pede login numa página"');
+      if (aviso) {
+        await p.waitForTimeout(200);
+        r.ok(await r.focoEm('os-portal-abrir'), 'o foco vai no botão "Abrir a página de login"');
+        await r.passo('o aviso do portal', 'menu-sistema');
+        await foto(p, '30-portal-aviso');
+        await r.tecla('Enter');
+        // a janela do portal, já no fim da cadeia /nm → /entrar
+        let portal: Page | null = null;
+        for (let i = 0; i < 50 && !portal; i++) {
+          portal = electron.windows().find((w) => w.url().includes('/entrar')) ?? null;
+          if (!portal) await new Promise((ok) => setTimeout(ok, 200));
+        }
+        r.ok(!!portal, 'Enter abre a janela do portal, já na página de login (o redirecionamento do teste)');
+        r.ok(await esperarRelato(raiz, 'portal abriu', 5000), 'o agente: portal abriu');
+        if (portal) {
+          const janelaDoPortal = portal;
+          await janelaDoPortal.waitForSelector('#fora', { timeout: 5000 }).catch(() => undefined);
+          if (prints) await janelaDoPortal.screenshot({ path: join(prints, '31-portal-janela.png') }).catch(() => undefined);
+          const focoNo = () => janelaDoPortal.evaluate(() => document.activeElement?.id ?? '');
+          for (let i = 0; i < 6 && (await focoNo()) !== 'fora'; i++) await janelaDoPortal.keyboard.press('Tab');
+          await janelaDoPortal.keyboard.press('Enter');
+          await janelaDoPortal.waitForTimeout(1000);
+          r.ok(!saiuDoPortal, 'o link para outro site (localhost) não sai: o pedido nem chega');
+          r.ok(janelaDoPortal.url().includes('127.0.0.1') && janelaDoPortal.url().includes('/entrar'), `a janela continua na página do portal (${janelaDoPortal.url()})`);
+          const barrado = await electron.evaluate(() => {
+            const b = (globalThis as unknown as { ekfraseCasca?: { travas: { bloqueado: { tipo: string; alvo: string }[] } } }).ekfraseCasca?.travas.bloqueado ?? [];
+            return b.some((x) => x.alvo.startsWith('http://localhost'));
+          });
+          r.ok(barrado, 'a trava anotou o link barrado');
+          for (let i = 0; i < 6 && (await focoNo()) !== 'quarto'; i++) await janelaDoPortal.keyboard.press('Tab');
+          await janelaDoPortal.keyboard.type('101');
+          await janelaDoPortal.keyboard.press('Enter');
+          const fechou = await esperarRelato(raiz, 'portal fechou internet', 15000);
+          r.ok(entrou, 'o formulário do portal foi enviado (o POST chegou)');
+          r.ok(fechou, 'entrou: a janela fecha sozinha quando a internet chega (o agente: portal fechou internet)');
+          await p.waitForTimeout(300);
+          r.ok(electron.windows().every((w) => !w.url().includes(`127.0.0.1:${porta}`)), 'a janela do portal sumiu');
+        }
+        r.ok(await r.esperar('os-rede', 3000), 'a lista de redes continua');
+        r.ok(!(await p.$('[data-teste="os-portal"]')), 'com a internet, o aviso do portal sai');
+        r.ok(((await p.textContent('[data-teste="os-redes"]')) ?? '').includes('internet chegou'), 'o recado diz que a internet chegou');
+        r.ok(await naBiblioteca(), 'o foco volta para a rede conectada');
+        await foto(p, '32-portal-fechou');
+      }
+      await r.tecla('Escape');
+      await r.tecla('Escape');
+    } else r.ok(false, 'Ctrl+Alt+S abre o menu do sistema');
+    await app.fechar();
+    somar(r);
+  } finally {
+    servidor.close();
+  }
+}
+
+/** Todos os arquivos de uma pasta, com as subpastas (para procurar algo que não pode estar em claro). */
+function arquivosDe(pasta: string): string[] {
+  const fora: string[] = [];
+  for (const e of readdirSync(pasta, { withFileTypes: true })) {
+    const c = join(pasta, e.name);
+    if (e.isDirectory()) fora.push(...arquivosDe(c));
+    else if (e.isFile()) fora.push(c);
+  }
+  return fora;
+}
+
+/**
+ * 6. A VPN (PLANO §7, W4, parte 2c-2): no pendrive simulado OUTRO, um `.conf` de WireGuard, um `.ovpn` que pede usuário
+ * e senha (o simulado só liga com `vpn123`), um `.ovpn` com `up` (recusado) e um `.txt` (que nem aparece). Tudo pelo
+ * teclado: o menu → "VPN" → "Importar o arquivo da VPN" → a tela dos pendrives → Enter no arquivo; ligar, a senha, o
+ * cadeado, desligar, "Ligar sozinha"; fechar e abrir (outro boot): as duas voltaram do cofre, e a senha guardada liga
+ * sem perguntar; Esquecer pergunta antes.
+ */
+async function percorrerVpn(abrir: Abrir, base: string, comum: Record<string, string>, falar: (l: string) => void, foto: (p: Page, nome: string) => Promise<void>, somar: (r: Roteiro) => void): Promise<void> {
+  const raiz = join(base, 'vpn');
+  mkdirSync(join(raiz, 'dados', 'Ekfrase Writer'), { recursive: true });
+  writeFileSync(join(raiz, 'dados', 'Ekfrase Writer', 'sistema.json'), JSON.stringify({ idioma: 'pt-BR', teclado: 'br', fuso: 'America/Sao_Paulo', wifiVisto: true, espelho: 'nao', uso: 'pendrive' }));
+  const outro = join(raiz, 'media', 'OUTRO');
+  mkdirSync(outro, { recursive: true });
+  const nl = String.fromCharCode(10);
+  // as chaves da imagem de teste (sorteadas, não abrem nada); o servidor é da faixa de documentação
+  const privada = '/C+IDWTXV8Ok/uFRSeUrbTnRysu0mJDtwnI6l7KDC18=';
+  writeFileSync(join(outro, 'casa.conf'), ['[Interface]', `PrivateKey = ${privada}`, 'Address = 10.99.0.2/32', '', '[Peer]', 'PublicKey = r29dFHxRpkv75xw5E0CTX53XY0M08+YZFznO6aIGfcM=', 'AllowedIPs = 0.0.0.0/0', 'Endpoint = 192.0.2.1:51820', ''].join(nl));
+  const certificado = ['<ca>', '-----BEGIN CERTIFICATE-----', 'MIIBszCCAVmgAwIBAgIUEkfrase', '-----END CERTIFICATE-----', '</ca>'];
+  writeFileSync(join(outro, 'empresa.ovpn'), ['client', 'dev tun', 'remote vpn.empresa.example 1194', 'auth-user-pass', ...certificado, 'verb 3', ''].join(nl));
+  writeFileSync(join(outro, 'perigosa.ovpn'), ['client', 'dev tun', 'remote 203.0.113.9 1194', 'up /bin/sh', ...certificado, ''].join(nl));
+  writeFileSync(join(outro, 'notas.txt'), 'não é VPN');
+  const env = { ...comum, EKFRASE_CASCA_OS_RAIZ: raiz, EKFRASE_CASCA_OS_DADOS: 'pendrive', EKFRASE_CASCA_OS_TESTE: '1', EKFRASE_CASCA_PERFIL: join(raiz, 'perfil') };
+
+  falar('— a VPN: importar do pendrive, recusar o .ovpn com up, ligar com a senha, o cadeado, desligar');
+  let app = await abrir(env);
+  let p = await app.pagina();
+  let r = new Roteiro(p, falar);
+  /** Onde está o foco: `<nome da VPN>|<data-teste>`. */
+  const foco = () => p.evaluate(() => `${document.activeElement?.closest('[data-teste="os-vpn"]')?.getAttribute('data-nome') ?? ''}|${document.activeElement?.getAttribute('data-teste') ?? ''}`);
+  const esperarFoco = (alvo: string) =>
+    p
+      .waitForFunction((a) => `${document.activeElement?.closest('[data-teste="os-vpn"]')?.getAttribute('data-nome') ?? ''}|${document.activeElement?.getAttribute('data-teste') ?? ''}` === a, alvo, { timeout: 5000 })
+      .then(
+        () => true,
+        () => false,
+      );
+  /** Tab (até 20) até o foco chegar no botão `teste` da VPN `nome`. */
+  const irAte = async (nome: string, teste: string) => {
+    for (let i = 0; i < 20 && (await foco()) !== `${nome}|${teste}`; i++) await r.tecla('Tab');
+    return (await foco()) === `${nome}|${teste}`;
+  };
+  const ligada = (nome: string) => p.evaluate((n) => document.querySelector(`[data-teste="os-vpn"][data-nome="${n}"]`)?.getAttribute('data-ligada') === 'sim', nome);
+  const cadeado = () => p.evaluate(() => document.querySelector('[data-teste="os-vpn-cadeado"]')?.getAttribute('aria-label') ?? null);
+  const sozinhaMarcada = (nome: string) => p.evaluate((n) => document.querySelector<HTMLInputElement>(`[data-teste="os-vpn"][data-nome="${n}"] [data-teste="os-vpn-sozinha"]`)?.checked === true, nome);
+  /** O menu → "VPN" (setas até o item, Enter). */
+  const abrirVpn = async (): Promise<boolean> => {
+    await r.tecla('Control+Alt+s');
+    if (!(await r.esperar('menu-sistema', 5000))) return false;
+    const itens = await p.$$eval('[data-teste="menu-sistema"] [role="menuitem"]', (l) => l.map((e) => e.getAttribute('data-teste') ?? ''));
+    r.ok(itens.indexOf('os-menu-vpn') === itens.indexOf('os-menu-wifi') + 1, `"VPN" vem logo depois do Wi-Fi no menu (${itens.join(', ')})`);
+    for (let i = 0; i < itens.length && !(await r.focoEm('os-menu-vpn')); i++) await r.tecla('ArrowDown');
+    await r.tecla('Enter');
+    return r.esperar('os-painel-vpn', 5000);
+  };
+  /** "Importar o arquivo da VPN" → o pendrive OUTRO → Enter no arquivo. */
+  const importar = async (arquivo: string, print?: string): Promise<boolean> => {
+    if (!(await r.focoEm('os-vpn-importar')) && !(await r.tabAte('os-vpn-importar', 20))) return false;
+    await r.tecla('Enter');
+    if (!(await r.esperar('os-pendrive-disco', 5000))) return false;
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-pendrive-disco', null, { timeout: 5000 }).catch(() => undefined);
+    await r.tecla('Enter');
+    if (!(await r.esperar('os-pendrive-vpn', 6000))) return false;
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-pendrive-vpn', null, { timeout: 5000 }).catch(() => undefined);
+    if (print) {
+      const lista = await p.$$eval('[data-teste="os-pendrive-vpn"]', (l) => l.map((b) => (b.textContent ?? '').split(' (')[0]));
+      r.ok([...lista].sort().join(',') === 'casa.conf,empresa.ovpn,perigosa.ovpn', `a tela dos pendrives mostra só os arquivos de VPN (${lista.join(', ')})`);
+      await r.passo('a lista dos arquivos de VPN', 'os-pendrive');
+      await foto(p, print);
+    }
+    const noArquivo = () => p.evaluate((a) => (document.activeElement?.textContent ?? '').startsWith(a), arquivo);
+    for (let i = 0; i < 8 && !(await noArquivo()); i++) await r.tecla('Tab');
+    if (!(await noArquivo())) return false;
+    await r.tecla('Enter');
+    return true;
+  };
+
+  r.ok(await r.esperar('casca-criar-senha', 10000), 'com o primeiro uso respondido, abre na senha nova');
+  await p.keyboard.type(SENHA);
+  if (await r.tabAte('casca-senha-repetir')) await p.keyboard.type(SENHA);
+  await r.tecla('Enter');
+  await p.waitForTimeout(500);
+  if (await abrirVpn()) {
+    r.ok(await r.esperar('os-vpn-nenhuma', 3000), 'a parte "VPN" diz que ainda não há nenhuma');
+    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-importar', null, { timeout: 3000 }).catch(() => undefined);
+    r.ok(await r.focoEm('os-vpn-importar'), 'sem VPN, o foco começa em "Importar o arquivo da VPN"');
+    await r.passo('a parte "VPN"', 'menu-sistema');
+    await foto(p, '40-vpn-vazia');
+
+    // o .conf (WireGuard)
+    r.ok(await importar('casa.conf', '41-vpn-pendrive'), 'importar: a tela dos pendrives e Enter em casa.conf');
+    r.ok(await esperarFoco('casa|os-vpn-ligar'), `importou: a VPN "casa" aparece, com o foco no Ligar dela (${await foco()})`);
+    r.ok(((await p.textContent('[data-teste="os-vpn-recado"]').catch(() => '')) ?? '').includes('casa'), 'o recado diz que a VPN casa foi importada');
+    r.ok(!(await p.$('[data-teste="os-pendrive"]')), 'a tela dos pendrives fechou');
+
+    // o .ovpn com "up": recusado, dizendo a linha
+    r.ok(await importar('perigosa.ovpn'), 'importar perigosa.ovpn pelo teclado');
+    const erro = (await r.esperar('os-vpn-erro', 5000)) ? ((await p.textContent('[data-teste="os-vpn-erro"]')) ?? '') : '';
+    r.ok(erro.includes('"up"'), `o .ovpn que roda programa é recusado, dizendo a linha (${erro})`);
+    r.ok((await p.$$('[data-teste="os-vpn"]')).length === 1, 'a recusada não entra na lista');
+    await r.passo('a recusa do .ovpn', 'menu-sistema');
+    await foto(p, '42-vpn-recusada');
+
+    // o .ovpn que pede usuário e senha
+    r.ok(await importar('empresa.ovpn'), 'importar empresa.ovpn pelo teclado');
+    r.ok(await esperarFoco('empresa|os-vpn-ligar'), `importou a "empresa", com o foco no Ligar dela (${await foco()})`);
+
+    // ligar o WireGuard: o cadeado ao lado da bateria
+    r.ok(await irAte('casa', 'os-vpn-ligar'), 'o Tab chega no Ligar da "casa"');
+    await r.tecla('Enter');
+    r.ok(await esperarFoco('casa|os-vpn-desligar'), `ligou a "casa": o botão vira Desligar, com o foco (${await foco()})`);
+    r.ok(await ligada('casa'), 'a "casa" aparece ligada');
+    r.ok((await cadeado())?.includes('casa') === true, `o cadeado aparece (${await cadeado()})`);
+    r.ok(await p.evaluate(() => !!document.querySelector('[data-teste="os-relogio"] [data-teste="os-vpn-cadeado"] + [data-teste="bateria-nivel"]')), 'o cadeado fica logo antes da bateria, no relógio');
+
+    // ligar o OpenVPN: o usuário e a senha (a errada, depois a certa)
+    r.ok(await irAte('empresa', 'os-vpn-ligar'), 'o Tab chega no Ligar da "empresa"');
+    await r.tecla('Enter');
+    if (await r.esperar('os-vpn-usuario', 3000)) {
+      r.ok(await r.focoEm('os-vpn-usuario'), 'o OpenVPN pede o usuário, com o foco nele');
+      const acima = await p.evaluate(() => {
+        const campo = document.querySelector('[data-teste="os-vpn-usuario"]');
+        const lista = document.querySelector('[data-teste="os-vpn"]');
+        return !!campo && !!lista && (campo.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      });
+      r.ok(acima, 'o usuário e a senha ficam acima da lista');
+      await p.keyboard.type('ana');
+      await r.tecla('Tab');
+      r.ok(await r.focoEm('os-vpn-senha'), 'Tab: a senha');
+      await p.keyboard.type('errada');
+      await foto(p, '43-vpn-senha');
+      await r.tecla('Enter');
+      const errada = (await r.esperar('os-vpn-erro', 5000)) ? ((await p.textContent('[data-teste="os-vpn-erro"]')) ?? '') : '';
+      r.ok(errada.includes('senha'), `a senha errada: o aviso (${errada})`);
+      await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-senha', null, { timeout: 3000 }).catch(() => undefined);
+      r.ok(await r.focoEm('os-vpn-senha'), 'o foco volta à senha, para digitar de novo');
+      r.ok(!(await ligada('empresa')), 'com a senha errada, a "empresa" não liga');
+      await p.keyboard.type('vpn123');
+      await r.tecla('Enter');
+      r.ok(await esperarFoco('empresa|os-vpn-desligar'), `a senha certa: ligou, com o foco no Desligar dela (${await foco()})`);
+      r.ok(!(await p.$('[data-teste="os-vpn-usuario"]')), 'os campos do usuário e da senha somem');
+      r.ok((await ligada('empresa')) && !(await ligada('casa')), 'a "empresa" ligada; a "casa" desligou (uma VPN por vez)');
+      r.ok((await cadeado())?.includes('empresa') === true, `o cadeado diz qual está ligada (${await cadeado()})`);
+      await r.passo('a VPN ligada', 'menu-sistema');
+      await foto(p, '44-vpn-ligada');
+    } else r.ok(false, 'o OpenVPN pede usuário e senha');
+
+    // desligar: o cadeado some
+    if ((await foco()) === 'empresa|os-vpn-desligar') await r.tecla('Enter');
+    r.ok(await esperarFoco('empresa|os-vpn-ligar'), `desligou: o botão volta a Ligar, com o foco (${await foco()})`);
+    r.ok((await cadeado()) === null, 'desligada, o cadeado some');
+    // "Ligar sozinha quando houver internet" (padrão: não)
+    r.ok(!(await sozinhaMarcada('casa')) && !(await sozinhaMarcada('empresa')), '"Ligar sozinha" vem desmarcado');
+    r.ok(await irAte('casa', 'os-vpn-sozinha'), 'o Tab chega em "Ligar sozinha" da "casa"');
+    await r.tecla('Space');
+    await p.waitForTimeout(300);
+    r.ok(await sozinhaMarcada('casa'), 'a barra de espaço marca "Ligar sozinha"');
+    await r.tecla('Escape');
+    await r.tecla('Escape');
+  } else r.ok(false, 'o menu do sistema abre a parte "VPN"');
+  await app.fechar();
+  // nada da VPN em claro no pendrive: nem o arquivo (a chave, o servidor), nem a senha
+  const emClaro = arquivosDe(join(raiz, 'dados')).filter((f) => {
+    const b = readFileSync(f);
+    return b.includes(privada) || b.includes('vpn123') || b.includes('vpn.empresa.example');
+  });
+  r.ok(emClaro.length === 0, `nada da VPN em claro no pendrive (${emClaro.join(', ')})`);
+  somar(r);
+
+  // ---- outro boot: as VPNs voltam do cofre
+  falar('— a VPN, outro boot: voltaram do cofre; a senha guardada liga sem perguntar');
+  app = await abrir({ ...env, EKFRASE_CASCA_PERFIL: join(raiz, 'perfil-2') });
+  p = await app.pagina();
+  r = new Roteiro(p, falar);
+  r.ok(await r.esperar('casca-abrir', 10000), 'no outro boot, a senha');
+  await p.keyboard.type(SENHA);
+  await r.tecla('Enter');
+  await p.waitForTimeout(500);
+  if (await abrirVpn()) {
+    await p.waitForSelector('[data-teste="os-vpn"]', { timeout: 5000 }).catch(() => undefined);
+    const nomes = await p.$$eval('[data-teste="os-vpn"]', (l) => l.map((e) => e.getAttribute('data-nome') ?? ''));
+    r.ok([...nomes].sort().join(',') === 'casa,empresa', `as duas VPNs voltaram do cofre (${nomes.join(', ')})`);
+    r.ok(await esperarFoco(`${nomes[0] ?? ''}|os-vpn-ligar`), `o foco começa no Ligar da primeira (${await foco()})`);
+    r.ok(await sozinhaMarcada('casa'), '"Ligar sozinha" da "casa" foi lembrado');
+    r.ok(!(await ligada('empresa')) && (await cadeado()) === null, 'voltam desligadas (sem o cadeado)');
+    r.ok(await irAte('empresa', 'os-vpn-ligar'), 'o Tab chega no Ligar da "empresa"');
+    await r.tecla('Enter');
+    r.ok(await esperarFoco('empresa|os-vpn-desligar'), `a senha guardada no cofre: liga sem perguntar (${await foco()})`);
+    r.ok(!(await p.$('[data-teste="os-vpn-usuario"]')) && (await ligada('empresa')), 'nenhum campo de senha, e a "empresa" está ligada');
+    // Esquecer pergunta antes; confirmado, sai da lista
+    r.ok(await irAte('empresa', 'os-vpn-esquecer'), 'o Tab chega no Esquecer da "empresa"');
+    await r.tecla('Enter');
+    if (await r.esperar('confirmar', 3000)) {
+      await foto(p, '45-vpn-esquecer');
+      r.ok(await r.focoEm('confirmar-sim'), 'Esquecer pergunta antes (o foco em "Esquecer")');
+      await r.tecla('Enter');
+      await p.waitForFunction(() => document.querySelectorAll('[data-teste="os-vpn"]').length === 1, null, { timeout: 5000 }).catch(() => undefined);
+      const ficou = await p.$$eval('[data-teste="os-vpn"]', (l) => l.map((e) => e.getAttribute('data-nome') ?? ''));
+      r.ok(ficou.join(',') === 'casa', `a "empresa" saiu da lista (${ficou.join(', ')})`);
+      r.ok((await cadeado()) === null, 'esquecida a que estava ligada, o cadeado some');
+      r.ok(await esperarFoco('casa|os-vpn-ligar'), `o foco vai para a VPN que ficou (${await foco()})`);
+    } else r.ok(false, 'Esquecer pede confirmação');
+    await r.tecla('Escape');
+    await r.tecla('Escape');
+  } else r.ok(false, 'o menu do sistema abre a parte "VPN" (outro boot)');
+  await app.fechar();
+  somar(r);
 }
