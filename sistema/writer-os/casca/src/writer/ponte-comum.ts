@@ -5,7 +5,7 @@
  * `window.ekfraseCasca` que o preload do Electron põe na página (o transporte é o `ipcRenderer`).
  * Os canais são os de `canais.ts`.
  */
-import type { Bateria, DiscoUSB, ErroSistema, EscolhaEspelho, EstadoAtualizacoes, EstadoCasca, EstadoOS, InfoInstalacao, ListaDePasta, MetodoArmazem, ModoAtualizacoes, Mudanca, PassoInstalar, PonteAtualizacoes, PonteCasca, PonteSistema, RedeWifi, Cabo, Conectividade, FeedbackGuardado, RespostaArmazem, RespostaCasca, RespostaInstalar, RespostaSistema, ServidorConferido, SobreOS, VpnOS, RespostaVpn } from '@ekfrase/writer-nucleo';
+import type { Bateria, DiscoUSB, ErroSistema, EscolhaEspelho, EstadoAtualizacoes, EstadoCasca, EstadoOS, InfoInstalacao, ListaDePasta, MetodoArmazem, ModoAtualizacoes, Mudanca, PassoInstalar, PonteAtualizacoes, PonteCasca, PonteSistema, RedeWifi, Cabo, Conectividade, FeedbackGuardado, RespostaArmazem, RespostaCasca, RespostaInstalar, RespostaSistema, ServidorConferido, SobreOS, VpnOS, RespostaVpn, NovaVpnEmpresa, ExtraVpn } from '@ekfrase/writer-nucleo';
 
 export interface Transporte {
   /** Um pedido com resposta (o `ipcRenderer.invoke`). */
@@ -99,8 +99,18 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         abrirPortal: () => pedir<Conectividade>('os:abrir-portal'),
         vpns: () => pedir<VpnOS[]>('os:vpns'),
         importarVpn: (arquivo: string, bytes: Uint8Array) => pedir<RespostaVpn>('os:importar-vpn', String(arquivo), bytes),
-        ligarVpn: (nome: string, usuario?: string | null, senha?: string | null) =>
-          pedir<RespostaVpn>('os:ligar-vpn', String(nome), typeof usuario === 'string' ? usuario : null, typeof senha === 'string' ? senha : null),
+        adicionarVpnEmpresa: (nova: NovaVpnEmpresa) =>
+          pedir<RespostaVpn>('os:adicionar-vpn-empresa', {
+            protocolo: String(nova?.protocolo ?? ''),
+            servidor: String(nova?.servidor ?? ''),
+            usuario: String(nova?.usuario ?? ''),
+            senha: String(nova?.senha ?? ''),
+          }),
+        ligarVpn: (nome: string, usuario?: string | null, senha?: string | null, extra?: ExtraVpn) =>
+          pedir<RespostaVpn>('os:ligar-vpn', String(nome), typeof usuario === 'string' ? usuario : null, typeof senha === 'string' ? senha : null, {
+            codigo: typeof extra?.codigo === 'string' ? extra.codigo : null,
+            confiar: typeof extra?.confiar === 'string' ? extra.confiar : null,
+          }),
         desligarVpn: (nome: string) => pedir<RespostaVpn>('os:desligar-vpn', String(nome)),
         esquecerVpn: (nome: string) => pedir<void>('os:esquecer-vpn', String(nome)),
         vpnSozinha: (nome: string, sim: boolean) => pedir<VpnOS[]>('os:vpn-sozinha', String(nome), sim === true),

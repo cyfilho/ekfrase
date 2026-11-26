@@ -102,6 +102,8 @@ class Qemu:
         # as atualizações: o "GitHub" do teste (liga a rede só até ele) e se a casca NÃO confirma
         self.atualizacoes = None
         self.nao_confirmar = False
+        # a VPN de empresa (W5a): o JSON do tests/writer-os/ocserv.sh (os ocserv do computador que roda o QEMU)
+        self.vpn_empresa = None
         os.makedirs(pasta, exist_ok=True)
         self.trab = tempfile.mkdtemp(prefix=f'ekfrase-qemu-{nome}-')
         if disco_pronto:
@@ -146,6 +148,8 @@ class Qemu:
         """Sem rede, a não ser no teste das atualizações: aí uma placa virtio cuja rede do QEMU NÃO sai para lugar nenhum
         (restrict=on) e só leva o endereço do "GitHub" do teste (guestfwd) ao servidor local; o endereço vai à imagem pelo
         fw_cfg (o ekfrase-teste.service copia para /run/ekfrase/teste/atualizacoes)."""
+        if self.vpn_empresa:
+            return self.rede_vpn_empresa()
         if not self.atualizacoes:
             return ['-nic', 'none']
         a = self.atualizacoes
@@ -153,6 +157,38 @@ class Qemu:
         # cmd: um repassador NOVO por conexão (o guestfwd para um tcp: é UMA conexão só: o 2º pedido da casca nunca chegava)
         return ['-nic', f'user,model=virtio-net-pci,restrict=on,guestfwd=tcp:{a.IP_VM}:{a.PORTA_VM}-cmd:python3 {a.repassador} {a.porta}',
                 '-fw_cfg', f'name=opt/ekfrase/atualizacoes,string={a.url_vm}', *extra]
+
+    def rede_vpn_empresa(self):
+        """A VPN de empresa (W5a): a rede do QEMU também NÃO sai (restrict=on); só os dois ocserv do computador que roda o
+        QEMU chegam à máquina, em 10.0.2.100:4443 e :4444 (um repassador novo por conexão, como no das atualizações). O
+        que o agente de teste precisa (os servidores, os usuários e as senhas de TESTE, a chave do TOTP) vai num JSON
+        pelo fw_cfg opt/ekfrase/vpn-empresa (o ekfrase-teste.service copia para /run/ekfrase/teste/vpn-empresa)."""
+        v = self.vpn_empresa
+        repassador = os.path.join(self.trab, 'repassar.py')
+        with open(repassador, 'w', encoding='utf-8') as f:
+            f.write(REPASSADOR)
+        para_a_vm = {
+            'servidor': f'{IP_VPN}:{PORTA_VPN}', 'usuario': v['usuario'], 'senha': v['senha'],
+            'servidor2': f'{IP_VPN}:{PORTA_VPN_2FA}', 'usuario2': v['usuario2'], 'senha2': v['senha2'], 'totp': v['totp'],
+            'rede': '192.168.9',
+        }
+        arquivo = os.path.join(self.trab, 'vpn-empresa.json')
+        with open(arquivo, 'w', encoding='utf-8') as f:
+            json.dump(para_a_vm, f)
+        fwd = [f'guestfwd=tcp:{IP_VPN}:{PORTA_VPN}-cmd:python3 {repassador} {v["porta"]}',
+               f'guestfwd=tcp:{IP_VPN}:{PORTA_VPN_2FA}-cmd:python3 {repassador} {v["porta2"]}']
+        return ['-nic', ','.join(['user', 'model=virtio-net-pci', 'restrict=on', *fwd]),
+                '-fw_cfg', f'name=opt/ekfrase/vpn-empresa,file={arquivo}']
+
+    def relogio(self):
+        """A placa do Writer OS guarda a hora LOCAL (raiz/etc/adjtime; como o Windows) e o fuso padrão é o de Brasília;
+        o QEMU dá UTC, e a máquina ficava 3 h adiantada (sem internet, o chrony não acerta). Só importa no teste da VPN
+        de empresa: o código TOTP do segundo fator depende da hora certa. Aí a placa liga com a hora de Brasília."""
+        if not self.vpn_empresa:
+            return []
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        return ['-rtc', f'base={datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%Y-%m-%dT%H:%M:%S")}']
 
     def ligar(self):
         codigo = os.path.join(OVMF, 'OVMF_CODE_4M.secboot.fd' if self.secure else 'OVMF_CODE_4M.fd')
@@ -178,7 +214,7 @@ class Qemu:
             '-blockdev', 'driver=raw,file=outro-arquivo,node-name=outro',
             '-device', 'usb-storage,bus=xhci.0,drive=outro,id=outro',
             *self.dispositivo_interno(),
-            *tela, *self.rede(),
+            *tela, *self.rede(), *self.relogio(),
             '-serial', f'file:{self.serial}',
             '-qmp', f'unix:{self.sock},server=on,wait=off',
         ]
@@ -925,6 +961,80 @@ class ServidorAtualizacao:
         shutil.rmtree(self.trab, ignore_errors=True)
 
 
+# ---------- a VPN de empresa (W5a; PLANO §7, "VPN de empresa") ----------
+
+IP_VPN = '10.0.2.100'
+PORTA_VPN = 4443
+PORTA_VPN_2FA = 4444
+
+
+def teste_vpn_empresa(imagem, pasta):
+    """A VPN DE EMPRESA (openconnect) contra dois ocserv de verdade no computador que roda o QEMU (tests/writer-os/ocserv.sh:
+    certificado autoassinado, usuário e senha; o 2º pede também o código TOTP). O agente de teste cria a VPN pelo
+    ekfrase-vpn.service, recebe `certificado` com a impressão (tem de ser a do certificado do ocserv), erra a senha,
+    confia, liga (o NetworkManager com o cookie, o servidor e o certificado do passwd-file: o risco que o PLANO manda
+    provar), confere o endereço do túnel, desliga e faz o segundo fator. O JSON do ocserv.sh vem de EKFRASE_QEMU_VPN."""
+    cfg = os.environ.get('EKFRASE_QEMU_VPN')
+    if not cfg or not os.path.exists(cfg):
+        print('-- a VPN de empresa: sem EKFRASE_QEMU_VPN (o ocserv.sh não rodou); o teste fica de fora', flush=True)
+        return
+    with open(cfg, encoding='utf-8') as f:
+        v = json.load(f)
+    q = Qemu(imagem, pasta, secure=True, nome='vpn-empresa')
+    q.vpn_empresa = v
+    q.ligar()
+    try:
+        b = q.boot()
+        for teste in ['os-idioma', 'os-uso', 'os-teclado', 'os-fuso']:
+            if q.tela(teste, b, 240) is None:
+                q.foto(f'sem-{teste}')
+                ok(False, f'vpn empresa: o primeiro uso parou antes de {teste}')
+                return
+            q.tecla('ret')
+        if q.tela('casca-criar-senha', b, 60) is None:
+            ok(False, 'vpn empresa: a tela da senha não abriu')
+            return
+        q.digitar(SENHA)
+        q.tecla('tab')
+        q.digitar(SENHA)
+        q.tecla('ret')
+        for teste in ['casca-espelho', 'os-wifi']:
+            if q.tela(teste, b, 60) is not None:
+                q.tecla('ret')
+
+        def linha(alvo, tempo):
+            i = q.esperar(re.compile(rf'^vpn empresa (?:{alvo})( |$)'), b, tempo)
+            return q.linhas()[i] if i is not None else 'sem resposta'
+
+        l = linha('adicionar', 180)
+        ok(l == 'vpn empresa adicionar ok', f'vpn empresa: o ekfrase-vpn.service criou a conexão do openconnect ({l})')
+        l = linha('ligar', 90)
+        ok(l == f'vpn empresa ligar certificado {v["pin"]}', f'vpn empresa: o certificado autoassinado volta com a impressão dele ({l}; a do ocserv: {v["pin"]})')
+        l = linha('senha-errada', 90)
+        ok(l == 'vpn empresa senha-errada senha', f'vpn empresa: a senha errada é "senha" ({l})')
+        l = linha('confiar', 120)
+        ok(l == 'vpn empresa confiar ok', f'vpn empresa: confiar no certificado liga (o NetworkManager com os segredos do passwd-file) ({l})')
+        l = linha('ok|nao-ligada', 30)
+        ok(l == 'vpn empresa ok', f'vpn empresa: o NetworkManager diz que a VPN está ligada ({l})')
+        l = linha('ip', 10)
+        ok(l.startswith('vpn empresa ip 192.168.99.'), f'vpn empresa: o túnel tem o endereço que o ocserv deu ({l})')
+        l = linha('desligar', 60)
+        ok(l == 'vpn empresa desligar ok', f'vpn empresa: desliga ({l})')
+        l = linha('2fa-sem-codigo', 120)
+        ok(l == 'vpn empresa 2fa-sem-codigo segundo-fator', f'vpn empresa: o servidor que pede código, sem o código, é "segundo-fator" ({l})')
+        l = linha('2fa', 120)
+        ok(l == 'vpn empresa 2fa ok', f'vpn empresa: com o código (TOTP) liga ({l})')
+        q.esperar('nm fim', b, 60)
+        time.sleep(1)
+        # o que o openconnect, o nmcli e o NetworkManager disseram (para entender uma falha sem rodar de novo)
+        for l in q.linhas()[b:]:
+            if l.startswith('vpn empresa') or l.startswith('nm'):
+                print('   ' + l, flush=True)
+        q.foto('vpn-empresa')
+    finally:
+        q.desligar()
+
+
 def linha_de(q, alvo, desde, tempo):
     i = q.esperar(alvo, desde, tempo)
     return (i, q.linhas()[i]) if i is not None else (None, 'sem resposta')
@@ -1147,9 +1257,10 @@ def main():
     a.add_argument('--so-instalar', action='store_true', help='só o teste de instalar no computador (PLANO §8c)')
     a.add_argument('--so-apagar', action='store_true', help='só o teste de apagar o 2º disco inteiro e ligar por ele (W3f)')
     a.add_argument('--so-atualizar', action='store_true', help='só os testes das atualizações (atualizar e voltar; U1)')
+    a.add_argument('--so-vpn', action='store_true', help='só o teste da VPN de empresa (W5a; precisa do EKFRASE_QEMU_VPN do ocserv.sh)')
     args = a.parse_args()
     srv = None
-    if args.imagem and not args.gpu and not args.disco_4k and not args.so_apagar:
+    if args.imagem and not args.gpu and not args.disco_4k and not args.so_apagar and not args.so_vpn:
         try:
             srv = ServidorAtualizacao(args.imagem)
         except Exception as e:
@@ -1162,12 +1273,16 @@ def main():
         teste_instalar(args.imagem, args.prints, srv)
     elif args.so_apagar:
         teste_apagar(args.imagem, args.prints)
+    elif args.so_vpn:
+        teste_vpn_empresa(args.imagem, args.prints)
     elif args.so_atualizar:
         if srv:
             teste_atualizar(args.imagem, args.prints, srv)
             teste_voltar(args.imagem, args.prints, srv)
     else:
         teste_completo(args.imagem, args.prints)
+        # logo depois do completo: é o risco novo (W5a), e o resultado sai cedo no log
+        teste_vpn_empresa(args.imagem, args.prints)
         teste_instalar(args.imagem, args.prints, srv)
         teste_apagar(args.imagem, args.prints)
         if srv:
