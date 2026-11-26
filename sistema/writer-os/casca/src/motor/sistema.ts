@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { lerConectividade, type Conectividade } from './portal-regras.ts';
-import { filtrarVpn, type TipoVpn } from './vpn-regras.ts';
+import { erroDoOpenconnect, filtrarVpn, IMPRESSAO_SIMULADA, lerAutenticacao, type ErroOpenconnect, type ProtocoloVpn, type TipoVpn } from './vpn-regras.ts';
 
 /** Os teclados do primeiro uso e do painel (o `ekfrase-sessao.sh` da imagem conhece os mesmos). */
 export const TECLADOS = [
@@ -100,6 +100,16 @@ export interface Sistema {
   importarVpn(tipo: TipoVpn, nome: string, texto: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }>;
   /** Liga (no OpenVPN que pede, com o usuário e a senha). */
   ligarVpn(nome: string, usuario: string | null, senha: string | null): Promise<RespostaSistema>;
+  /** Cria a conexão de uma VPN de empresa (o `criar openconnect …` do `ekfrase-vpn.service`; W5a). */
+  criarVpnEmpresa(nome: string, protocolo: ProtocoloVpn, servidor: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }>;
+  /**
+   * Liga uma VPN de empresa: autentica como writer (`openconnect --authenticate`, sem túnel nem root) e passa o cookie,
+   * o servidor e o certificado ao NetworkManager (o `passwd-file`, na memória, apagado logo). O cookie nunca vai ao
+   * disco nem ao cofre.
+   */
+  ligarVpnEmpresa(nome: string, d: LigarVpnEmpresa): Promise<{ ok: true } | { ok: false; erro: ErroOpenconnect; impressao?: string }>;
+  /** Só o agente de teste: o que o openconnect e o nmcli escreveram na última tentativa de ligar uma VPN de empresa. */
+  readonly ultimaSaidaVpn?: string;
   desligarVpn(nome: string): Promise<boolean>;
   esquecerVpn(nome: string): Promise<void>;
   /** Só o agente de teste: o dono da conexão (`connection.permissions`; tem de ser `user:writer`). */
@@ -140,9 +150,25 @@ export interface Sistema {
 /** Uma VPN como o NetworkManager a vê. */
 export interface VpnDoSistema {
   nome: string;
-  tipo: TipoVpn;
+  tipo: TipoVpn | 'openconnect';
   ligada: boolean;
 }
+
+/** O que ligar uma VPN de empresa precisa (o `pin` é a impressão do certificado em que a pessoa confiou). */
+export interface LigarVpnEmpresa {
+  protocolo: ProtocoloVpn;
+  servidor: string;
+  usuario: string;
+  senha: string;
+  codigo: string | null;
+  pin: string | null;
+}
+
+/** Os plugins de VPN do NetworkManager que a casca conhece (o `vpn.service-type`). */
+const SERVICOS_VPN: Record<string, 'openvpn' | 'openconnect'> = {
+  'org.freedesktop.NetworkManager.openvpn': 'openvpn',
+  'org.freedesktop.NetworkManager.openconnect': 'openconnect',
+};
 
 /** A resposta do `ekfrase-vpn.sh` (`ok` | `erro <código>`) no erro que a tela conhece. */
 export function lerRespostaVpn(linha: string | null): { ok: true } | { ok: false; erro: ErroVpn } {
@@ -151,19 +177,35 @@ export function lerRespostaVpn(linha: string | null): { ok: true } | { ok: false
   const c = /^erro ([a-z]+)$/.exec(l)?.[1];
   if (c === 'grande' || c === 'proibida' || c === 'arquivo') return { ok: false, erro: c };
   if (c === 'importar' || c === 'tipo' || c === 'nome' || c === 'pedido') return { ok: false, erro: 'invalido' };
+  if (c === 'servidor') return { ok: false, erro: 'servidor' };
   if (c === 'dono') return { ok: false, erro: 'negado' };
   return { ok: false, erro: 'falhou' };
 }
 
-/** As VPNs da lista do `nmcli -t -f NAME,TYPE,STATE connection show` (o OpenVPN é o TYPE `vpn`: é o único plugin). */
-export function lerVpnsNmcli(saida: string): VpnDoSistema[] {
+/**
+ * As VPNs da lista do `nmcli -t -f NAME,TYPE,STATE connection show`. O TYPE `vpn` é de um plugin: qual, diz o
+ * `vpn.service-type` de cada uma (`servicos`, pelo nome; W5a); plugin que a casca não conhece fica de fora.
+ */
+export function lerVpnsNmcli(saida: string, servicos: ReadonlyMap<string, string> = new Map()): VpnDoSistema[] {
   const lista: VpnDoSistema[] = [];
   for (const linha of saida.split('\n')) {
     const [nome, tipo, estado] = camposNmcli(linha.replace(/\r$/, ''));
     if (!nome || (tipo !== 'wireguard' && tipo !== 'vpn')) continue;
-    lista.push({ nome, tipo: tipo === 'vpn' ? 'openvpn' : 'wireguard', ligada: estado === 'activated' });
+    const t = tipo === 'wireguard' ? 'wireguard' : SERVICOS_VPN[servicos.get(nome) ?? ''];
+    if (!t) continue;
+    lista.push({ nome, tipo: t, ligada: estado === 'activated' });
   }
   return lista;
+}
+
+/** Os nomes das conexões de TYPE `vpn` (as que precisam do `vpn.service-type` para saber o plugin). */
+export function nomesVpnPlugin(saida: string): string[] {
+  const nomes: string[] = [];
+  for (const linha of saida.split('\n')) {
+    const [nome, tipo] = camposNmcli(linha.replace(/\r$/, ''));
+    if (nome && tipo === 'vpn') nomes.push(nome);
+  }
+  return nomes;
 }
 
 /** O Writer tem uma pasta com textos neste disco montado? */
@@ -298,6 +340,20 @@ interface Saida {
   ok: boolean;
   out: string;
   err: string;
+}
+
+/**
+ * Como `rodar`, com a entrada (o stdin) dada e o ambiente LIMPO (só o `PATH` e `LC_ALL=C`): é o do openconnect, que
+ * recebe a senha por aqui e nunca na linha de comando.
+ */
+function rodarComEntrada(programa: string, args: string[], entrada: string, tempo: number): Promise<Saida> {
+  return new Promise((ok) => {
+    const filho = execFile(programa, args, { timeout: tempo, maxBuffer: 1024 * 1024, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', LC_ALL: 'C' } }, (erro, out, err) => {
+      ok({ ok: !erro, out: String(out ?? ''), err: String(err ?? '') });
+    });
+    filho.stdin?.on('error', () => undefined);
+    filho.stdin?.end(entrada);
+  });
 }
 
 function rodar(programa: string, args: string[], tempo = 20000): Promise<Saida> {
@@ -457,7 +513,46 @@ export class SistemaLinux implements Sistema {
   }
 
   async vpns(): Promise<VpnDoSistema[]> {
-    return lerVpnsNmcli((await rodar('nmcli', ['-t', '-f', 'NAME,TYPE,STATE', 'connection', 'show'])).out);
+    const saida = (await rodar('nmcli', ['-t', '-f', 'NAME,TYPE,STATE', 'connection', 'show'])).out;
+    const servicos = new Map<string, string>();
+    for (const nome of nomesVpnPlugin(saida)) {
+      const r = await rodar('nmcli', ['-g', 'vpn.service-type', 'connection', 'show', 'id', nome]);
+      if (r.ok) servicos.set(nome, camposNmcli(r.out.trim())[0] ?? '');
+    }
+    return lerVpnsNmcli(saida, servicos);
+  }
+
+  async criarVpnEmpresa(nome: string, protocolo: ProtocoloVpn, servidor: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }> {
+    let resposta: string | null = null;
+    await pedirAoInstalador(join(this.caminhos.run, 'vpn.sock'), `criar openconnect ${nome} ${protocolo} ${servidor}`, (l) => (resposta ??= l), 30000);
+    return resposta === null ? { ok: false, erro: 'falhou' } : lerRespostaVpn(resposta);
+  }
+
+  ultimaSaidaVpn = '';
+
+  async ligarVpnEmpresa(nome: string, d: LigarVpnEmpresa): Promise<{ ok: true } | { ok: false; erro: ErroOpenconnect; impressao?: string }> {
+    // 1. autenticar, como writer: sem túnel, sem root, sem shell. A senha (e o código) só pelo stdin. Sem código,
+    // `--non-inter`: o servidor que pede mais um campo faz o openconnect sair em vez de esperar (= segundo-fator).
+    const args = [
+      '--authenticate', `--protocol=${d.protocolo}`, `--user=${d.usuario}`, '--passwd-on-stdin', '--no-external-auth',
+      ...(d.codigo ? [] : ['--non-inter']), ...(d.pin ? ['--servercert', d.pin] : []), '--', d.servidor,
+    ];
+    const a = await rodarComEntrada('openconnect', args, `${d.senha}\n${d.codigo ? `${d.codigo}\n` : ''}`, 60000);
+    this.ultimaSaidaVpn = a.err.slice(-4000);
+    const aut = lerAutenticacao(a.out);
+    if (!aut) return { ok: false, ...erroDoOpenconnect(a.err, !!d.codigo) };
+    // 2. o túnel, pelo NetworkManager (root): os segredos pelo passwd-file, só do writer, na memória, apagado logo
+    const arquivo = join(this.caminhos.ram, `.vpn-${randomBytes(8).toString('hex')}`);
+    const linhas = [`vpn.secrets.cookie:${aut.cookie}`, `vpn.secrets.gateway:${aut.gateway}`, `vpn.secrets.gwcert:${aut.gwcert}`];
+    if (aut.resolve) linhas.push(`vpn.secrets.resolve:${aut.resolve}`);
+    try {
+      writeFileSync(arquivo, `${linhas.join('\n')}\n`, { mode: 0o600, flag: 'wx' });
+      const r = await rodar('nmcli', ['--wait', '40', 'connection', 'up', 'id', nome, 'passwd-file', arquivo], 50000);
+      this.ultimaSaidaVpn += `\nnmcli: ${r.err.slice(-1000)}`;
+      return r.ok ? { ok: true } : { ok: false, erro: 'falhou' };
+    } finally {
+      rmSync(arquivo, { force: true });
+    }
   }
 
   async importarVpn(tipo: TipoVpn, nome: string, texto: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }> {
@@ -829,7 +924,7 @@ export class SistemaSimulado implements Sistema {
    * As VPNs simuladas: o arquivo passa pelo MESMO filtro (como o `ekfrase-vpn.sh` faria); o OpenVPN que pede usuário e
    * senha só liga com a senha `vpn123`. Uma ligada por vez (o NetworkManager também troca a rota).
    */
-  private vpnsSim = new Map<string, { tipo: TipoVpn; ligada: boolean; pedeSenha: boolean }>();
+  private vpnsSim = new Map<string, { tipo: TipoVpn | 'openconnect'; ligada: boolean; pedeSenha: boolean }>();
 
   async vpns(): Promise<VpnDoSistema[]> {
     return [...this.vpnsSim].map(([nome, v]) => ({ nome, tipo: v.tipo, ligada: v.ligada }));
@@ -847,6 +942,31 @@ export class SistemaSimulado implements Sistema {
     const v = this.vpnsSim.get(nome);
     if (!v) return { ok: false, erro: 'falhou' };
     if (v.pedeSenha && senha !== 'vpn123') return { ok: false, erro: 'senha' };
+    for (const o of this.vpnsSim.values()) o.ligada = false;
+    v.ligada = true;
+    return { ok: true };
+  }
+
+  /**
+   * A VPN de empresa simulada (W5a; PLANO §7): o servidor `vpn.exemplo.local` (e `autoassinado.exemplo.local`, que
+   * devolve `certificado` até confiar; `sso.exemplo.local` só aceita o navegador), a senha `vpn123`; o usuário `dois`
+   * pede o código `123456`. Outro servidor não responde.
+   */
+  async criarVpnEmpresa(nome: string, _protocolo: ProtocoloVpn, _servidor: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }> {
+    if (this.vpnsSim.has(nome)) return { ok: false, erro: 'falhou' };
+    this.vpnsSim.set(nome, { tipo: 'openconnect', ligada: false, pedeSenha: true });
+    return { ok: true };
+  }
+
+  async ligarVpnEmpresa(nome: string, d: LigarVpnEmpresa): Promise<{ ok: true } | { ok: false; erro: ErroOpenconnect; impressao?: string }> {
+    const v = this.vpnsSim.get(nome);
+    if (!v) return { ok: false, erro: 'falhou' };
+    const host = d.servidor.replace(/[:/].*$/, '').toLowerCase();
+    if (host === 'sso.exemplo.local') return { ok: false, erro: 'sso' };
+    if (host !== 'vpn.exemplo.local' && host !== 'autoassinado.exemplo.local') return { ok: false, erro: 'servidor' };
+    if (host === 'autoassinado.exemplo.local' && d.pin !== IMPRESSAO_SIMULADA) return { ok: false, erro: 'certificado', impressao: IMPRESSAO_SIMULADA };
+    if (d.senha !== 'vpn123') return { ok: false, erro: 'senha' };
+    if (d.usuario === 'dois' && d.codigo !== '123456') return { ok: false, erro: d.codigo ? 'senha' : 'segundo-fator' };
     for (const o of this.vpnsSim.values()) o.ligada = false;
     v.ligada = true;
     return { ok: true };

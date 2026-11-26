@@ -24,7 +24,21 @@ import type { Pagina } from '../sistema/writer-os/casca/src/writer/pagina.ts';
 import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../sistema/writer-os/casca/src/motor/selo.ts';
 import { abrirNaMesma, deixarPassar, lerConectividade, siteDe } from '../sistema/writer-os/casca/src/motor/portal-regras.ts';
 import { COM_ARQUIVO_OVPN, filtrarOvpn, filtrarWireguard, nomeDaVpn, PROIBIDAS_OVPN, PROIBIDAS_WIREGUARD, qualLigarSozinha, tipoDaVpn } from '../sistema/writer-os/casca/src/motor/vpn-regras.ts';
-import { lerRespostaVpn, lerVpnsNmcli } from '../sistema/writer-os/casca/src/motor/sistema.ts';
+import { lerRespostaVpn, lerVpnsNmcli, nomesVpnPlugin } from '../sistema/writer-os/casca/src/motor/sistema.ts';
+import {
+  codigoValido,
+  erroDoOpenconnect,
+  hostDoServidor,
+  IMPRESSAO_SIMULADA,
+  IMPRESSAO_VPN,
+  lerAutenticacao,
+  limparServidor,
+  nomeDaVpnEmpresa,
+  protocoloValido,
+  SERVIDOR_VPN,
+  servidorValido,
+} from '../sistema/writer-os/casca/src/motor/vpn-regras.ts';
+import { totp } from '../sistema/writer-os/casca/src/writer/agente-teste.ts';
 
 const pastas: string[] = [];
 const temp = (): string => {
@@ -769,10 +783,21 @@ describe('Writer OS: a VPN (PLANO §7, W4 parte 2c)', { timeout: 60_000 }, () =>
   });
 
   it('as respostas do sistema: a lista do nmcli e o que o serviço diz', () => {
-    expect(lerVpnsNmcli('Casa:802-11-wireless:activated\ncasa:wireguard:activated\nescola:vpn:\nCabo:802-3-ethernet:activated\n')).toEqual([
+    const saida = 'Casa:802-11-wireless:activated\ncasa:wireguard:activated\nescola:vpn:\nempresa:vpn:activated\noutra:vpn:\nCabo:802-3-ethernet:activated\n';
+    // o TYPE `vpn` é de um plugin: o `vpn.service-type` diz qual (W5a); plugin que a casca não conhece fica de fora
+    expect(nomesVpnPlugin(saida)).toEqual(['escola', 'empresa', 'outra']);
+    const servicos = new Map([
+      ['escola', 'org.freedesktop.NetworkManager.openvpn'],
+      ['empresa', 'org.freedesktop.NetworkManager.openconnect'],
+      ['outra', 'org.freedesktop.NetworkManager.vpnc'],
+    ]);
+    expect(lerVpnsNmcli(saida, servicos)).toEqual([
       { nome: 'casa', tipo: 'wireguard', ligada: true },
       { nome: 'escola', tipo: 'openvpn', ligada: false },
+      { nome: 'empresa', tipo: 'openconnect', ligada: true },
     ]);
+    expect(lerVpnsNmcli(saida)).toEqual([{ nome: 'casa', tipo: 'wireguard', ligada: true }]);
+    expect(lerRespostaVpn('erro servidor')).toEqual({ ok: false, erro: 'servidor' });
     expect(lerRespostaVpn('ok')).toEqual({ ok: true });
     expect(lerRespostaVpn('erro proibida')).toEqual({ ok: false, erro: 'proibida' });
     expect(lerRespostaVpn('erro importar')).toEqual({ ok: false, erro: 'invalido' });
@@ -852,5 +877,162 @@ describe('Writer OS: a VPN (PLANO §7, W4 parte 2c)', { timeout: 60_000 }, () =>
     // a senha guardada liga a escola sem perguntar
     expect(await dois.os.ligarVpn('escola')).toEqual({ ok: true, nome: 'escola' });
     await dois.dados.trancar();
+  });
+});
+
+describe('a VPN de empresa (W5a: openconnect, sem arquivo)', () => {
+  it('o servidor: um nome, um IPv4 ou um [IPv6], com porta e grupo; nada que vire opção ou URL', () => {
+    for (const s of ['vpn.empresa.com.br', 'vpn.empresa.com:443', 'vpn.empresa.com/grupo', 'vpn.x.com:8443/vendas/sp', '10.0.2.100:4443', '[2001:db8::1]:443', 'VPN-1.Empresa.com'])
+      expect(servidorValido(s), s).toBe(true);
+    for (const s of ['-vpn.com', 'https://vpn.com', 'vpn .com', 'vpn..com', 'vpn.com:0', 'vpn.com:65536', 'vpn.com:0443', 'vpn.com:', 'vpn.com/a b', 'vpn.com;rm', 'vpñ.com', '', `${'a'.repeat(64)}.com`, `${'a.'.repeat(127)}aa`])
+      expect(servidorValido(s), s).toBe(false);
+    expect(servidorValido(7)).toBe(false);
+    // o que a pessoa colou
+    expect(limparServidor('  https://vpn.empresa.com/grupo/ ')).toBe('vpn.empresa.com/grupo');
+    expect(hostDoServidor('vpn.empresa.com:443/grupo')).toBe('vpn.empresa.com');
+    expect(hostDoServidor('[2001:db8::1]:443')).toBe('2001:db8::1');
+    expect(nomeDaVpnEmpresa('vpn.empresa.com:443/grupo', [])).toBe('vpn-empresa-com');
+    expect(nomeDaVpnEmpresa('vpn.empresa.com', ['vpn-empresa-com'])).toBe('vpn-empresa-c-2');
+    expect(nomeDaVpnEmpresa('10.0.2.100:4443', [])).toBe('10-0-2-100');
+    expect(['anyconnect', 'gp', 'fortinet'].every(protocoloValido)).toBe(true);
+    expect(protocoloValido('pulse')).toBe(false);
+    expect(codigoValido('123456')).toBe(true);
+    expect(codigoValido('12 34')).toBe(false);
+    expect(IMPRESSAO_VPN.test(IMPRESSAO_SIMULADA)).toBe(true);
+  });
+
+  it('o ekfrase-vpn.sh (root, que cria a conexão) aceita o servidor pela MESMA expressão e só os três protocolos', () => {
+    const sh = readFileSync('sistema/writer-os/imagem/raiz/usr/lib/ekfrase/ekfrase-vpn.sh', 'utf8');
+    expect(/^SERVIDOR='([^']*)'$/m.exec(sh)?.[1]).toBe(SERVIDOR_VPN);
+    expect(sh).toContain('^criar\\ openconnect\\ ([A-Za-z0-9_-]{1,15})\\ (anyconnect|gp|fortinet)\\ ');
+    // o vpn.data é a lista fechada do PLANO: o servidor, o protocolo e os três segredos "não guardar"
+    expect(/vpn\.data "([^"]*)"/.exec(sh)?.[1]).toBe('gateway=$servidor,protocol=$protocolo,cookie-flags=2,gateway-flags=2,gwcert-flags=2');
+  });
+
+  it('lerAutenticacao: só as cinco linhas do --authenticate, com as aspas desfeitas', () => {
+    const saida = [
+      'POST https://vpn.empresa.com/',
+      "COOKIE='webvpn=ABC'\\''DEF:x'",
+      "HOST='203.0.113.7'",
+      "CONNECT_URL='https://vpn.empresa.com:443/grupo'",
+      "FINGERPRINT='pin-sha256:EkfraseWriterOSsimuladoAutoassinado01234567='",
+      "RESOLVE='vpn.empresa.com:203.0.113.7'",
+      "OUTRA='nada'",
+      "COOKIE='segunda'",
+    ].join('\n');
+    expect(lerAutenticacao(saida)).toEqual({
+      cookie: "webvpn=ABC'DEF:x",
+      gateway: 'https://vpn.empresa.com:443/grupo',
+      gwcert: 'pin-sha256:EkfraseWriterOSsimuladoAutoassinado01234567=',
+      resolve: 'vpn.empresa.com:203.0.113.7',
+    });
+    // sem o CONNECT_URL, o HOST; sem o cookie (ou com quebra de linha dentro), nada
+    expect(lerAutenticacao("COOKIE='c'\nHOST='h'\nFINGERPRINT='f'")?.gateway).toBe('h');
+    expect(lerAutenticacao("HOST='h'\nFINGERPRINT='f'")).toBeNull();
+    expect(lerAutenticacao("COOKIE='a\u0001b'\nHOST='h'\nFINGERPRINT='f'")).toBeNull();
+    expect(lerAutenticacao('')).toBeNull();
+  });
+
+  it('erroDoOpenconnect: certificado (com a impressão), senha, segundo fator, servidor, SSO', () => {
+    const pin = 'pin-sha256:EkfraseWriterOSsimuladoAutoassinado01234567=';
+    expect(
+      erroDoOpenconnect(`Server certificate verify failed: signer not found\nCertificate from VPN server "10.0.2.100" failed verification.\nReason: signer not found\nTo trust this server in future, perhaps add this to your command line:\n    --servercert ${pin}\n`, false),
+    ).toEqual({ erro: 'certificado', impressao: pin });
+    const codigo = 'POST https://10.0.2.100:4444/\nPlease enter your one-time password.\nOTP:***\nUser input required in non-interactive mode\nFailed to obtain WebVPN cookie\n';
+    expect(erroDoOpenconnect(codigo, false)).toEqual({ erro: 'segundo-fator' });
+    expect(erroDoOpenconnect(codigo, true)).toEqual({ erro: 'senha' });
+    expect(erroDoOpenconnect('Login failed.\nPassword:***\nUser input required in non-interactive mode\n', false)).toEqual({ erro: 'senha' });
+    expect(erroDoOpenconnect('getaddrinfo failed for host "vpn.nao.existe": Name or service not known\nFailed to open HTTPS connection to vpn.nao.existe\n', false)).toEqual({ erro: 'servidor' });
+    expect(erroDoOpenconnect('Authentication via SAML is required; use --external-browser\n', false)).toEqual({ erro: 'sso' });
+    expect(erroDoOpenconnect('algo que ninguém previu\n', false)).toEqual({ erro: 'falhou' });
+  });
+
+  it('o TOTP do agente de teste (o segundo fator do ocserv do CI) é o da RFC 6238', () => {
+    expect(totp(Buffer.from('12345678901234567890').toString('hex'), 59_000)).toBe('287082');
+    expect(totp(Buffer.from('12345678901234567890').toString('hex'), 1_111_111_109_000)).toBe('081804');
+  });
+
+  it('adicionar, o certificado, o segundo fator, o cofre e a volta no outro boot (simulado)', async () => {
+    const raiz = temp();
+    const semPagina = { aberta: () => false } as unknown as Pagina;
+    const abrir = async () => {
+      const sistema = new SistemaSimulado(raiz, false);
+      mkdirSync(sistema.caminhos.dados, { recursive: true });
+      writeFileSync(join(sistema.caminhos.run, 'dados.json'), dadosSimulados(true, 'usb'));
+      const os = new WriterOS(sistema);
+      const dados = new DadosDoWriter({ lembrado: join(raiz, 'perfil', 'casca.json'), sugerida: join(raiz, 'Documentos'), servidor: () => ({ base: 'https://ekfrase.com/api/v1/', padrao: true }), atrasoDoEspelho: 0 });
+      await os.ligar({ dados, pagina: semPagina, sair: async () => undefined, versaoApp: '0' });
+      return { os, dados };
+    };
+    const um = await abrir();
+    expect((await um.dados.criarSenha('senha dos testes')).ok).toBe(true);
+    await um.os.depoisDeAbrir();
+    const nova = (o: Record<string, unknown>) => ({ protocolo: 'anyconnect', servidor: 'vpn.exemplo.local', usuario: 'ana', senha: 'vpn123', ...o });
+    // o que a tela manda e não serve
+    expect(await um.os.adicionarVpnEmpresa(nova({ protocolo: 'pulse' }))).toEqual({ ok: false, erro: 'invalido' });
+    expect(await um.os.adicionarVpnEmpresa(nova({ servidor: '-o x' }))).toEqual({ ok: false, erro: 'servidor' });
+    expect(await um.os.adicionarVpnEmpresa(nova({ usuario: 'a,b' }))).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.adicionarVpnEmpresa(nova({ senha: '' }))).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.adicionarVpnEmpresa(null)).toEqual({ ok: false, erro: 'invalido' });
+
+    // a VPN de sempre: o https:// colado sai; liga com a senha guardada
+    expect(await um.os.adicionarVpnEmpresa(nova({ servidor: 'https://vpn.exemplo.local/' }))).toEqual({ ok: true, nome: 'vpn-exemplo-loc' });
+    expect(await um.os.ligarVpn('vpn-exemplo-loc')).toEqual({ ok: true, nome: 'vpn-exemplo-loc' });
+    expect(await um.os.ligarVpn('vpn-exemplo-loc', 'ana', 'errada')).toEqual({ ok: false, erro: 'senha' });
+    // o certificado que o sistema não conhece: a impressão volta; "Confiar" liga e o pin fica guardado
+    expect((await um.os.adicionarVpnEmpresa(nova({ protocolo: 'gp', servidor: 'autoassinado.exemplo.local:8443' }))).ok).toBe(true);
+    expect(await um.os.ligarVpn('autoassinado-ex')).toEqual({ ok: false, erro: 'certificado', impressao: IMPRESSAO_SIMULADA });
+    expect(await um.os.ligarVpn('autoassinado-ex', null, null, { confiar: 'pin-sha256:qualquer' })).toEqual({ ok: false, erro: 'certificado', impressao: IMPRESSAO_SIMULADA });
+    expect(await um.os.ligarVpn('autoassinado-ex', null, null, { confiar: IMPRESSAO_SIMULADA })).toEqual({ ok: true, nome: 'autoassinado-ex' });
+    expect(await um.os.ligarVpn('autoassinado-ex')).toEqual({ ok: true, nome: 'autoassinado-ex' });
+    // o segundo fator: sem o código, `segundo-fator` (e passa a perguntar sempre); o código errado, `senha`
+    expect((await um.os.adicionarVpnEmpresa(nova({ protocolo: 'fortinet', servidor: 'vpn.exemplo.local:10443', usuario: 'dois' }))).ok).toBe(true);
+    const dois = (await um.os.vpns()).find((v) => v.usuario === 'dois')?.nome ?? '?';
+    expect(await um.os.ligarVpn(dois)).toEqual({ ok: false, erro: 'segundo-fator' });
+    expect(await um.os.ligarVpn(dois, null, null, { codigo: '000000' })).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.ligarVpn(dois, null, null, { codigo: 'com espaço' })).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.ligarVpn(dois, null, null, { codigo: '123456' })).toEqual({ ok: true, nome: dois });
+    // o SSO e o servidor que não responde
+    expect((await um.os.adicionarVpnEmpresa(nova({ servidor: 'sso.exemplo.local' }))).ok).toBe(true);
+    expect(await um.os.ligarVpn('sso-exemplo-loc')).toEqual({ ok: false, erro: 'sso' });
+    expect((await um.os.adicionarVpnEmpresa(nova({ servidor: 'nao.existe' }))).ok).toBe(true);
+    expect(await um.os.ligarVpn('nao-existe')).toEqual({ ok: false, erro: 'servidor' });
+    await um.os.esquecerVpn('sso-exemplo-loc');
+    await um.os.esquecerVpn('nao-existe');
+
+    const lista = await um.os.vpns();
+    expect(lista.map((v) => [v.nome, v.tipo, v.protocolo, v.servidor, v.temSenha, v.pedeCodigo])).toEqual([
+      ['vpn-exemplo-loc', 'openconnect', 'anyconnect', 'vpn.exemplo.local', true, false],
+      ['autoassinado-ex', 'openconnect', 'gp', 'autoassinado.exemplo.local:8443', true, false],
+      [dois, 'openconnect', 'fortinet', 'vpn.exemplo.local:10443', true, true],
+    ]);
+    expect(JSON.stringify(lista)).not.toContain('vpn123');
+    // a que pede código não liga sozinha
+    await um.os.vpnSozinha(dois, true);
+    expect((await um.os.conectar('Biblioteca', null)).ok).toBe(true);
+    for (const v of await um.os.vpns()) if (v.ligada) await um.os.desligarVpn(v.nome);
+    await um.os.vpnSozinha(dois, true);
+    expect(await um.os.vezDaVpn()).toBeNull();
+    // nada em claro no pendrive: nem o servidor, nem a senha, nem o código
+    for (const a of todos(raiz)) {
+      const c = readFileSync(a);
+      expect(c.includes(Buffer.from('exemplo.local')) || c.includes(Buffer.from('vpn123')) || c.includes(Buffer.from('123456')), a).toBe(false);
+    }
+    await um.dados.trancar();
+
+    // o outro boot: as três voltam do cofre (o criar de novo), e o pin guardado liga sem perguntar
+    const outro = await abrir();
+    expect((await outro.dados.abrir('senha dos testes')).ok).toBe(true);
+    await outro.os.depoisDeAbrir();
+    await outro.os.vpnsVoltaram;
+    expect((await outro.os.vpns()).map((v) => [v.nome, v.tipo, v.pedeCodigo])).toEqual([
+      ['vpn-exemplo-loc', 'openconnect', false],
+      ['autoassinado-ex', 'openconnect', false],
+      [dois, 'openconnect', true],
+    ]);
+    expect(await outro.os.ligarVpn('autoassinado-ex')).toEqual({ ok: true, nome: 'autoassinado-ex' });
+    // o código nunca é guardado: pede de novo
+    expect(await outro.os.ligarVpn(dois)).toEqual({ ok: false, erro: 'segundo-fator' });
+    await outro.dados.trancar();
   });
 });
