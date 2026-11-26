@@ -103,6 +103,19 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
   dizer "brilho ${luz:-sem-luz}"
 ) &
 
+# A VPN de empresa (W5a): quando o agente termina o teste dela (/run/ekfrase/teste/vpn-empresa-fim), o que o
+# NetworkManager e o openconnect disseram vai para a serial ("nm …"; o writer não lê o journal)
+(
+  [ -e /run/ekfrase/teste/vpn-empresa ] || exit 0
+  for _ in $(seq 1 900); do [ -e /run/ekfrase/teste/vpn-empresa-fim ] && break; sleep 1; done
+  # tudo o que o NetworkManager (e o plugin, que é filho dele) disse desde o 1º "starting openconnect"
+  journalctl -b --no-pager -o cat -u NetworkManager 2>/dev/null | sed -n '/starting openconnect/,$p' | head -n 150 | while IFS= read -r l; do dizer "nm $l"; done
+  # e o openconnect (com --syslog) e o plugin, em qualquer unidade
+  journalctl -b --no-pager -o short-monotonic --grep 'openconnect|vpn0|cookie|CSTP|servercert' 2>/dev/null | grep -v 'ekfrase-teste\|relato' | tail -n 60 | while IFS= read -r l; do dizer "nm-oc $l"; done
+  dizer "nm usuario-plugin $(getent passwd nm-openconnect | cut -d: -f1,3 || echo nenhum)"
+  dizer "nm fim"
+) &
+
 # As medidas (P3, 18/11: o tempo da janela e a memória): "medida …"
 #   janela <s desde o boot> <s desde a sessão>: quando a casca avisou que a janela apareceu (/run/ekfrase/sessao/pronta)
 #   memoria <quando> usada <MB> pss <MB> [<processo>=<MB>…]: o sistema todo (MemTotal − MemAvailable) e o PSS dos
