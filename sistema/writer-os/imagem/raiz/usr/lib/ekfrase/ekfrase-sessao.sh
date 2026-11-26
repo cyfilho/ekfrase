@@ -33,8 +33,11 @@ while true; do
   TECLADO=$(grep -o '"teclado"[[:space:]]*:[[:space:]]*"[a-z-]*"' "$ARQ" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
   VARIANTE=
   case "$TECLADO" in
-    us | gb | pt | es | de | fr) LAYOUT=$TECLADO ;;
+    us | gb | pt | es | latam | fr | ca | be | ch | de | it | se | no | dk | fi | pl | tr) LAYOUT=$TECLADO ;;
     us-intl) LAYOUT=us VARIANTE=intl ;;
+    us-dvorak) LAYOUT=us VARIANTE=dvorak ;;
+    us-colemak) LAYOUT=us VARIANTE=colemak ;;
+    ch-fr) LAYOUT=ch VARIANTE=fr ;;
     *) LAYOUT=br ;;
   esac
   XKB_DEFAULT_LAYOUT=$LAYOUT XKB_DEFAULT_VARIANT=$VARIANTE cage -d -- /opt/ekfrase-writer/ekfrase-writer --modo-os --ozone-platform=wayland

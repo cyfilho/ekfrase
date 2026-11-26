@@ -474,10 +474,23 @@ def teste_completo(imagem, pasta):
         ok(q.esperar('texto falta', b, 60) is not None, 'no primeiro boot, o texto de teste ainda não existe')
         ok(q.esperar('usb ok', b, 60) is not None, 'o 2º pendrive (OUTRO) monta e aceita um arquivo')
         ok(q.esperar('interno negado', b, 60) is not None, 'o disco interno (virtio) NÃO monta')
+        # a VPN (PLANO §7, W4): o agente importa um .conf de WireGuard pelo ekfrase-vpn.service, como a tela faz
+        i = q.esperar(re.compile(r'^vpn importar '), b, 90)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok(l == 'vpn importar ok', f'a VPN: o nmcli connection import aceitou o .conf de WireGuard ({l})')
+        i = q.esperar(re.compile(r'^vpn dono '), b, 20)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok(l == 'vpn dono user:writer', f'a VPN: a conexão importada é do writer ({l})')
         ok(q.esperar('gravado 5', b, 60) is not None, 'o agente grava')
         ok(q.esperar('diagnostico ok', b, 240) is not None, 'o diagnóstico foi gravado na EKFRASE-DADOS (Ekfrase Writer/.diagnostico)')
         ok(q.esperar('diagnostico mac 0', b, 5) is not None, 'o diagnóstico não tem o endereço (MAC) da placa de rede (Bloco F)')
         ok(q.esperar('quedas 0', b, 5) is not None, 'a sessão não caiu nenhuma vez')
+        i = q.esperar(re.compile(r'^diagnostico renderer '), b, 5)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok(re.fullmatch(r'diagnostico renderer (auto|pixman)', l) is not None, f'o diagnóstico (root, achado 2) ainda lê o que a sessão escreveu ({l})')
+        i = q.esperar(re.compile(r'^opcoes-dados '), b, 5)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok('nosymfollow' in l.split(' ', 1)[-1].split(','), f'a EKFRASE-DADOS monta sem seguir links (achado 1: {l})')
         # o Num Lock (18/11): o ekfrase-numlock apertou numa tecla virtual e a luz do teclado do QEMU acendeu
         i = q.esperar(re.compile(r'^numlock '), b, 60)
         ok(i is not None and q.linhas()[i] == 'numlock ligado', f'o Num Lock fica ligado na sessão ({q.linhas()[i] if i is not None else "sem resposta"})')
@@ -502,6 +515,9 @@ def teste_completo(imagem, pasta):
         q.tecla('ret')
         ok(q.esperar('texto ok', b, 60) is not None, '4. escrever → reiniciar → a senha → o texto está lá')
         ok(q.esperar('integridade ok', b, 60) is not None, '4. o banco está íntegro')
+        i = q.esperar(re.compile(r'^vpns \d+$'), b, 60)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok(l == 'vpns 1', f'a VPN volta do cofre no outro boot ({l})')
 
         # ---------- arrancar o pendrive no meio de uma gravação ----------
         inicio = len(q.linhas())
@@ -1036,6 +1052,35 @@ def teste_voltar(imagem, pasta, srv):
         q.desligar()
 
 
+def teste_link_ext4(imagem, pasta):
+    """O ACHADO 1 DA REVISÃO DE SEGURANÇA (W4, 25/11): na EKFRASE-DADOS ext4 (discos de 1 TB ou mais) o writer pode deixar um
+    link, e o ekfrase-dados.sh (root) seguia "Ekfrase Writer" no chown: dava ao writer o ekfrase-atualizar.sh. Aqui a
+    partição já vem ext4 com o link plantado (como quem tem o HD na mão): o boot tem de deixar a partição de fora
+    (sem-dados nao-grava) e o script continuar do root."""
+    q = Qemu(imagem, pasta, secure=False, nome='link-ext4')
+    subprocess.run(['sgdisk', '-e', '-n', '2:0:+256M', '-t', '2:8300', '-c', '2:EKFRASE-DADOS', q.disco], check=True, stdout=subprocess.DEVNULL)
+    raiz = os.path.join(q.trab, 'raiz-ext4')
+    os.makedirs(raiz)
+    os.symlink('/usr/lib/ekfrase/ekfrase-atualizar.sh', os.path.join(raiz, 'Ekfrase Writer'))
+    ext4 = os.path.join(q.trab, 'dados-ext4.img')
+    with open(ext4, 'wb') as f:
+        f.truncate(256 * M)
+    subprocess.run(['mkfs.ext4', '-q', '-F', '-L', 'EKFR-DADOS', '-d', raiz, '-E', 'root_owner=1000:1000', ext4], check=True, stdout=subprocess.DEVNULL)
+    escrever_em(q.disco, particoes(q.disco)[2][0], ext4)
+    os.remove(ext4)
+    q.ligar()
+    try:
+        b = q.boot()
+        i = q.esperar(re.compile(r'^dados '), b, 30)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok('"motivo":"nao-grava"' in l, f'link no ext4: a partição de dados fica de fora ({l})')
+        i = q.esperar(re.compile(r'^dono-atualizar '), b, 30)
+        l = q.linhas()[i] if i is not None else 'sem resposta'
+        ok(l == 'dono-atualizar root', f'link no ext4: o ekfrase-atualizar.sh continua do root ({l})')
+    finally:
+        q.desligar()
+
+
 def teste_sem_secure_boot(imagem, pasta):
     q = Qemu(imagem, pasta, secure=False, nome='sb-desligado')
     q.ligar()
@@ -1128,6 +1173,7 @@ def main():
         if srv:
             teste_atualizar(args.imagem, args.prints, srv)
             teste_voltar(args.imagem, args.prints, srv)
+        teste_link_ext4(args.imagem, args.prints)
         teste_sem_secure_boot(args.imagem, args.prints)
     if srv:
         srv.fechar()

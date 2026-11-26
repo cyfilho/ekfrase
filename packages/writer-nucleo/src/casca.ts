@@ -331,7 +331,36 @@ export interface ItemDePasta {
 
 export type ListaDePasta = { ok: true; caminho: string; itens: ItemDePasta[] } | { ok: false; erro: ErroSistema };
 
+/**
+ * A internet de verdade (o teste de conectividade do NetworkManager; PLANO §7, o portal cativo): `internet`, `portal`
+ * (a rede pede login numa página), `sem` (conectado à rede, mas a internet não respondeu) ou `desconhecida`.
+ */
+export type Conectividade = 'internet' | 'portal' | 'sem' | 'desconhecida';
+
 export type ErroSistema = 'senha' | 'falhou' | 'negado' | 'grande';
+
+/** Uma VPN do Writer OS (PLANO §7, "VPN"): WireGuard (`.conf`) ou OpenVPN (`.ovpn`). A senha nunca volta à página. */
+export interface VpnOS {
+  nome: string;
+  tipo: 'wireguard' | 'openvpn';
+  ligada: boolean;
+  /** O `.ovpn` pede usuário e senha (`auth-user-pass`). */
+  pedeSenha: boolean;
+  /** O usuário e a senha já estão guardados (cifrados, no cofre): Ligar não pergunta. */
+  temSenha: boolean;
+  /** O usuário guardado (para preencher o campo), ou `null`. */
+  usuario: string | null;
+  /** "Ligar sozinha quando houver internet" (padrão: não). */
+  sozinha: boolean;
+}
+
+/**
+ * O que deu errado com uma VPN: `tipo` (não é `.conf` nem `.ovpn`), `grande` (mais de 64 kB), `proibida` (o arquivo pede
+ * para rodar um programa: `diretiva` diz qual), `arquivo` (aponta para um arquivo de fora em vez do certificado
+ * embutido), `invalido` (não é um arquivo de VPN), `senha` (usuário ou senha recusados), `negado`, `falhou`.
+ */
+export type ErroVpn = 'tipo' | 'grande' | 'proibida' | 'arquivo' | 'invalido' | 'senha' | 'negado' | 'falhou';
+export type RespostaVpn = { ok: true; nome: string } | { ok: false; erro: ErroVpn; diretiva?: string };
 export type RespostaSistema = { ok: true } | { ok: false; erro: ErroSistema };
 
 export interface PonteSistema {
@@ -365,6 +394,24 @@ export interface PonteSistema {
   cabo(): Promise<Cabo | null>;
   /** Liga a internet por cabo (o NetworkManager já liga sozinho; isto só tenta de novo). */
   conectarCabo(): Promise<RespostaSistema>;
+  /** Pergunta ao sistema, agora, se a internet chega (o portal cativo: `portal`). */
+  internet(): Promise<Conectividade>;
+  /**
+   * Abre a página de login da rede (o portal cativo, PLANO §7) numa janela presa ao site dela, que fecha sozinha quando
+   * a internet aparece, com Esc ou em 10 min. Só abre se o sistema diz `portal`. Devolve a conectividade ao fechar.
+   */
+  abrirPortal(): Promise<Conectividade>;
+  /** As VPNs (as importadas neste boot e as que voltaram do cofre). */
+  vpns(): Promise<VpnOS[]>;
+  /** Importa um `.conf` (WireGuard) ou `.ovpn` (OpenVPN), até 64 kB; vai também, cifrado, para o cofre. */
+  importarVpn(arquivo: string, bytes: Uint8Array): Promise<RespostaVpn>;
+  /** Liga. No OpenVPN que pede, o usuário e a senha (guardados no cofre se der certo); sem eles, os guardados. */
+  ligarVpn(nome: string, usuario?: string | null, senha?: string | null): Promise<RespostaVpn>;
+  desligarVpn(nome: string): Promise<RespostaVpn>;
+  /** Tira do sistema e do cofre. */
+  esquecerVpn(nome: string): Promise<void>;
+  /** "Ligar sozinha quando houver internet" (depois do portal, se houver). */
+  vpnSozinha(nome: string, sim: boolean): Promise<VpnOS[]>;
   /** Guarda um feedback no aparelho, para enviar quando a internet voltar. */
   guardarFeedback(f: Omit<FeedbackGuardado, 'id'>): Promise<RespostaSistema>;
   feedbacksGuardados(): Promise<FeedbackGuardado[]>;
@@ -387,7 +434,8 @@ export interface PonteSistema {
    * trabalham com um arquivo (nunca por cima de um que já existe: o nome ganha " (2)").
    */
   abrirDisco(id: string): Promise<{ ok: true; raiz: string } | { ok: false; erro: ErroSistema }>;
-  listar(caminho: string): Promise<ListaDePasta>;
+  /** `tipo: 'vpn'` mostra só os arquivos de VPN (`.conf`, `.ovpn`) em vez dos que o Writer importa. */
+  listar(caminho: string, tipo?: 'vpn'): Promise<ListaDePasta>;
   lerArquivo(caminho: string): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; erro: ErroSistema }>;
   gravarArquivo(pasta: string, nome: string, bytes: Uint8Array): Promise<{ ok: true; nome: string } | { ok: false; erro: ErroSistema }>;
   /** Desliga e reinicia: os textos fecham antes (a página grava antes de pedir). */

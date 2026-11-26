@@ -24,6 +24,9 @@ for b in sudo su doas pkexec login agetty getty sulogin apt apt-get dpkg; do
 done
 find / -xdev -type f -perm /6000 2>/dev/null | while IFS= read -r f; do dizer "suid $f"; done
 dizer "binarios conferidos"
+# a revisão de segurança (W4, achado 1): /dados sem seguir links e o script root de atualizar ainda do root
+dizer "opcoes-dados $(findmnt -no OPTIONS /dados 2>/dev/null || echo nenhuma)"
+dizer "dono-atualizar $(stat -c %U /usr/lib/ekfrase/ekfrase-atualizar.sh)"
 dizer "grupos $(id -nG writer)"
 dizer "shell-root $(getent passwd root | cut -d: -f7)"
 dizer "root $(passwd -S root 2>/dev/null | awk '{print $2}')"
@@ -75,6 +78,14 @@ achar_cage() { for d in /proc/[0-9]*; do [ "$(cat "$d/comm" 2>/dev/null)" = cage
         grep -rqiF "$m" /dados/'Ekfrase Writer'/.diagnostico/ && mac=$((mac + 1))
       done
       dizer "diagnostico mac $mac"
+      # o achado 2: o root lê o que a sessão escreveu sem seguir link; o arquivo de verdade continua sendo lido
+      # (a 1ª foto, aos 20 s, pode vir antes da sessão: espera a de 60 s ou a de 180 s)
+      for _ in $(seq 1 100); do
+        r=$(sed -n 's/^renderer: //p' /dados/'Ekfrase Writer'/.diagnostico/*/resumo.txt 2>/dev/null | tail -1)
+        [ "$r" = auto ] || [ "$r" = pixman ] && break
+        sleep 2
+      done
+      dizer "diagnostico renderer ${r:-?}"
       dizer "diagnostico ok"; exit 0
     fi
     sleep 2

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# Importar uma VPN (PLANO §7, "VPN"): o pedido chega por este socket, que só o grupo writer abre.
+# Um ekfrase-vpn@.service (root) por conexão; ele lê uma linha e só aceita "importar …".
+[Unit]
+Description=Ekfrase Writer OS: o pedido de importar uma VPN
+
+[Socket]
+ListenStream=/run/ekfrase/vpn.sock
+SocketUser=root
+SocketGroup=writer
+SocketMode=0660
+Accept=yes
+MaxConnections=2
+
+[Install]
+WantedBy=sockets.target

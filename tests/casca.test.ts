@@ -22,6 +22,9 @@ import { DadosDoWriter, NOME_DA_PASTA } from '../sistema/writer-os/casca/src/wri
 import { ARQUIVO_DO_SELO, dadosSimulados, passoDaTecla, WriterOS } from '../sistema/writer-os/casca/src/writer/os.ts';
 import type { Pagina } from '../sistema/writer-os/casca/src/writer/pagina.ts';
 import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../sistema/writer-os/casca/src/motor/selo.ts';
+import { abrirNaMesma, deixarPassar, lerConectividade, siteDe } from '../sistema/writer-os/casca/src/motor/portal-regras.ts';
+import { COM_ARQUIVO_OVPN, filtrarOvpn, filtrarWireguard, nomeDaVpn, PROIBIDAS_OVPN, PROIBIDAS_WIREGUARD, qualLigarSozinha, tipoDaVpn } from '../sistema/writer-os/casca/src/motor/vpn-regras.ts';
+import { lerRespostaVpn, lerVpnsNmcli } from '../sistema/writer-os/casca/src/motor/sistema.ts';
 
 const pastas: string[] = [];
 const temp = (): string => {
@@ -623,5 +626,231 @@ describe('Writer OS: o feedback guardado sem internet fica selado (Bloco F, segu
     expect(abrirSelado(par.privada, JSON.stringify({ ...j, dados: b.toString('base64') }))).toBeNull();
     expect(abrirSelado(par.privada, 'lixo')).toBeNull();
     expect(publicaDaPrivada(par.privada)).toBe(par.publica);
+  });
+});
+
+describe('Writer OS: a janela do portal cativo (PLANO §7, W4)', () => {
+  it('o site de cada endereço: o IP, localhost, ou os dois últimos nomes (três em com.br, co.uk…)', () => {
+    expect(siteDe('http://wifi.hotel.com.br/entrar')).toBe('hotel.com.br');
+    expect(siteDe('https://login.cafe.co.uk/x')).toBe('cafe.co.uk');
+    expect(siteDe('https://portal.rede.net/a?b=1')).toBe('rede.net');
+    expect(siteDe('http://192.168.0.1:8080/login')).toBe('192.168.0.1');
+    expect(siteDe('http://[fe80::1]/')).toBe('[fe80::1]');
+    expect(siteDe('http://localhost:3000/')).toBe('localhost');
+    expect(siteDe('http://com.br/')).toBe('com.br');
+    for (const fora of ['file:///etc/passwd', 'app://writer/writer/', 'chrome://gpu', 'javascript:alert(1)', 'ftp://x.com/', 'lixo']) expect(siteDe(fora)).toBeNull();
+  });
+
+  it('a primeira cadeia ensina os sites do portal; depois, só se navega dentro deles', () => {
+    const sites = new Set<string>();
+    // o teste do NetworkManager e o redirecionamento do hotel: os dois viram sites do portal
+    expect(deixarPassar('http://network-test.debian.org/nm', 'principal', sites, true)).toBe(true);
+    expect(deixarPassar('https://wifi.hotel.com.br/entrar', 'principal', sites, true)).toBe(true);
+    expect([...sites].sort()).toEqual(['debian.org', 'hotel.com.br']);
+    // depois da 1ª página: dentro do portal, sim; fora, não (página e quadro)
+    expect(deixarPassar('https://pagar.hotel.com.br/ok', 'principal', sites, false)).toBe(true);
+    expect(deixarPassar('https://outro-site.com/', 'principal', sites, false)).toBe(false);
+    expect(deixarPassar('https://anuncio.com/q', 'quadro', sites, false)).toBe(false);
+    expect(deixarPassar('https://wifi.hotel.com.br/q', 'quadro', sites, false)).toBe(true);
+    // recursos (imagem, estilo, script) de outro site passam; esquemas estranhos, nunca
+    expect(deixarPassar('https://cdn.exemplo.net/estilo.css', 'outro', sites, false)).toBe(true);
+    expect(deixarPassar('data:image/png;base64,AAAA', 'outro', sites, false)).toBe(true);
+    expect(deixarPassar('data:text/html,<b>oi</b>', 'principal', sites, false)).toBe(false);
+    expect(deixarPassar('file:///dados/x', 'outro', sites, false)).toBe(false);
+    expect(deixarPassar('file:///dados/x', 'principal', sites, true)).toBe(false);
+    expect(deixarPassar('about:blank', 'quadro', sites, false)).toBe(true);
+    expect(deixarPassar('about:blank', 'principal', sites, false)).toBe(false);
+    expect(sites.size).toBe(2);
+  });
+
+  it('janela nova só se for um site do portal (e abre na mesma)', () => {
+    const sites = new Set(['hotel.com.br']);
+    expect(abrirNaMesma('https://termos.hotel.com.br/', sites)).toBe(true);
+    expect(abrirNaMesma('https://facebook.com/', sites)).toBe(false);
+    expect(abrirNaMesma('file:///etc/passwd', sites)).toBe(false);
+  });
+
+  it('o que o NetworkManager responde vira internet, portal, sem ou desconhecida', () => {
+    expect(lerConectividade(' full \t')).toBe('internet');
+    expect(lerConectividade('portal')).toBe('portal');
+    expect(lerConectividade('limited')).toBe('sem');
+    expect(lerConectividade('none')).toBe('sem');
+    expect(lerConectividade('unknown')).toBe('desconhecida');
+    expect(lerConectividade('')).toBe('desconhecida');
+  });
+
+  it('o simulado: sem rede = sem; com EKFRASE_CASCA_OS_PORTAL, o /nm diz se é portal', async () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'ekfrase-portal-'));
+    const antes = process.env['EKFRASE_CASCA_OS_PORTAL'];
+    const { createServer } = await import('node:http');
+    let entrou = false;
+    const srv = createServer((q, r) => {
+      if (q.url === '/nm' && entrou) r.writeHead(204, { 'X-NetworkManager-Status': 'online' }).end();
+      else r.writeHead(302, { location: '/entrar' }).end();
+    });
+    await new Promise<void>((ok) => srv.listen(0, '127.0.0.1', ok));
+    try {
+      const porta = (srv.address() as { port: number }).port;
+      process.env['EKFRASE_CASCA_OS_PORTAL'] = `http://127.0.0.1:${porta}/`;
+      const s = new SistemaSimulado(raiz, false);
+      expect(s.enderecoDoTeste()).toBe(`http://127.0.0.1:${porta}/nm`);
+      expect(await s.conectividade()).toBe('sem');
+      await s.conectar('Biblioteca', null);
+      expect(await s.conectividade()).toBe('portal');
+      entrou = true;
+      expect(await s.conectividade()).toBe('internet');
+      delete process.env['EKFRASE_CASCA_OS_PORTAL'];
+      const sem = new SistemaSimulado(raiz, false);
+      await sem.conectar('Biblioteca', null);
+      expect(sem.enderecoDoTeste()).toBeNull();
+      expect(await sem.conectividade()).toBe('internet');
+    } finally {
+      srv.close();
+      if (antes === undefined) delete process.env['EKFRASE_CASCA_OS_PORTAL'];
+      else process.env['EKFRASE_CASCA_OS_PORTAL'] = antes;
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Writer OS: a VPN (PLANO §7, W4 parte 2c)', { timeout: 60_000 }, () => {
+  const CHAVE = Buffer.alloc(32, 7).toString('base64');
+  const WG = `[Interface]\nPrivateKey = ${CHAVE}\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = ${CHAVE}\nAllowedIPs = 0.0.0.0/0\nEndpoint = vpn.exemplo.org:51820\n`;
+  const OVPN = ['client', 'dev tun', 'remote vpn.escola.example 1194', 'remote 203.0.113.7 443 tcp', 'persist-tun', 'user nobody', 'auth-user-pass', '<ca>', '-----BEGIN CERTIFICATE-----', 'up /bin/sh', '-----END CERTIFICATE-----', '</ca>', 'verb 3', ''].join('\n');
+
+  it('o tipo vem da extensão e o nome é limpo, curto (até 15) e sem repetir', () => {
+    expect(tipoDaVpn('Casa.CONF')).toBe('wireguard');
+    expect(tipoDaVpn('escola.ovpn')).toBe('openvpn');
+    expect(tipoDaVpn('notas.txt')).toBeNull();
+    expect(nomeDaVpn('Proton São Paulo #12.conf', [])).toBe('Proton-Sao-Paul');
+    expect(nomeDaVpn('/media/x/../wg0.conf', [])).toBe('wg0');
+    expect(nomeDaVpn('wg0.conf', ['WG0'])).toBe('wg0-2');
+    expect(nomeDaVpn('....ovpn', [])).toBe('vpn');
+    expect(nomeDaVpn('abcdefghijklmnopq.conf', ['abcdefghijklmno'])).toBe('abcdefghijklm-2');
+  });
+
+  it('o .ovpn: certificados embutidos e usuário/senha passam; programa e arquivo do sistema, não', () => {
+    // o "up" dentro do bloco <ca> é só texto do certificado
+    expect(filtrarOvpn(OVPN)).toEqual({ ok: true, pedeSenha: true, servidores: ['vpn.escola.example', '203.0.113.7'] });
+    expect(filtrarOvpn('client\nremote a.example\nca [inline]\n<ca>\nx\n</ca>\n')).toMatchObject({ ok: true, pedeSenha: false });
+    expect(filtrarOvpn('client\nremote a.example\nup /bin/sh -c id\n')).toEqual({ ok: false, erro: 'proibida', diretiva: 'up' });
+    expect(filtrarOvpn('client\nremote a.example\n  --Script-Security 2\n')).toEqual({ ok: false, erro: 'proibida', diretiva: 'script-security' });
+    expect(filtrarOvpn('client\nremote a.example\nmanagement-hold\n')).toMatchObject({ ok: false, erro: 'proibida' });
+    expect(filtrarOvpn('client\nremote a.example\nplugin /x.so\n')).toMatchObject({ ok: false, erro: 'proibida' });
+    expect(filtrarOvpn('client\nremote a.example\n<script>\nx\n</script>\n')).toEqual({ ok: false, erro: 'proibida', diretiva: '<script>' });
+    expect(filtrarOvpn('client\nremote a.example\nca /etc/shadow\n')).toEqual({ ok: false, erro: 'arquivo', diretiva: 'ca' });
+    expect(filtrarOvpn('client\nremote a.example\nauth-user-pass /etc/senha\n')).toEqual({ ok: false, erro: 'arquivo', diretiva: 'auth-user-pass' });
+    expect(filtrarOvpn('client\nremote a.example\nhttp-proxy p 8080 /etc/passwd\n')).toMatchObject({ ok: false, erro: 'arquivo' });
+    expect(filtrarOvpn('client\nremote a.example\nhttp-proxy p 8080 auto\n')).toMatchObject({ ok: true });
+    expect(filtrarOvpn('client\n<ca>\nx\n')).toEqual({ ok: false, erro: 'invalido' });
+    expect(filtrarOvpn('client\ndev tun\n')).toEqual({ ok: false, erro: 'invalido' });
+    expect(filtrarOvpn('client\nremote a\n\0')).toEqual({ ok: false, erro: 'invalido' });
+    // <connection> só agrupa diretivas comuns: elas são olhadas do mesmo jeito
+    expect(filtrarOvpn('client\n<connection>\nremote a.example\nup /x\n</connection>\n')).toMatchObject({ ok: false, erro: 'proibida' });
+  });
+
+  it('o .conf do WireGuard: a chave e o par; PostUp e afins, não', () => {
+    expect(filtrarWireguard(WG)).toEqual({ ok: true, pedeSenha: false, servidores: ['vpn.exemplo.org'] });
+    expect(filtrarWireguard(WG.replace('Endpoint = vpn.exemplo.org:51820', 'Endpoint = [2001:db8::1]:51820'))).toMatchObject({ servidores: ['2001:db8::1'] });
+    expect(filtrarWireguard(`${WG}PostUp = iptables -F\n`)).toEqual({ ok: false, erro: 'proibida', diretiva: 'PostUp' });
+    expect(filtrarWireguard(WG.replace(/PublicKey = .*/, 'PublicKey = curta'))).toEqual({ ok: false, erro: 'invalido' });
+    expect(filtrarWireguard('[Interface]\nPrivateKey = x\n')).toEqual({ ok: false, erro: 'invalido' });
+    expect(filtrarWireguard('isto não é uma VPN')).toEqual({ ok: false, erro: 'invalido' });
+  });
+
+  it('o ekfrase-vpn.sh da imagem (que importa como root) recusa pela MESMA lista', () => {
+    const sh = readFileSync('sistema/writer-os/imagem/raiz/usr/lib/ekfrase/ekfrase-vpn.sh', 'utf8');
+    const lista = (nome: string) => (new RegExp(`^${nome}='([^']*)'$`, 'm').exec(sh)?.[1] ?? '').split('|').sort();
+    expect(lista('PROIBIDAS')).toEqual([...PROIBIDAS_OVPN].sort());
+    expect(lista('ARQUIVOS')).toEqual([...COM_ARQUIVO_OVPN].sort());
+    expect(lista('PROIBIDAS_WG')).toEqual([...PROIBIDAS_WIREGUARD].sort());
+    // o nome: o mesmo padrão da casca
+    expect(sh).toContain('([A-Za-z0-9_-]{1,15})');
+  });
+
+  it('as respostas do sistema: a lista do nmcli e o que o serviço diz', () => {
+    expect(lerVpnsNmcli('Casa:802-11-wireless:activated\ncasa:wireguard:activated\nescola:vpn:\nCabo:802-3-ethernet:activated\n')).toEqual([
+      { nome: 'casa', tipo: 'wireguard', ligada: true },
+      { nome: 'escola', tipo: 'openvpn', ligada: false },
+    ]);
+    expect(lerRespostaVpn('ok')).toEqual({ ok: true });
+    expect(lerRespostaVpn('erro proibida')).toEqual({ ok: false, erro: 'proibida' });
+    expect(lerRespostaVpn('erro importar')).toEqual({ ok: false, erro: 'invalido' });
+    expect(lerRespostaVpn('erro dono')).toEqual({ ok: false, erro: 'negado' });
+    expect(lerRespostaVpn(null)).toEqual({ ok: false, erro: 'falhou' });
+  });
+
+  it('Portal + VPN: a que liga sozinha só liga com a internet de verdade, uma por vez, e não a desligada à mão', () => {
+    const v = (nome: string, o: Partial<{ ligada: boolean; sozinha: boolean; faltaSenha: boolean }> = {}) => ({ nome, ligada: false, sozinha: true, faltaSenha: false, ...o });
+    expect(qualLigarSozinha([v('casa')], 'portal', new Set())).toBeNull();
+    expect(qualLigarSozinha([v('casa')], 'sem', new Set())).toBeNull();
+    expect(qualLigarSozinha([v('casa')], 'internet', new Set())).toBe('casa');
+    expect(qualLigarSozinha([v('casa', { sozinha: false }), v('escola')], 'internet', new Set())).toBe('escola');
+    expect(qualLigarSozinha([v('casa'), v('escola', { ligada: true })], 'internet', new Set())).toBeNull();
+    expect(qualLigarSozinha([v('casa')], 'internet', new Set(['casa']))).toBeNull();
+    expect(qualLigarSozinha([v('casa', { faltaSenha: true })], 'internet', new Set())).toBeNull();
+  });
+
+  it('importar, ligar com senha, o cofre e a volta no outro boot (simulado)', async () => {
+    const raiz = temp();
+    const semPagina = { aberta: () => false } as unknown as Pagina;
+    const abrir = async () => {
+      const sistema = new SistemaSimulado(raiz, false);
+      mkdirSync(sistema.caminhos.dados, { recursive: true });
+      writeFileSync(join(sistema.caminhos.run, 'dados.json'), dadosSimulados(true, 'usb'));
+      const os = new WriterOS(sistema);
+      const dados = new DadosDoWriter({ lembrado: join(raiz, 'perfil', 'casca.json'), sugerida: join(raiz, 'Documentos'), servidor: () => ({ base: 'https://ekfrase.com/api/v1/', padrao: true }), atrasoDoEspelho: 0 });
+      await os.ligar({ dados, pagina: semPagina, sair: async () => undefined, versaoApp: '0' });
+      return { os, dados };
+    };
+    const bytes = (t: string) => new Uint8Array(Buffer.from(t));
+    const um = await abrir();
+    expect((await um.dados.criarSenha('senha dos testes')).ok).toBe(true);
+    await um.os.depoisDeAbrir();
+    expect(await um.os.importarVpn('Casa.conf', bytes(WG))).toEqual({ ok: true, nome: 'Casa' });
+    expect(await um.os.importarVpn('escola.ovpn', bytes(OVPN))).toEqual({ ok: true, nome: 'escola' });
+    expect(await um.os.importarVpn('ruim.ovpn', bytes('client\nremote a\nup /bin/sh\n'))).toEqual({ ok: false, erro: 'proibida', diretiva: 'up' });
+    expect(await um.os.importarVpn('grande.conf', new Uint8Array(70 * 1024))).toEqual({ ok: false, erro: 'grande' });
+    expect(await um.os.importarVpn('notas.txt', bytes('x'))).toEqual({ ok: false, erro: 'tipo' });
+    expect(await um.os.importarVpn('Casa.conf', bytes(WG))).toEqual({ ok: true, nome: 'Casa-2' });
+    await um.os.esquecerVpn('Casa-2');
+
+    expect(await um.os.ligarVpn('Casa')).toEqual({ ok: true, nome: 'Casa' });
+    expect(await um.os.ligarVpn('escola')).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.ligarVpn('escola', 'aluno', 'errada')).toEqual({ ok: false, erro: 'senha' });
+    expect(await um.os.ligarVpn('escola', 'aluno', 'vpn123')).toEqual({ ok: true, nome: 'escola' });
+    let lista = await um.os.vpns();
+    expect(lista.map((v) => [v.nome, v.ligada, v.pedeSenha, v.temSenha, v.usuario])).toEqual([
+      ['Casa', false, false, false, null],
+      ['escola', true, true, true, 'aluno'],
+    ]);
+    expect(JSON.stringify(lista)).not.toContain('vpn123');
+    expect((await um.os.desligarVpn('escola')).ok).toBe(true);
+    await um.os.vpnSozinha('Casa', true);
+    // nada da VPN em claro no pendrive (o arquivo, o usuário e a senha vão cifrados no cofre)
+    for (const a of todos(raiz)) {
+      const c = readFileSync(a);
+      expect(c.includes(Buffer.from('vpn.escola.example')) || c.includes(Buffer.from('vpn123')) || c.includes(Buffer.from(CHAVE)), a).toBe(false);
+    }
+    await um.dados.trancar();
+
+    // o outro boot: o NetworkManager começa vazio; dada a senha, as VPNs voltam do cofre (e a que liga sozinha, com a internet)
+    const dois = await abrir();
+    expect(await dois.os.vpns()).toEqual([]);
+    expect((await dois.dados.abrir('senha dos testes')).ok).toBe(true);
+    await dois.os.depoisDeAbrir();
+    await dois.os.vpnsVoltaram;
+    lista = await dois.os.vpns();
+    expect(lista.map((v) => [v.nome, v.temSenha, v.sozinha])).toEqual([
+      ['Casa', false, true],
+      ['escola', true, false],
+    ]);
+    // sem rede, nada liga sozinha; com a rede (o simulado: conectado = internet), a "Casa" liga
+    expect(await dois.os.vezDaVpn()).toBeNull();
+    expect((await dois.os.conectar('Biblioteca', null)).ok).toBe(true);
+    expect(await dois.os.vezDaVpn()).toBe('Casa');
+    // a senha guardada liga a escola sem perguntar
+    expect(await dois.os.ligarVpn('escola')).toEqual({ ok: true, nome: 'escola' });
+    await dois.dados.trancar();
   });
 });

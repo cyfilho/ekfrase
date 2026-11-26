@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 
 export interface Bloqueio {
-  tipo: 'navegar' | 'janela' | 'tecla' | 'permissao' | 'webview' | 'rede-pagina' | 'rede' | 'devtools' | 'ponte';
+  tipo: 'navegar' | 'janela' | 'tecla' | 'permissao' | 'webview' | 'rede-pagina' | 'rede' | 'devtools' | 'ponte' | 'portal';
   alvo: string;
 }
 

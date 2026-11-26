@@ -63,7 +63,16 @@ nomes_de_rede() {
   ( umask 077
     { nmcli -g NAME connection show 2>/dev/null   # a casca dá à conexão o nome da rede (sistema.ts)
       nmcli -g SSID device wifi list --rescan no 2>/dev/null
+      cat /run/ekfrase/vpn-servidores 2>/dev/null   # os servidores das VPNs (o ekfrase-vpn.sh anota; W4)
     } | grep -v '^$' | sort -u > "$REDES.tmp" && mv -f "$REDES.tmp" "$REDES" )
+}
+
+# O QUE A SESSÃO (O WRITER) ESCREVEU (achado 2 da revisão de segurança, 25/11): a pasta é do writer, então o root
+# nunca segue um link dela (O_NOFOLLOW), não espera num FIFO (O_NONBLOCK + timeout), só lê arquivo comum e no máximo
+# 64 KB. Sem isso, um link para /dev/nvme0n1p3 copiava o disco interno para o pendrive, em claro.
+da_sessao() {
+  timeout 5 perl -e 'use Fcntl; sysopen(my $f, $ARGV[0], O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or exit 1;
+    -f $f or exit 1; my $b = ""; sysread($f, $b, 65536); print $b;' -- "$SESSAO/$1" 2>/dev/null
 }
 
 # o filtro; sem perl ou sem o filtro, nada passa
@@ -97,9 +106,9 @@ fotografar() {
     dmesg 2>/dev/null | grep -iE 'firmware|fw:|guc|huc|dmc' | grep -iE 'fail|error|missing|not found|-2' | tail -n 40 || true
     echo
     echo "== a sessão"
-    echo "renderer: $(cat "$SESSAO/renderer" 2>/dev/null || echo '?')"
+    echo "renderer: $(da_sessao renderer || echo '?')"
     echo "quedas do Cage (hora código segundos renderer):"
-    cat "$SESSAO/quedas" 2>/dev/null || echo "(nenhuma)"
+    da_sessao quedas || echo "(nenhuma)"
     echo "dados.json: $(cat /run/ekfrase/dados.json 2>/dev/null)"
     echo
     echo "== serviços que falharam"
@@ -119,7 +128,7 @@ proximo=${PROXIMOS[0]}
 i=0
 while true; do
   agora=$(cut -d. -f1 /proc/uptime)
-  n=$(wc -l < "$SESSAO/quedas" 2>/dev/null || echo 0)
+  n=$(da_sessao quedas | wc -l)
   if [ "$n" -gt "$quedas_vistas" ]; then
     quedas_vistas=$n
     fotografar "o Cage saiu ($n)"

@@ -66,6 +66,9 @@ export function App() {
         <RelogioOS />
         <AlertaDeBateria />
         <AvisoDeAtualizacao />
+        {/* a tela dos pendrives fica por cima de tudo: o importar dos Arquivos e o da VPN, que abre do menu do sistema
+            (também na tela inicial e no hall, onde as camadas do app não existem) */}
+        <PendriveOS />
       </>
     );
   }
@@ -275,7 +278,6 @@ function Casca() {
       {aberta === 'levar' && <Levar fechar={fechar} />}
       {(aberta === 'sistema' || aberta === 'hora') && <MenuSistema fechar={fechar} {...(aberta === 'hora' ? { secaoInicial: 'fuso' as const } : {})} />}
       {aberta === 'conta' && <EntrarOS fechar={fechar} />}
-      {noOS && <PendriveOS />}
       <Confirmacoes />
       <Avisos />
     </>
