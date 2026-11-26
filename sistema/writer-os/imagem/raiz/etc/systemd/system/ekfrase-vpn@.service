@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MPL-2.0
+# Um pedido de importar uma VPN (PLANO §7). A entrada e a saída são o socket; fala só com o NetworkManager (D-Bus).
+# Os certificados embutidos do .ovpn o plugin grava em $HOME/.cert/nm-openvpn: aqui, /var/lib/ekfrase-vpn (na memória,
+# como todo o sistema; a casca importa de novo do cofre a cada boot).
+[Unit]
+Description=Ekfrase Writer OS: importar uma VPN (um pedido)
+After=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ekfrase/ekfrase-vpn.sh
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+Environment=HOME=/var/lib/ekfrase-vpn
+StateDirectory=ekfrase-vpn
+StateDirectoryMode=0700
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ekfrase
+NoNewPrivileges=yes
+TimeoutSec=60

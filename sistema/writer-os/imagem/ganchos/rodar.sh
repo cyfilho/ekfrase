@@ -7,7 +7,10 @@
 set -euo pipefail
 R=$1
 
-cp -a "$AQUI/raiz/." "$R/"
+# sem levar o dono: no CI os arquivos de raiz/ são do usuário do runner (uid 1001), e o `cp -a` os punha assim na imagem
+# (o `/` e os scripts root, como o ekfrase-atualizar.sh, de um uid que nem existe nela; o qemu.py teste_link_ext4 viu
+# "dono-atualizar UNKNOWN" em 26/11). Copiando como root sem preservar o dono, tudo nasce do root.
+cp -a --no-preserve=ownership "$AQUI/raiz/." "$R/"
 chmod 0755 "$R"/usr/lib/ekfrase/*.sh "$R"/etc/initramfs-tools/hooks/ekfrase-*
 # o ekfrase-numlock, compilado pelo montar.sh (fonte/ekfrase-numlock.c)
 install -m 0755 "$NUMLOCK" "$R/usr/lib/ekfrase/ekfrase-numlock"

@@ -34,6 +34,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { anotar, criarJanela, ehDoApp, registrarEsquema, servirApp, travarApp, travarPermissoes, travas } from '../motor/janela.ts';
 import { lerLembrado } from '../motor/pastas.ts';
+import { abrirPortal } from '../motor/portal.ts';
 import { Rede } from '../motor/rede.ts';
 import { SistemaLinux, SistemaSimulado, type Sistema } from '../motor/sistema.ts';
 import { ligarAgente } from './agente-teste.ts';
@@ -188,6 +189,8 @@ void app.whenReady().then(async () => {
       dados,
       pagina,
       versaoApp: app.getVersion(),
+      // o portal cativo (PLANO §7): a janela presa ao site da página de login da rede
+      portal: (endereco) => abrirPortal({ endereco, conectividade: () => writerOS.internet(), pai: janela, telaCheia: !sistemaOS?.simulado }),
       sair: async () => {
         await writerOS.salvarPagina();
         await fecharDeVez();

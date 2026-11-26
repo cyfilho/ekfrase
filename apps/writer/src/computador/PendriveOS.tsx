@@ -4,7 +4,8 @@
  * A tela dos PENDRIVES do Writer OS (PLANO §6.5 item 5, §7): importar e salvar sem o seletor de arquivos
  * do Linux. Primeiro o pendrive, depois as pastas; só se enxerga o que está nos discos USB (a casca
  * recusa qualquer outro caminho). Tudo pelo teclado: Enter entra na pasta, a barra de espaço marca o
- * arquivo, Esc fecha. Quem pede é `pendrive.ts`.
+ * arquivo, Esc fecha. Quem pede é `pendrive.ts`. No pedido `vpn` (a parte "VPN" do menu, PLANO §7) a lista
+ * mostra só `.conf` e `.ovpn` (`listar(…, 'vpn')`) e cada arquivo é um botão: Enter escolhe aquele.
  */
 import type { DiscoUSB, ErroSistema, ItemDePasta } from '@ekfrase/writer-nucleo';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -43,6 +44,8 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
   useEffect(() => () => void (vivo.current = false), []);
 
   const caminho = (t: string[]): string => [raiz, ...t].join('/');
+  const vpn = pedido.tipo === 'vpn';
+  const listar = (c: string) => (vpn ? os.listar(c, 'vpn') : os.listar(c));
 
   // a lista mudou (escolheu o pendrive, entrou ou saiu de uma pasta): o foco vai ao primeiro item, nunca se perde
   useEffect(() => {
@@ -55,7 +58,7 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
     setOcupado(true);
     setErro(null);
     const a = await os.abrirDisco(d.id);
-    const l = a.ok ? await os.listar(a.raiz) : a;
+    const l = a.ok ? await listar(a.raiz) : a;
     if (!vivo.current) return;
     setOcupado(false);
     if (!l.ok) return setErro(textoDoErro(l.erro));
@@ -68,7 +71,7 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
 
   const irPara = async (nova: string[]) => {
     setErro(null);
-    const l = await os.listar(caminho(nova));
+    const l = await listar(caminho(nova));
     if (!vivo.current) return;
     if (!l.ok) return setErro(textoDoErro(l.erro));
     setTrilha(nova);
@@ -103,6 +106,21 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
     terminarPedido(lidos);
   };
 
+  /** VPN: um arquivo só, escolhido com Enter; quem pediu (a parte "VPN") manda à casca. */
+  const escolherVpn = async (nome: string) => {
+    setOcupado(true);
+    setErro(null);
+    const r = await os.lerArquivo(`${caminho(trilha)}/${nome}`);
+    if (!r.ok) {
+      if (vivo.current) {
+        setOcupado(false);
+        setErro(`${nome}: ${textoDoErro(r.erro)}`);
+      }
+      return;
+    }
+    terminarPedido([{ nome, bytes: r.bytes }]);
+  };
+
   const salvar = async () => {
     if (pedido.tipo !== 'salvar') return;
     setOcupado(true);
@@ -123,9 +141,11 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
   const importando = pedido.tipo === 'importar';
   const pastas = (itens ?? []).filter((i) => i.pasta);
   const arquivos = importando ? (itens ?? []).filter((i) => !i.pasta) : [];
+  const deVpn = vpn ? (itens ?? []).filter((i) => !i.pasta) : [];
+  const titulo = vpn ? 'writer.os.vpn.importar.titulo' : importando ? 'writer.os.pendrive.importar.titulo' : 'writer.os.pendrive.salvar.titulo';
 
   return (
-    <Camada titulo={t(importando ? 'writer.os.pendrive.importar.titulo' : 'writer.os.pendrive.salvar.titulo')} fechar={fecharPedido} teste="os-pendrive">
+    <Camada titulo={t(titulo)} fechar={fecharPedido} teste="os-pendrive">
       {!disco && (
         <div class="acoes-coluna">
           <p>{t('writer.os.pendrive.escolher')}</p>
@@ -142,7 +162,7 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
           <p data-teste="os-pendrive-onde">
             {t('writer.os.pendrive.onde', { onde: [disco.rotulo || disco.nome || disco.id, ...trilha].join(' / ') })}
           </p>
-          {!importando && <p class="dica">{t('writer.os.pendrive.arquivo', { nome: pedido.nome })}</p>}
+          {pedido.tipo === 'salvar' && <p class="dica">{t('writer.os.pendrive.arquivo', { nome: pedido.nome })}</p>}
           <ul class="lista-pendrive" aria-label={t('writer.os.pendrive.lista')}>
             <li>
               <button type="button" class="botao pequeno" onClick={acima} data-teste="os-pendrive-acima">
@@ -164,9 +184,20 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
                 </label>
               </li>
             ))}
+            {deVpn.map((a) => (
+              <li key={`v-${a.nome}`}>
+                <button type="button" class="botao" disabled={ocupado} aria-busy={ocupado} onClick={() => void escolherVpn(a.nome)} data-teste="os-pendrive-vpn">
+                  {t('writer.os.pendrive.arquivo-item', { nome: a.nome, tamanho: tamanhoDoArquivo(a.tamanho) })}
+                </button>
+              </li>
+            ))}
           </ul>
-          {itens && !pastas.length && !arquivos.length && <p class="dica">{t(importando ? 'writer.os.pendrive.vazia' : 'writer.os.pendrive.sem-pastas')}</p>}
+          {itens && !pastas.length && !arquivos.length && !deVpn.length && (
+            <p class="dica">{t(vpn ? 'writer.os.vpn.importar.vazia' : importando ? 'writer.os.pendrive.vazia' : 'writer.os.pendrive.sem-pastas')}</p>
+          )}
           {importando && <p class="dica">{t('writer.os.pendrive.dica')}</p>}
+          {vpn && <p class="dica">{t('writer.os.vpn.importar.dica')}</p>}
+          {!vpn && (
           <div class="acoes-linha">
             {importando ? (
               <button type="button" class="botao principal" disabled={ocupado || !marcados.length} aria-busy={ocupado} onClick={() => void importar()} data-teste="os-pendrive-importar">
@@ -178,6 +209,7 @@ function EscolherNoPendrive({ pedido }: { pedido: PedidoDePendrive }) {
               </button>
             )}
           </div>
+          )}
         </>
       )}
       {erro && (

@@ -104,6 +104,9 @@ describe('idiomas', () => {
       ...['sem-espaco', 'nao-usb', 'sem-medio', 'nao-monta', 'protegido', 'sem-servico', 'sem-dados', 'nao-grava', 'outras-particoes', 'nao-cria', 'nao-formata'].map((m) => `os.onde.motivo.${m}`),
       ...['ligado', 'desligado', 'desconhecido'].map((s) => `os.sobre.secure-boot.${s}`),
       ...['senha', 'falhou', 'negado'].flatMap((e) => [`os.wifi.erro.${e}`, `os.discos.erro.${e}`]),
+      // a VPN (PLANO §7, W4): os códigos de ErroVpn e os tipos
+      ...['tipo', 'grande', 'proibida', 'arquivo', 'invalido', 'senha', 'negado', 'falhou'].map((e) => `os.vpn.erro.${e}`),
+      ...['wireguard', 'openvpn'].map((v) => `os.vpn.tipo.${v}`),
       // instalar no computador (PLANO §8c): os passos e os erros do ekfrase-instalar.sh e os motivos da tela
       ...['apagar', 'particoes', 'copiar', 'conferir', 'textos', 'entrada'].map((p) => `os.instalar.passo.${p}`),
       ...['sem-espaco', 'nao-gpt', 'nao-uefi', 'ja-instalado', 'nao-usb', 'disco', 'copia', 'textos', 'entrada', 'ocupado', 'confirmacao', 'falhou'].map((e) => `os.instalar.erro.${e}`),

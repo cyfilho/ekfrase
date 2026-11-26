@@ -103,3 +103,8 @@ export const IconeLigar = (p: P) => <Pixels px={LIGAR} {...p} />;
 // prettier-ignore
 const SISTEMA: readonly Px[] = [[1, 1, 10, 1], [1, 2, 1, 6], [10, 2, 1, 6], [1, 8, 10, 1], [5, 9, 2, 1], [3, 10, 6, 1]];
 export const IconeSistema = (p: P) => <Pixels px={SISTEMA} {...p} />;
+
+// O cadeado (a VPN ligada, ao lado da bateria no Writer OS): a alça em cima e o corpo com o buraco da chave.
+// prettier-ignore
+const CADEADO: readonly Px[] = [[4, 0, 4, 1], [3, 1, 1, 4], [8, 1, 1, 4], [2, 5, 8, 2], [2, 7, 4, 2], [7, 7, 3, 2], [2, 9, 8, 3]];
+export const IconeCadeado = (p: P) => <Pixels px={CADEADO} {...p} />;

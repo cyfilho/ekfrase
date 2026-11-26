@@ -62,6 +62,8 @@ jobs:
   release:
     needs: instalador
     runs-on: ubuntu-latest
+    # a chave do lacre vive só no environment `assinatura` (só as tags; revisão de segurança, achado 3)
+    environment: assinatura
     permissions:
       contents: write
     steps:

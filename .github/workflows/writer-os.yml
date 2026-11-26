@@ -7,6 +7,9 @@
 # AS ATUALIZAÇÕES (docs/ATUALIZACOES.md §4, U1): o Release leva também o que os pendrives baixam para se atualizar
 # sozinhos: ekfrase-writer-os-<v>.squashfs, .vmlinuz, .initrd, .grub.cfg e o manifesto .atualizacao.json com o lacre.
 # E o Gravador se atualiza sozinho (U2, §5): ekfrase-gravador-<v>.atualizacao.json + o .minisig de cada Gravador.
+# A CHAVE DO LACRE (revisão de segurança, achado 3; W4, 25/11/2026): o segredo vive só no environment `assinatura`
+# (Settings → Environments: só as tags writer-os-v* e writer-v*), e só os jobs que assinam o pedem (`assinar` e
+# `release`), num runner limpo, com os artefatos prontos. O job `imagem` roda o npm ci e o Docker e nunca vê a chave.
 name: Writer OS e Gravador
 
 on:
@@ -74,16 +77,11 @@ jobs:
           path: prints-writer-os
           if-no-files-found: ignore
           retention-days: 7
-      - name: Comprimir e assinar
-        env:
-          CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
+      - name: Comprimir e montar o manifesto da atualização (a assinatura é no job assinar)
         run: |
-          test -n "$CHAVE" || { echo "Falta o segredo EKFRASE_MINISIGN_CHAVE."; exit 1; }
           cd sistema/writer-os/imagem/saida
           xz -T0 -6 "ekfrase-writer-os-$VERSAO.img"
           sha256sum "ekfrase-writer-os-$VERSAO.img.xz" > "ekfrase-writer-os-$VERSAO.img.xz.sha256"
-          ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
-          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "ekfrase-writer-os-$VERSAO.img.xz" -t "Ekfrase Writer OS $VERSAO" < /dev/null
           # a atualização: o manifesto (o formato de packages/atualizacoes/src/manifesto.ts, que o ekfrase-atualizar.sh lê)
           N="ekfrase-writer-os-$VERSAO"
           CANAL=estavel
@@ -91,10 +89,6 @@ jobs:
           arq() { jq -n --arg p "$1" --arg n "$2" --argjson t "$(stat -c %s "$2")" --arg s "$(sha256sum "$2" | cut -d' ' -f1)" '{papel: $p, nome: $n, tamanho: $t, sha256: $s}'; }
           { arq squashfs "$N.squashfs"; arq vmlinuz "$N.vmlinuz"; arq initrd "$N.initrd"; arq grub.cfg "$N.grub.cfg"; } | jq -s . > "$RUNNER_TEMP/arquivos.json"
           jq -n --arg v "$VERSAO" --arg c "$CANAL" --slurpfile a "$RUNNER_TEMP/arquivos.json" '{app: "ekfrase-writer-os", versao: $v, canal: $c, arquivos: $a[0]}' > "$N.atualizacao.json"
-          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Writer OS $VERSAO atualizacao" < /dev/null
-          rm -f "$RUNNER_TEMP/minisign.key"
-          minisign -V -p "$GITHUB_WORKSPACE/sistema/writer-os/imagem/minisign.pub" -m "ekfrase-writer-os-$VERSAO.img.xz"
-          minisign -V -p "$GITHUB_WORKSPACE/sistema/writer-os/imagem/minisign.pub" -m "$N.atualizacao.json"
           # a chave de teste das atualizações nunca vai ao Release
           rm -f teste-atualizacao.key
       - uses: actions/upload-artifact@v4
@@ -103,7 +97,6 @@ jobs:
           path: |
             sistema/writer-os/imagem/saida/*.img.xz
             sistema/writer-os/imagem/saida/*.sha256
-            sistema/writer-os/imagem/saida/*.minisig
             sistema/writer-os/imagem/saida/*.atualizacao.json
             sistema/writer-os/imagem/saida/*.squashfs
             sistema/writer-os/imagem/saida/*.vmlinuz
@@ -112,6 +105,47 @@ jobs:
             sistema/writer-os/imagem/saida/*.pacotes.tsv
           if-no-files-found: error
           compression-level: 0
+
+  # o lacre da imagem e do manifesto: só o artefato (nada de npm, Docker nem código do ramo além da chave pública)
+  assinar:
+    name: O lacre da imagem
+    needs: imagem
+    runs-on: ubuntu-24.04
+    environment: assinatura
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: writer-os-imagem
+          path: saida
+      - uses: actions/checkout@v5
+        with:
+          path: fonte
+          sparse-checkout: sistema/writer-os/imagem/minisign.pub
+          sparse-checkout-cone-mode: false
+      - name: Assinar a imagem e o manifesto da atualização
+        env:
+          CHAVE: ${{ secrets.EKFRASE_MINISIGN_CHAVE }}
+        run: |
+          test -n "$CHAVE" || { echo "Falta o segredo EKFRASE_MINISIGN_CHAVE (no environment assinatura)."; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          VERSAO="${GITHUB_REF_NAME#writer-os-v}"
+          N="ekfrase-writer-os-$VERSAO"
+          PUB="$GITHUB_WORKSPACE/fonte/sistema/writer-os/imagem/minisign.pub"
+          cd saida
+          sha256sum -c "$N.img.xz.sha256"
+          ( umask 077; printf '%s\n' "$CHAVE" > "$RUNNER_TEMP/minisign.key" )
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.img.xz" -t "Ekfrase Writer OS $VERSAO" < /dev/null
+          minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$N.atualizacao.json" -t "Ekfrase Writer OS $VERSAO atualizacao" < /dev/null
+          rm -f "$RUNNER_TEMP/minisign.key"
+          minisign -V -p "$PUB" -m "$N.img.xz"
+          minisign -V -p "$PUB" -m "$N.atualizacao.json"
+      # só os lacres sobem de novo (a imagem já está no artefato writer-os-imagem)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: writer-os-lacres
+          path: saida/*.minisig
+          if-no-files-found: error
 
   gravador:
     name: Gravador (${{ matrix.os }})
@@ -154,8 +188,9 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [imagem, gravador]
+    needs: [assinar, gravador]
     runs-on: ubuntu-latest
+    environment: assinatura
     permissions:
       contents: write
       actions: write
@@ -164,6 +199,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: writer-os-imagem
+          path: arquivos
+      - uses: actions/download-artifact@v4
+        with:
+          name: writer-os-lacres
           path: arquivos
       - uses: actions/download-artifact@v4
         with:

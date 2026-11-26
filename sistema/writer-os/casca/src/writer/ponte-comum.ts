@@ -5,33 +5,7 @@
  * `window.ekfraseCasca` que o preload do Electron põe na página (o transporte é o `ipcRenderer`).
  * Os canais são os de `canais.ts`.
  */
-import type {
-  Bateria,
-  DiscoUSB,
-  ErroSistema,
-  EscolhaEspelho,
-  EstadoAtualizacoes,
-  EstadoCasca,
-  EstadoOS,
-  InfoInstalacao,
-  ListaDePasta,
-  MetodoArmazem,
-  ModoAtualizacoes,
-  Mudanca,
-  PassoInstalar,
-  PonteAtualizacoes,
-  PonteCasca,
-  PonteSistema,
-  RedeWifi,
-  Cabo,
-  FeedbackGuardado,
-  RespostaArmazem,
-  RespostaCasca,
-  RespostaInstalar,
-  RespostaSistema,
-  ServidorConferido,
-  SobreOS,
-} from '@ekfrase/writer-nucleo';
+import type { Bateria, DiscoUSB, ErroSistema, EscolhaEspelho, EstadoAtualizacoes, EstadoCasca, EstadoOS, InfoInstalacao, ListaDePasta, MetodoArmazem, ModoAtualizacoes, Mudanca, PassoInstalar, PonteAtualizacoes, PonteCasca, PonteSistema, RedeWifi, Cabo, Conectividade, FeedbackGuardado, RespostaArmazem, RespostaCasca, RespostaInstalar, RespostaSistema, ServidorConferido, SobreOS, VpnOS, RespostaVpn } from '@ekfrase/writer-nucleo';
 
 export interface Transporte {
   /** Um pedido com resposta (o `ipcRenderer.invoke`). */
@@ -121,6 +95,15 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         esquecer: (ssid: string) => pedir<void>('os:esquecer', String(ssid)),
         cabo: () => pedir<Cabo | null>('os:cabo'),
         conectarCabo: () => pedir<RespostaSistema>('os:conectar-cabo'),
+        internet: () => pedir<Conectividade>('os:internet'),
+        abrirPortal: () => pedir<Conectividade>('os:abrir-portal'),
+        vpns: () => pedir<VpnOS[]>('os:vpns'),
+        importarVpn: (arquivo: string, bytes: Uint8Array) => pedir<RespostaVpn>('os:importar-vpn', String(arquivo), bytes),
+        ligarVpn: (nome: string, usuario?: string | null, senha?: string | null) =>
+          pedir<RespostaVpn>('os:ligar-vpn', String(nome), typeof usuario === 'string' ? usuario : null, typeof senha === 'string' ? senha : null),
+        desligarVpn: (nome: string) => pedir<RespostaVpn>('os:desligar-vpn', String(nome)),
+        esquecerVpn: (nome: string) => pedir<void>('os:esquecer-vpn', String(nome)),
+        vpnSozinha: (nome: string, sim: boolean) => pedir<VpnOS[]>('os:vpn-sozinha', String(nome), sim === true),
         guardarFeedback: (f: Omit<FeedbackGuardado, 'id'>) => pedir<RespostaSistema>('os:feedback-guardar', f),
         feedbacksGuardados: () => pedir<FeedbackGuardado[]>('os:feedback-guardados'),
         apagarFeedback: (id: string) => pedir<void>('os:feedback-apagar', String(id)),
@@ -135,7 +118,7 @@ export function montarPonte(t: Transporte, info: { versao: string; plataforma: s
         guardarNaMemoria: () => pedir<RespostaCasca>('os:guardar-na-memoria'),
         ejetar: (id: string) => pedir<RespostaSistema>('os:ejetar', String(id)),
         abrirDisco: (id: string) => pedir<{ ok: true; raiz: string } | { ok: false; erro: ErroSistema }>('os:abrir-disco', String(id)),
-        listar: (caminho: string) => pedir<ListaDePasta>('os:listar', String(caminho)),
+        listar: (caminho: string, tipo?: 'vpn') => pedir<ListaDePasta>('os:listar', String(caminho), tipo === 'vpn' ? 'vpn' : null),
         lerArquivo: (caminho: string) => pedir<{ ok: true; bytes: Uint8Array } | { ok: false; erro: ErroSistema }>('os:ler-arquivo', String(caminho)),
         gravarArquivo: (pasta: string, nome: string, bytes: Uint8Array) =>
           pedir<{ ok: true; nome: string } | { ok: false; erro: ErroSistema }>('os:gravar-arquivo', String(pasta), String(nome), bytes),

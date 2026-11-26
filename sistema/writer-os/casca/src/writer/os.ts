@@ -13,7 +13,7 @@
  *   sessão abre de novo;
  * - **o que se perderia a cada boot** (o sistema roda na memória): as redes Wi-Fi conhecidas e o que a
  *   página guarda no `localStorage` (escrever sem conta, idioma, tema) vão CIFRADOS para o cofre da
- *   pasta dos dados e voltam quando a senha é dada.
+ *   pasta dos dados e voltam quando a senha é dada; as VPNs também (o arquivo, o usuário e a senha; PLANO §7).
  */
 import {
   marcaDoComputador,
@@ -30,13 +30,17 @@ import {
   type RespostaInstalar,
   type FeedbackGuardado,
   type RespostaSistema,
+  type RespostaVpn,
   type SobreOS,
+  type VpnOS,
 } from '@ekfrase/writer-nucleo';
 import { closeSync, cpSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { extname, join, sep } from 'node:path';
 import { gravarInteiro } from '../motor/pastas.ts';
+import type { Conectividade } from '../motor/portal-regras.ts';
 import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../motor/selo.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
+import { filtrarVpn, MAXIMO_VPN, nomeDaVpn, qualLigarSozinha, tipoDaVpn, usuarioValido, type TipoVpn } from '../motor/vpn-regras.ts';
 import { NOME_DA_PASTA, type DadosDoWriter } from './dados.ts';
 import type { Pagina } from './pagina.ts';
 
@@ -58,6 +62,22 @@ interface RedeGuardada {
   senha: string | null;
 }
 
+/** Uma VPN no cofre (segredo `vpns`): o arquivo como veio (já filtrado), o usuário, a senha e o "ligar sozinha". */
+interface VpnGuardada {
+  nome: string;
+  tipo: TipoVpn;
+  arquivo: string;
+  pedeSenha: boolean;
+  usuario: string | null;
+  senha: string | null;
+  sozinha: boolean;
+}
+
+/** A cada quanto a vigia da VPN olha se é hora de ligar a que liga sozinha (Portal + VPN, PLANO §7). */
+const VIGIA_VPN_MS = 20_000;
+/** Ligar sozinha falhou: espera isto antes de tentar de novo. */
+const ESPERA_VPN_MS = 120_000;
+
 /**
  * O `dados.json` que o `ekfrase-dados.service` da imagem teria escrito, para o simulado: com ou sem a partição de dados,
  * e de onde ligou (`EKFRASE_CASCA_OS_BOOT=usb|computador`; o padrão é o pendrive).
@@ -75,6 +95,8 @@ export function tecladoEmUso(env: NodeJS.ProcessEnv = process.env): string {
 
 /** O que o Writer importa (`.ekfr`, Markdown, texto, zip): só isto aparece na lista dos pendrives. */
 const IMPORTAVEIS = ['.ekfr', '.md', '.markdown', '.txt', '.zip'];
+/** Os arquivos de VPN (a parte "VPN" do menu pede a lista só com eles). */
+const DE_VPN = ['.conf', '.ovpn'];
 /** O maior arquivo que passa pela ponte (a bomba de zip é barrada de novo no núcleo). */
 const MAXIMO_ARQUIVO = 64 * 1024 * 1024;
 /** O feedback guardado sem internet: o print e os anexos, juntos (o servidor aceita até isto). */
@@ -199,11 +221,16 @@ export class WriterOS {
   }
 
   /** Liga às peças (depois de criar os dados) e abre a partição de dados, se há. */
-  async ligar(o: { dados: DadosDoWriter; pagina: Pagina; sair: () => Promise<void>; versaoApp: string }): Promise<void> {
+  /**
+   * `portal`: abre a janela do portal cativo neste endereço (`motor/portal.ts`, que precisa do Electron; nos testes sem
+   * ele, não há) e devolve a conectividade quando ela fecha.
+   */
+  async ligar(o: { dados: DadosDoWriter; pagina: Pagina; sair: () => Promise<void>; versaoApp: string; portal?: (endereco: string) => Promise<Conectividade> }): Promise<void> {
     this.dados = o.dados;
     this.pagina = o.pagina;
     this.sair = o.sair;
     this.versaoApp = o.versaoApp;
+    this.janelaDoPortal = o.portal ?? null;
     if (this.motivo === null) {
       mkdirSync(this.pastaDoPendrive, { recursive: true });
       this.destino = 'pendrive';
@@ -391,7 +418,8 @@ export class WriterOS {
     return montado ? { ok: true, raiz: montado } : { ok: false, erro: 'falhou' };
   }
 
-  async listar(caminho: string): Promise<ListaDePasta> {
+  async listar(caminho: string, tipo?: unknown): Promise<ListaDePasta> {
+    const aceitos = tipo === 'vpn' ? DE_VPN : IMPORTAVEIS;
     const real = await this.dentroDeUmPendrive(caminho);
     if (!real) return { ok: false, erro: 'negado' };
     try {
@@ -405,7 +433,7 @@ export class WriterOS {
           continue;
         }
         if (st.isDirectory()) itens.push({ nome, pasta: true, tamanho: 0 });
-        else if (st.isFile() && IMPORTAVEIS.includes(extname(nome).toLowerCase())) itens.push({ nome, pasta: false, tamanho: st.size });
+        else if (st.isFile() && aceitos.includes(extname(nome).toLowerCase())) itens.push({ nome, pasta: false, tamanho: st.size });
       }
       itens.sort((a, b) => Number(b.pasta) - Number(a.pasta) || a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
       return { ok: true, caminho: real, itens };
@@ -484,6 +512,177 @@ export class WriterOS {
   async esquecer(ssid: string): Promise<void> {
     await this.sistema.esquecer(String(ssid));
     this.guardarRedes(this.redesGuardadas().filter((x) => x.ssid !== ssid));
+  }
+
+  // ---------- o portal cativo (PLANO §7): a rede pede login numa página ----------
+  private janelaDoPortal: ((endereco: string) => Promise<Conectividade>) | null = null;
+
+  /** A internet chega? (o NetworkManager confere agora). */
+  internet(): Promise<Conectividade> {
+    return this.sistema.conectividade();
+  }
+
+  /**
+   * Abre a página de login da rede. Só se o sistema diz `portal` AGORA (a página não abre uma janela da internet por
+   * conta própria) e há o endereço do teste; senão, só responde a conectividade.
+   */
+  async abrirPortal(): Promise<Conectividade> {
+    const agora = await this.sistema.conectividade();
+    const endereco = this.sistema.enderecoDoTeste();
+    if (agora !== 'portal' || !endereco || !this.janelaDoPortal) return agora;
+    this.depurar?.('portal abriu');
+    const c = await this.janelaDoPortal(endereco);
+    this.depurar?.(`portal fechou ${c}`);
+    return c;
+  }
+
+  // ---------- a VPN (PLANO §7): WireGuard e OpenVPN, o arquivo cifrado no cofre, ligar sozinha depois do portal ----------
+
+  /** O que se sabe de cada VPN mesmo com o cofre fechado (o `pedeSenha` do filtro). */
+  private infoVpn = new Map<string, { pedeSenha: boolean }>();
+  /** As que a pessoa desligou neste boot: não ligam sozinhas de novo. */
+  private desligadasAMao = new Set<string>();
+  /** Ligar sozinha falhou: até quando esperar. */
+  private esperarVpn = new Map<string, number>();
+  private vigiaVpn: ReturnType<typeof setInterval> | null = null;
+  private ligandoSozinha = false;
+  private vpnsProntas: () => void = () => undefined;
+  /** As VPNs do cofre voltando ao NetworkManager (depois da senha); `null` quando terminou. */
+  private restaurando: Promise<void> | null = null;
+  /** As VPNs do cofre já voltaram ao NetworkManager neste boot (o agente de teste espera por isto). */
+  vpnsVoltaram: Promise<void> = new Promise((ok) => (this.vpnsProntas = ok));
+
+  private vpnsGuardadas(): VpnGuardada[] {
+    try {
+      const l = JSON.parse(this.dados?.cofreAberto?.segredo('vpns') ?? '[]') as VpnGuardada[];
+      return Array.isArray(l) ? l.filter((v) => typeof v?.nome === 'string' && (v.tipo === 'wireguard' || v.tipo === 'openvpn') && typeof v.arquivo === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private guardarVpns(lista: VpnGuardada[]): void {
+    this.dados?.cofreAberto?.porSegredo('vpns', JSON.stringify(lista));
+  }
+
+  private mudarVpnGuardada(nome: string, mudar: Partial<VpnGuardada>): void {
+    const l = this.vpnsGuardadas();
+    const i = l.findIndex((v) => v.nome === nome);
+    if (i < 0) return;
+    l[i] = { ...(l[i] as VpnGuardada), ...mudar };
+    this.guardarVpns(l);
+  }
+
+  async vpns(): Promise<VpnOS[]> {
+    // logo depois da senha as do cofre ainda estão voltando ao NetworkManager: a lista espera (até 10 s)
+    if (this.restaurando) await Promise.race([this.restaurando, new Promise((ok) => setTimeout(ok, 10_000).unref?.())]);
+    const guardadas = this.vpnsGuardadas();
+    return (await this.sistema.vpns()).map((v) => {
+      const g = guardadas.find((x) => x.nome === v.nome);
+      const pedeSenha = g?.pedeSenha ?? this.infoVpn.get(v.nome)?.pedeSenha ?? false;
+      return { nome: v.nome, tipo: v.tipo, ligada: v.ligada, pedeSenha, temSenha: !!(g?.usuario && g.senha), usuario: g?.usuario ?? null, sozinha: g?.sozinha ?? false };
+    });
+  }
+
+  /** Um `.conf` ou `.ovpn` vindo de um pendrive: o filtro, o nome, o NetworkManager (pelo serviço) e o cofre. */
+  async importarVpn(arquivo: unknown, bytes: unknown): Promise<RespostaVpn> {
+    if (typeof arquivo !== 'string' || !(bytes instanceof Uint8Array)) return { ok: false, erro: 'invalido' };
+    const tipo = tipoDaVpn(arquivo);
+    if (!tipo) return { ok: false, erro: 'tipo' };
+    if (bytes.byteLength > MAXIMO_VPN) return { ok: false, erro: 'grande' };
+    let texto: string;
+    try {
+      texto = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '');
+    } catch {
+      return { ok: false, erro: 'invalido' };
+    }
+    const f = filtrarVpn(tipo, texto);
+    if (!f.ok) return { ok: false, erro: f.erro, ...(f.diretiva ? { diretiva: f.diretiva.slice(0, 40) } : {}) };
+    const existentes = [...(await this.sistema.vpns()).map((v) => v.nome), ...this.vpnsGuardadas().map((v) => v.nome)];
+    const nome = nomeDaVpn(arquivo, existentes);
+    const r = await this.sistema.importarVpn(tipo, nome, texto);
+    this.depurar?.(`vpn importou ${tipo} ${r.ok ? 'ok' : r.erro}`);
+    if (!r.ok) return r;
+    this.infoVpn.set(nome, { pedeSenha: f.pedeSenha });
+    this.guardarVpns([...this.vpnsGuardadas().filter((v) => v.nome !== nome), { nome, tipo, arquivo: texto, pedeSenha: f.pedeSenha, usuario: null, senha: null, sozinha: false }]);
+    return { ok: true, nome };
+  }
+
+  /** Liga. No OpenVPN que pede usuário e senha: os dados agora ou os do cofre (e os novos vão ao cofre se der certo). */
+  async ligarVpn(nome: string, usuario?: unknown, senha?: unknown): Promise<RespostaVpn> {
+    const g = this.vpnsGuardadas().find((v) => v.nome === nome);
+    if (!g && !(await this.sistema.vpns()).some((v) => v.nome === nome)) return { ok: false, erro: 'falhou' };
+    const pede = g?.pedeSenha ?? this.infoVpn.get(nome)?.pedeSenha ?? false;
+    let u: string | null = null;
+    let s: string | null = null;
+    if (pede) {
+      u = typeof usuario === 'string' && usuario ? usuario : (g?.usuario ?? null);
+      s = typeof senha === 'string' && senha ? senha : (g?.senha ?? null);
+      if (!u || !s || !usuarioValido(u) || s.length > 256 || /[\r\n\u0000]/.test(s)) return { ok: false, erro: 'senha' };
+    }
+    const r = await this.sistema.ligarVpn(nome, u, s);
+    this.depurar?.(`vpn ligar ${r.ok ? 'ok' : r.erro}`);
+    if (!r.ok) return { ok: false, erro: r.erro === 'senha' || r.erro === 'negado' ? r.erro : 'falhou' };
+    this.desligadasAMao.delete(nome);
+    this.esperarVpn.delete(nome);
+    if (pede && g && (g.usuario !== u || g.senha !== s)) this.mudarVpnGuardada(nome, { usuario: u, senha: s });
+    return { ok: true, nome };
+  }
+
+  async desligarVpn(nome: string): Promise<RespostaVpn> {
+    this.desligadasAMao.add(nome);
+    const ok = await this.sistema.desligarVpn(nome);
+    this.depurar?.(`vpn desligar ${ok ? 'ok' : 'falhou'}`);
+    return ok ? { ok: true, nome } : { ok: false, erro: 'falhou' };
+  }
+
+  async esquecerVpn(nome: string): Promise<void> {
+    await this.sistema.esquecerVpn(nome);
+    this.infoVpn.delete(nome);
+    this.guardarVpns(this.vpnsGuardadas().filter((v) => v.nome !== nome));
+  }
+
+  async vpnSozinha(nome: string, sim: boolean): Promise<VpnOS[]> {
+    this.mudarVpnGuardada(nome, { sozinha: sim === true });
+    if (sim === true) this.desligadasAMao.delete(nome);
+    return this.vpns();
+  }
+
+  /** A senha foi dada: as VPNs do cofre voltam ao NetworkManager (que vive na memória) e a vigia começa. */
+  private async restaurarVpns(): Promise<void> {
+    const noSistema = new Set((await this.sistema.vpns()).map((v) => v.nome));
+    for (const g of this.vpnsGuardadas()) {
+      this.infoVpn.set(g.nome, { pedeSenha: g.pedeSenha });
+      if (noSistema.has(g.nome)) continue;
+      const r = await this.sistema.importarVpn(g.tipo, g.nome, g.arquivo);
+      this.depurar?.(`vpn voltou ${r.ok ? 'ok' : r.erro}`);
+    }
+    if (!this.vigiaVpn) {
+      this.vigiaVpn = setInterval(() => void this.vezDaVpn(), VIGIA_VPN_MS);
+      this.vigiaVpn.unref?.();
+    }
+  }
+
+  /**
+   * Portal + VPN (PLANO §7): a que liga sozinha só liga quando a internet chega de verdade (no hotel, depois do portal).
+   * Pergunta ao NetworkManager a ÚLTIMA conectividade (sem um teste novo a cada volta).
+   */
+  async vezDaVpn(): Promise<string | null> {
+    if (this.ligandoSozinha) return null;
+    this.ligandoSozinha = true;
+    try {
+      const agora = Date.now();
+      const lista = (await this.vpns()).map((v) => ({ nome: v.nome, ligada: v.ligada, sozinha: v.sozinha && (this.esperarVpn.get(v.nome) ?? 0) <= agora, faltaSenha: v.pedeSenha && !v.temSenha }));
+      if (!lista.some((v) => v.sozinha)) return null;
+      const nome = qualLigarSozinha(lista, await this.sistema.conectividade(false), this.desligadasAMao);
+      if (!nome) return null;
+      const r = await this.ligarVpn(nome);
+      this.depurar?.(`vpn sozinha ${nome} ${r.ok ? 'ok' : r.erro}`);
+      if (!r.ok) this.esperarVpn.set(nome, Date.now() + ESPERA_VPN_MS);
+      return r.ok ? nome : null;
+    } finally {
+      this.ligandoSozinha = false;
+    }
   }
 
   // ---------- feedback sem internet: guardado em `Ekfrase Writer/feedbacks`, enviado quando a internet volta ----------
@@ -655,6 +854,14 @@ export class WriterOS {
   async depoisDeAbrir(): Promise<void> {
     this.selarOsGuardados();
     for (const r of this.redesGuardadas()) await this.sistema.lembrarRede(r.ssid, r.senha);
+    const volta = this.restaurarVpns()
+      .catch((e: unknown) => this.depurar?.(`vpn nao voltou ${String(e)}`))
+      .finally(() => {
+        if (this.restaurando === volta) this.restaurando = null;
+        this.vpnsProntas();
+      });
+    this.restaurando = volta;
+
     if (this.paginaVoltou) return;
     this.paginaVoltou = true;
     const guardado = this.dados?.cofreAberto?.segredo('pagina');

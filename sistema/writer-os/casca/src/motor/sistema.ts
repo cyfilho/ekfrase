@@ -8,6 +8,8 @@
  *
  * - Wi-Fi: `nmcli` (NetworkManager: `network-control`, `wifi.scan`, `settings.modify.own`; as conexões
  *   são do `writer`, `connection.permissions user:writer`);
+ * - VPN (PLANO §7): importar, pelo socket do `ekfrase-vpn.socket` (root: o `nmcli connection import` cria conexão sem
+ *   dono, que o polkit nega ao writer; o serviço a dá ao writer); ligar, desligar e esquecer, o `nmcli` como writer;
  * - instalar no computador (PLANO §8c): o socket do `ekfrase-instalar.socket` (só o grupo `writer` abre), que aceita
  *   só `consultar`, `instalar <disco> <levar|nao-levar>` e `apagar-tudo <disco> <bytes> <levar|nao-levar>` (W3f);
  *   quem mexe no disco é o serviço (root), nunca a casca;
@@ -18,15 +20,21 @@
  * Duas versões: `SistemaLinux` (a de verdade) e `SistemaSimulado` (para os testes e os prints fora do
  * pendrive, no Windows também). Nenhum comando passa por shell: `execFile` com a lista de argumentos.
  */
-import type { Bateria, Cabo, DiscoInterno, DiscoUSB, ErroInstalar, InfoInstalacao, PassoInstalar, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
+import type { Bateria, Cabo, DiscoInterno, DiscoUSB, ErroInstalar, ErroVpn, InfoInstalacao, PassoInstalar, RedeWifi, RespostaSistema } from '@ekfrase/writer-nucleo';
 import { execFile } from 'node:child_process';
 import { connect } from 'node:net';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { release } from 'node:os';
 import { join } from 'node:path';
+import { lerConectividade, type Conectividade } from './portal-regras.ts';
+import { filtrarVpn, type TipoVpn } from './vpn-regras.ts';
 
 /** Os teclados do primeiro uso e do painel (o `ekfrase-sessao.sh` da imagem conhece os mesmos). */
-export const TECLADOS = ['br', 'us', 'us-intl', 'gb', 'pt', 'es', 'de', 'fr'] as const;
+export const TECLADOS = [
+  'br', 'us', 'us-intl', 'gb', 'pt', 'es', 'latam', 'fr', 'ca', 'be', 'ch', 'ch-fr', 'de', 'it',
+  'se', 'no', 'dk', 'fi', 'pl', 'tr', 'us-dvorak', 'us-colemak',
+] as const;
 
 /** Os fusos da lista (o primeiro é o padrão). Os do Brasil primeiro. */
 export const FUSOS = [
@@ -79,6 +87,23 @@ export interface Sistema {
   /** A internet por cabo (Ethernet), ou `null` se não há placa. */
   cabo(): Promise<Cabo | null>;
   conectarCabo(): Promise<RespostaSistema>;
+  /**
+   * A internet de verdade (o teste de conectividade do NetworkManager; PLANO §7, o portal cativo). `conferir` (o padrão)
+   * pede ao NetworkManager um teste AGORA; sem ele, a última resposta (a vigia da VPN pergunta assim, sem tráfego).
+   */
+  conectividade(conferir?: boolean): Promise<Conectividade>;
+  /** O endereço `http` do teste de conectividade: é o que a janela do portal abre (`null` = sem teste). */
+  enderecoDoTeste(): string | null;
+  /** As VPNs que o NetworkManager tem agora (WireGuard e OpenVPN). */
+  vpns(): Promise<VpnDoSistema[]>;
+  /** Importa (o `ekfrase-vpn.service` confere o arquivo de novo e dá a conexão ao writer). */
+  importarVpn(tipo: TipoVpn, nome: string, texto: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }>;
+  /** Liga (no OpenVPN que pede, com o usuário e a senha). */
+  ligarVpn(nome: string, usuario: string | null, senha: string | null): Promise<RespostaSistema>;
+  desligarVpn(nome: string): Promise<boolean>;
+  esquecerVpn(nome: string): Promise<void>;
+  /** Só o agente de teste: o dono da conexão (`connection.permissions`; tem de ser `user:writer`). */
+  donoDaConexao(nome: string): Promise<string | null>;
   bateria(): Promise<Bateria | null>;
   brilho(passo?: number): Promise<number | null>;
   usarFuso(id: string): Promise<boolean>;
@@ -110,6 +135,35 @@ export interface Sistema {
   versao(): string;
   kernel(): string;
   secureBoot(): 'ligado' | 'desligado' | 'desconhecido';
+}
+
+/** Uma VPN como o NetworkManager a vê. */
+export interface VpnDoSistema {
+  nome: string;
+  tipo: TipoVpn;
+  ligada: boolean;
+}
+
+/** A resposta do `ekfrase-vpn.sh` (`ok` | `erro <código>`) no erro que a tela conhece. */
+export function lerRespostaVpn(linha: string | null): { ok: true } | { ok: false; erro: ErroVpn } {
+  const l = (linha ?? '').trim();
+  if (l === 'ok') return { ok: true };
+  const c = /^erro ([a-z]+)$/.exec(l)?.[1];
+  if (c === 'grande' || c === 'proibida' || c === 'arquivo') return { ok: false, erro: c };
+  if (c === 'importar' || c === 'tipo' || c === 'nome' || c === 'pedido') return { ok: false, erro: 'invalido' };
+  if (c === 'dono') return { ok: false, erro: 'negado' };
+  return { ok: false, erro: 'falhou' };
+}
+
+/** As VPNs da lista do `nmcli -t -f NAME,TYPE,STATE connection show` (o OpenVPN é o TYPE `vpn`: é o único plugin). */
+export function lerVpnsNmcli(saida: string): VpnDoSistema[] {
+  const lista: VpnDoSistema[] = [];
+  for (const linha of saida.split('\n')) {
+    const [nome, tipo, estado] = camposNmcli(linha.replace(/\r$/, ''));
+    if (!nome || (tipo !== 'wireguard' && tipo !== 'vpn')) continue;
+    lista.push({ nome, tipo: tipo === 'vpn' ? 'openvpn' : 'wireguard', ligada: estado === 'activated' });
+  }
+  return lista;
 }
 
 /** O Writer tem uma pasta com textos neste disco montado? */
@@ -383,6 +437,69 @@ export class SistemaLinux implements Sistema {
     if (!alvo) return { ok: false, erro: 'falhou' };
     const r = await rodar('nmcli', ['--wait', '30', 'device', 'connect', alvo[0]], 40000);
     return r.ok ? { ok: true } : { ok: false, erro: /not available|no carrier|unavailable/i.test(r.err) ? 'falhou' : 'negado' };
+  }
+
+  async conectividade(conferir = true): Promise<Conectividade> {
+    // "check" pede ao NetworkManager uma conferência AGORA (o polkit: network-control, que o writer já tem)
+    const r = await rodar('nmcli', ['networking', 'connectivity', ...(conferir ? ['check'] : [])], 15000);
+    return r.ok ? lerConectividade(r.out) : 'desconhecida';
+  }
+
+  enderecoDoTeste(): string | null {
+    try {
+      const conf = readFileSync('/etc/NetworkManager/conf.d/20-ekfrase-conectividade.conf', 'utf8');
+      const uri = /^uri=(http:\/\/\S+)$/m.exec(conf)?.[1];
+      if (uri) return uri;
+    } catch {
+      // sem o arquivo: o mesmo endereço da imagem
+    }
+    return 'http://network-test.debian.org/nm';
+  }
+
+  async vpns(): Promise<VpnDoSistema[]> {
+    return lerVpnsNmcli((await rodar('nmcli', ['-t', '-f', 'NAME,TYPE,STATE', 'connection', 'show'])).out);
+  }
+
+  async importarVpn(tipo: TipoVpn, nome: string, texto: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }> {
+    let resposta: string | null = null;
+    const b64 = Buffer.from(texto, 'utf8').toString('base64');
+    await pedirAoInstalador(join(this.caminhos.run, 'vpn.sock'), `importar ${tipo} ${nome} ${b64}`, (l) => (resposta ??= l), 60000);
+    return resposta === null ? { ok: false, erro: 'falhou' } : lerRespostaVpn(resposta);
+  }
+
+  async ligarVpn(nome: string, usuario: string | null, senha: string | null): Promise<RespostaSistema> {
+    if (usuario !== null) {
+      // o usuário fica na conexão; a senha, NUNCA (password-flags=2: o NetworkManager pede a cada vez, e o nmcli dá)
+      const m = await rodar('nmcli', ['connection', 'modify', 'id', nome, '+vpn.data', `username=${usuario}`, '+vpn.data', 'password-flags=2']);
+      if (!m.ok) return { ok: false, erro: 'negado' };
+    }
+    let arquivo: string | null = null;
+    if (senha !== null) {
+      // o `passwd-file` do nmcli, só do writer, na memória, apagado logo depois
+      arquivo = join(this.caminhos.ram, `.vpn-${randomBytes(8).toString('hex')}`);
+      writeFileSync(arquivo, `vpn.secrets.password:${senha}\n`, { mode: 0o600, flag: 'wx' });
+    }
+    try {
+      const r = await rodar('nmcli', ['--wait', '40', 'connection', 'up', 'id', nome, ...(arquivo ? ['passwd-file', arquivo] : [])], 50000);
+      if (r.ok) return { ok: true };
+      return { ok: false, erro: /secret|password|auth/i.test(r.err) ? 'senha' : 'falhou' };
+    } finally {
+      if (arquivo) rmSync(arquivo, { force: true });
+    }
+  }
+
+  async desligarVpn(nome: string): Promise<boolean> {
+    return (await rodar('nmcli', ['connection', 'down', 'id', nome], 30000)).ok;
+  }
+
+  async esquecerVpn(nome: string): Promise<void> {
+    await rodar('nmcli', ['connection', 'delete', 'id', nome]);
+  }
+
+  async donoDaConexao(nome: string): Promise<string | null> {
+    const r = await rodar('nmcli', ['-g', 'connection.permissions', 'connection', 'show', 'id', nome]);
+    // o `-g` escapa os `:` do valor (`user\:writer`, visto no QEMU em 26/11): o mesmo leitor do `-t`
+    return r.ok ? (camposNmcli(r.out.trim())[0] ?? '') : null;
   }
 
   async bateria(): Promise<Bateria | null> {
@@ -684,6 +801,69 @@ export class SistemaSimulado implements Sistema {
   async esquecer(ssid: string): Promise<void> {
     this.conhecidas.delete(ssid);
     if (this.conectada === ssid) this.conectada = null;
+  }
+
+  /**
+   * O portal simulado (`EKFRASE_CASCA_OS_PORTAL=<base>`): a conectividade busca `<base>/nm` SEM seguir redirecionamento
+   * (o cabeçalho `X-NetworkManager-Status: online` = internet; outra resposta = portal; nada = sem). Sem a variável,
+   * conectado = internet.
+   */
+  private readonly basePortal = (process.env['EKFRASE_CASCA_OS_PORTAL'] ?? '').replace(/\/+$/, '') || null;
+
+  async conectividade(): Promise<Conectividade> {
+    if (this.conectada === null && this.caboSimulado !== 'ligado') return 'sem';
+    if (!this.basePortal) return 'internet';
+    try {
+      const r = await fetch(`${this.basePortal}/nm`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
+      return r.headers.get('x-networkmanager-status') === 'online' ? 'internet' : 'portal';
+    } catch {
+      return 'sem';
+    }
+  }
+
+  enderecoDoTeste(): string | null {
+    return this.basePortal ? `${this.basePortal}/nm` : null;
+  }
+
+  /**
+   * As VPNs simuladas: o arquivo passa pelo MESMO filtro (como o `ekfrase-vpn.sh` faria); o OpenVPN que pede usuário e
+   * senha só liga com a senha `vpn123`. Uma ligada por vez (o NetworkManager também troca a rota).
+   */
+  private vpnsSim = new Map<string, { tipo: TipoVpn; ligada: boolean; pedeSenha: boolean }>();
+
+  async vpns(): Promise<VpnDoSistema[]> {
+    return [...this.vpnsSim].map(([nome, v]) => ({ nome, tipo: v.tipo, ligada: v.ligada }));
+  }
+
+  async importarVpn(tipo: TipoVpn, nome: string, texto: string): Promise<{ ok: true } | { ok: false; erro: ErroVpn }> {
+    if (this.vpnsSim.has(nome)) return { ok: false, erro: 'falhou' };
+    const f = filtrarVpn(tipo, texto);
+    if (!f.ok) return { ok: false, erro: f.erro };
+    this.vpnsSim.set(nome, { tipo, ligada: false, pedeSenha: f.pedeSenha });
+    return { ok: true };
+  }
+
+  async ligarVpn(nome: string, _usuario: string | null, senha: string | null): Promise<RespostaSistema> {
+    const v = this.vpnsSim.get(nome);
+    if (!v) return { ok: false, erro: 'falhou' };
+    if (v.pedeSenha && senha !== 'vpn123') return { ok: false, erro: 'senha' };
+    for (const o of this.vpnsSim.values()) o.ligada = false;
+    v.ligada = true;
+    return { ok: true };
+  }
+
+  async desligarVpn(nome: string): Promise<boolean> {
+    const v = this.vpnsSim.get(nome);
+    if (v) v.ligada = false;
+    return !!v;
+  }
+
+  async esquecerVpn(nome: string): Promise<void> {
+    this.vpnsSim.delete(nome);
+  }
+
+  async donoDaConexao(nome: string): Promise<string | null> {
+    return this.vpnsSim.has(nome) ? 'user:writer' : null;
   }
 
   async bateria(): Promise<Bateria | null> {
