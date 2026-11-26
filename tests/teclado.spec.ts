@@ -84,6 +84,19 @@ export class Roteiro {
   }
 
   /**
+   * O foco chega no elemento `teste` (até 2,5 s)? O foco de uma tela nova vem um quadro depois: no Linux do CI, com o
+   * Xvfb, conferir no mesmo instante falhava de vez em quando. Quem já está certo responde na hora.
+   */
+  async focoChega(teste: string): Promise<boolean> {
+    return this.p
+      .waitForFunction((x) => document.activeElement?.getAttribute('data-teste') === x, teste, { timeout: 2500, polling: 50 })
+      .then(
+        () => true,
+        () => false,
+      );
+  }
+
+  /**
    * Tab (ou Shift+Tab, se o elemento está antes do foco na página) até o foco chegar no elemento
    * `teste`, conferindo o foco a cada tecla.
    */

@@ -339,12 +339,15 @@ export type Conectividade = 'internet' | 'portal' | 'sem' | 'desconhecida';
 
 export type ErroSistema = 'senha' | 'falhou' | 'negado' | 'grande';
 
-/** Uma VPN do Writer OS (PLANO §7, "VPN"): WireGuard (`.conf`) ou OpenVPN (`.ovpn`). A senha nunca volta à página. */
+/**
+ * Uma VPN do Writer OS (PLANO §7, "VPN"): WireGuard (`.conf`), OpenVPN (`.ovpn`) ou, sem arquivo, uma VPN de empresa
+ * pelo openconnect (W5a: `protocolo` e `servidor`). A senha nunca volta à página.
+ */
 export interface VpnOS {
   nome: string;
-  tipo: 'wireguard' | 'openvpn';
+  tipo: 'wireguard' | 'openvpn' | 'openconnect';
   ligada: boolean;
-  /** O `.ovpn` pede usuário e senha (`auth-user-pass`). */
+  /** O `.ovpn` pede usuário e senha (`auth-user-pass`); a VPN de empresa sempre pede. */
   pedeSenha: boolean;
   /** O usuário e a senha já estão guardados (cifrados, no cofre): Ligar não pergunta. */
   temSenha: boolean;
@@ -352,15 +355,43 @@ export interface VpnOS {
   usuario: string | null;
   /** "Ligar sozinha quando houver internet" (padrão: não). */
   sozinha: boolean;
+  /** A VPN de empresa: o protocolo do openconnect (`null` nas outras). */
+  protocolo: ProtocoloVpn | null;
+  /** A VPN de empresa: o servidor, como a pessoa deu (`null` nas outras). */
+  servidor: string | null;
+  /** A VPN de empresa já pediu um código (segundo fator): Ligar sempre pergunta, e ela não liga sozinha. */
+  pedeCodigo: boolean;
+}
+
+/** Os protocolos da VPN de empresa (openconnect): Cisco AnyConnect, Palo Alto GlobalProtect e Fortinet. */
+export type ProtocoloVpn = 'anyconnect' | 'gp' | 'fortinet';
+
+/** O que a tela "Adicionar VPN de empresa" pede. */
+export interface NovaVpnEmpresa {
+  protocolo: ProtocoloVpn;
+  servidor: string;
+  usuario: string;
+  senha: string;
+}
+
+/** O que mais vai ao ligar uma VPN de empresa: o código do segundo fator e a impressão do certificado em que confiar. */
+export interface ExtraVpn {
+  codigo?: string | null;
+  confiar?: string | null;
 }
 
 /**
  * O que deu errado com uma VPN: `tipo` (não é `.conf` nem `.ovpn`), `grande` (mais de 64 kB), `proibida` (o arquivo pede
  * para rodar um programa: `diretiva` diz qual), `arquivo` (aponta para um arquivo de fora em vez do certificado
- * embutido), `invalido` (não é um arquivo de VPN), `senha` (usuário ou senha recusados), `negado`, `falhou`.
+ * embutido), `invalido` (não é um arquivo de VPN), `senha` (usuário, senha ou código recusados), `negado`, `falhou`.
+ * Só na VPN de empresa (W5a): `servidor` (o endereço não serve ou o servidor não respondeu), `certificado` (o sistema não
+ * conhece o certificado do servidor: `impressao` diz qual, para conferir com a TI e confiar), `segundo-fator` (o servidor
+ * pediu um código) e `sso` (o servidor só aceita o login pelo navegador, que o Writer OS não tem).
  */
-export type ErroVpn = 'tipo' | 'grande' | 'proibida' | 'arquivo' | 'invalido' | 'senha' | 'negado' | 'falhou';
-export type RespostaVpn = { ok: true; nome: string } | { ok: false; erro: ErroVpn; diretiva?: string };
+export type ErroVpn =
+  | 'tipo' | 'grande' | 'proibida' | 'arquivo' | 'invalido' | 'senha' | 'negado' | 'falhou'
+  | 'servidor' | 'certificado' | 'segundo-fator' | 'sso';
+export type RespostaVpn = { ok: true; nome: string } | { ok: false; erro: ErroVpn; diretiva?: string; impressao?: string };
 export type RespostaSistema = { ok: true } | { ok: false; erro: ErroSistema };
 
 export interface PonteSistema {
@@ -405,8 +436,17 @@ export interface PonteSistema {
   vpns(): Promise<VpnOS[]>;
   /** Importa um `.conf` (WireGuard) ou `.ovpn` (OpenVPN), até 64 kB; vai também, cifrado, para o cofre. */
   importarVpn(arquivo: string, bytes: Uint8Array): Promise<RespostaVpn>;
-  /** Liga. No OpenVPN que pede, o usuário e a senha (guardados no cofre se der certo); sem eles, os guardados. */
-  ligarVpn(nome: string, usuario?: string | null, senha?: string | null): Promise<RespostaVpn>;
+  /**
+   * Cria uma VPN de empresa (W5a: openconnect, sem arquivo) e guarda no cofre o usuário e a senha; quem liga é o
+   * `ligarVpn` (que pode devolver `certificado` ou `segundo-fator`).
+   */
+  adicionarVpnEmpresa(nova: NovaVpnEmpresa): Promise<RespostaVpn>;
+  /**
+   * Liga. No OpenVPN que pede, o usuário e a senha (guardados no cofre se der certo); sem eles, os guardados. Na VPN de
+   * empresa, também `extra`: o código do segundo fator (nunca guardado) e a impressão do certificado em que confiar
+   * (guardada se ligar).
+   */
+  ligarVpn(nome: string, usuario?: string | null, senha?: string | null, extra?: ExtraVpn): Promise<RespostaVpn>;
   desligarVpn(nome: string): Promise<RespostaVpn>;
   /** Tira do sistema e do cofre. */
   esquecerVpn(nome: string): Promise<void>;
