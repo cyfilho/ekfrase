@@ -40,7 +40,22 @@ import { gravarInteiro } from '../motor/pastas.ts';
 import type { Conectividade } from '../motor/portal-regras.ts';
 import { abrirSelado, novoPar, publicaDaPrivada, selar } from '../motor/selo.ts';
 import { FUSOS, TECLADOS, type Sistema } from '../motor/sistema.ts';
-import { filtrarVpn, MAXIMO_VPN, nomeDaVpn, qualLigarSozinha, tipoDaVpn, usuarioValido, type TipoVpn } from '../motor/vpn-regras.ts';
+import {
+  codigoValido,
+  filtrarVpn,
+  IMPRESSAO_VPN,
+  limparServidor,
+  MAXIMO_VPN,
+  nomeDaVpn,
+  nomeDaVpnEmpresa,
+  protocoloValido,
+  qualLigarSozinha,
+  servidorValido,
+  tipoDaVpn,
+  usuarioValido,
+  type ProtocoloVpn,
+  type TipoVpn,
+} from '../motor/vpn-regras.ts';
 import { NOME_DA_PASTA, type DadosDoWriter } from './dados.ts';
 import type { Pagina } from './pagina.ts';
 
@@ -62,16 +77,27 @@ interface RedeGuardada {
   senha: string | null;
 }
 
-/** Uma VPN no cofre (segredo `vpns`): o arquivo como veio (já filtrado), o usuário, a senha e o "ligar sozinha". */
+/**
+ * Uma VPN no cofre (segredo `vpns`): o arquivo como veio (já filtrado), o usuário, a senha e o "ligar sozinha". A VPN de
+ * empresa (W5a, `tipo: 'openconnect'`) não tem arquivo (`''`): tem o protocolo, o servidor, a impressão do certificado
+ * em que a pessoa confiou (`pin`) e se já pediu código (`segundoFator`). O código e o cookie nunca vêm para cá.
+ */
 interface VpnGuardada {
   nome: string;
-  tipo: TipoVpn;
+  tipo: TipoVpn | 'openconnect';
   arquivo: string;
   pedeSenha: boolean;
   usuario: string | null;
   senha: string | null;
   sozinha: boolean;
+  protocolo?: ProtocoloVpn;
+  servidor?: string;
+  pin?: string | null;
+  segundoFator?: boolean;
 }
+
+/** O limite da senha de VPN (a que vai ao stdin do openconnect ou ao passwd-file do NetworkManager). */
+const senhaValida = (s: unknown): s is string => typeof s === 'string' && s.length >= 1 && s.length <= 256 && !/[\r\n\u0000]/.test(s);
 
 /** A cada quanto a vigia da VPN olha se é hora de ligar a que liga sozinha (Portal + VPN, PLANO §7). */
 const VIGIA_VPN_MS = 20_000;
@@ -555,7 +581,14 @@ export class WriterOS {
   private vpnsGuardadas(): VpnGuardada[] {
     try {
       const l = JSON.parse(this.dados?.cofreAberto?.segredo('vpns') ?? '[]') as VpnGuardada[];
-      return Array.isArray(l) ? l.filter((v) => typeof v?.nome === 'string' && (v.tipo === 'wireguard' || v.tipo === 'openvpn') && typeof v.arquivo === 'string') : [];
+      return Array.isArray(l)
+        ? l.filter(
+            (v) =>
+              typeof v?.nome === 'string' &&
+              typeof v.arquivo === 'string' &&
+              (v.tipo === 'wireguard' || v.tipo === 'openvpn' || (v.tipo === 'openconnect' && protocoloValido(v.protocolo) && servidorValido(v.servidor))),
+          )
+        : [];
     } catch {
       return [];
     }
@@ -580,8 +613,73 @@ export class WriterOS {
     return (await this.sistema.vpns()).map((v) => {
       const g = guardadas.find((x) => x.nome === v.nome);
       const pedeSenha = g?.pedeSenha ?? this.infoVpn.get(v.nome)?.pedeSenha ?? false;
-      return { nome: v.nome, tipo: v.tipo, ligada: v.ligada, pedeSenha, temSenha: !!(g?.usuario && g.senha), usuario: g?.usuario ?? null, sozinha: g?.sozinha ?? false };
+      return {
+        nome: v.nome,
+        tipo: v.tipo,
+        ligada: v.ligada,
+        pedeSenha,
+        temSenha: !!(g?.usuario && g.senha),
+        usuario: g?.usuario ?? null,
+        sozinha: g?.sozinha ?? false,
+        protocolo: g?.tipo === 'openconnect' ? (g.protocolo ?? null) : null,
+        servidor: g?.tipo === 'openconnect' ? (g.servidor ?? null) : null,
+        pedeCodigo: g?.segundoFator === true,
+      };
     });
+  }
+
+  /**
+   * Uma VPN de empresa (W5a; PLANO §7, "VPN de empresa"): sem arquivo, o tipo, o servidor, o usuário e a senha. O
+   * `ekfrase-vpn.service` cria a conexão (o servidor conferido de novo, lá); o cofre guarda tudo menos o código e o
+   * cookie. Quem liga é o `ligarVpn`.
+   */
+  async adicionarVpnEmpresa(nova: unknown): Promise<RespostaVpn> {
+    const n = (nova ?? {}) as Record<string, unknown>;
+    const protocolo = n['protocolo'];
+    if (!protocoloValido(protocolo)) return { ok: false, erro: 'invalido' };
+    const servidor = typeof n['servidor'] === 'string' ? limparServidor(n['servidor']) : '';
+    if (!servidorValido(servidor)) return { ok: false, erro: 'servidor' };
+    const usuario = n['usuario'];
+    const senha = n['senha'];
+    if (typeof usuario !== 'string' || !usuarioValido(usuario) || !senhaValida(senha)) return { ok: false, erro: 'senha' };
+    const existentes = [...(await this.sistema.vpns()).map((v) => v.nome), ...this.vpnsGuardadas().map((v) => v.nome)];
+    const nome = nomeDaVpnEmpresa(servidor, existentes);
+    const r = await this.sistema.criarVpnEmpresa(nome, protocolo, servidor);
+    this.depurar?.(`vpn criou openconnect ${r.ok ? 'ok' : r.erro}`);
+    if (!r.ok) return r;
+    this.infoVpn.set(nome, { pedeSenha: true });
+    this.guardarVpns([
+      ...this.vpnsGuardadas().filter((v) => v.nome !== nome),
+      { nome, tipo: 'openconnect', arquivo: '', pedeSenha: true, usuario, senha, sozinha: false, protocolo, servidor, pin: null, segundoFator: false },
+    ]);
+    return { ok: true, nome };
+  }
+
+  /** Liga uma VPN de empresa (o `ligarVpn` chega aqui): o certificado em que confiar, o código e o que vai ao cofre. */
+  private async ligarVpnEmpresa(g: VpnGuardada, usuario: unknown, senha: unknown, extra: unknown): Promise<RespostaVpn> {
+    const e = (extra ?? {}) as Record<string, unknown>;
+    const u = typeof usuario === 'string' && usuario ? usuario : g.usuario;
+    const s = typeof senha === 'string' && senha ? senha : g.senha;
+    if (!u || !usuarioValido(u) || !senhaValida(s)) return { ok: false, erro: 'senha' };
+    const codigo = e['codigo'] === undefined || e['codigo'] === null || e['codigo'] === '' ? null : e['codigo'];
+    if (codigo !== null && !codigoValido(codigo)) return { ok: false, erro: 'senha' };
+    const confiar = typeof e['confiar'] === 'string' && IMPRESSAO_VPN.test(e['confiar']) ? e['confiar'] : null;
+    if (!g.protocolo || !g.servidor) return { ok: false, erro: 'falhou' };
+    const r = await this.sistema.ligarVpnEmpresa(g.nome, { protocolo: g.protocolo, servidor: g.servidor, usuario: u, senha: s, codigo, pin: confiar ?? g.pin ?? null });
+    this.depurar?.(`vpn ligar openconnect ${r.ok ? 'ok' : r.erro}`);
+    if (!r.ok) {
+      // o servidor pediu código: a VPN passa a perguntar sempre (e não liga sozinha)
+      if (r.erro === 'segundo-fator' && !g.segundoFator) this.mudarVpnGuardada(g.nome, { segundoFator: true });
+      return { ok: false, erro: r.erro, ...(r.impressao ? { impressao: r.impressao } : {}) };
+    }
+    this.desligadasAMao.delete(g.nome);
+    this.esperarVpn.delete(g.nome);
+    const mudar: Partial<VpnGuardada> = {};
+    if (g.usuario !== u || g.senha !== s) Object.assign(mudar, { usuario: u, senha: s });
+    if (confiar && g.pin !== confiar) mudar.pin = confiar;
+    if (codigo && !g.segundoFator) mudar.segundoFator = true;
+    if (Object.keys(mudar).length) this.mudarVpnGuardada(g.nome, mudar);
+    return { ok: true, nome: g.nome };
   }
 
   /** Um `.conf` ou `.ovpn` vindo de um pendrive: o filtro, o nome, o NetworkManager (pelo serviço) e o cofre. */
@@ -609,8 +707,9 @@ export class WriterOS {
   }
 
   /** Liga. No OpenVPN que pede usuário e senha: os dados agora ou os do cofre (e os novos vão ao cofre se der certo). */
-  async ligarVpn(nome: string, usuario?: unknown, senha?: unknown): Promise<RespostaVpn> {
+  async ligarVpn(nome: string, usuario?: unknown, senha?: unknown, extra?: unknown): Promise<RespostaVpn> {
     const g = this.vpnsGuardadas().find((v) => v.nome === nome);
+    if (g?.tipo === 'openconnect') return this.ligarVpnEmpresa(g, usuario, senha, extra);
     if (!g && !(await this.sistema.vpns()).some((v) => v.nome === nome)) return { ok: false, erro: 'falhou' };
     const pede = g?.pedeSenha ?? this.infoVpn.get(nome)?.pedeSenha ?? false;
     let u: string | null = null;
@@ -654,7 +753,10 @@ export class WriterOS {
     for (const g of this.vpnsGuardadas()) {
       this.infoVpn.set(g.nome, { pedeSenha: g.pedeSenha });
       if (noSistema.has(g.nome)) continue;
-      const r = await this.sistema.importarVpn(g.tipo, g.nome, g.arquivo);
+      const r =
+        g.tipo === 'openconnect'
+          ? await this.sistema.criarVpnEmpresa(g.nome, g.protocolo as ProtocoloVpn, g.servidor as string)
+          : await this.sistema.importarVpn(g.tipo, g.nome, g.arquivo);
       this.depurar?.(`vpn voltou ${r.ok ? 'ok' : r.erro}`);
     }
     if (!this.vigiaVpn) {
@@ -672,7 +774,7 @@ export class WriterOS {
     this.ligandoSozinha = true;
     try {
       const agora = Date.now();
-      const lista = (await this.vpns()).map((v) => ({ nome: v.nome, ligada: v.ligada, sozinha: v.sozinha && (this.esperarVpn.get(v.nome) ?? 0) <= agora, faltaSenha: v.pedeSenha && !v.temSenha }));
+      const lista = (await this.vpns()).map((v) => ({ nome: v.nome, ligada: v.ligada, sozinha: v.sozinha && (this.esperarVpn.get(v.nome) ?? 0) <= agora, faltaSenha: (v.pedeSenha && !v.temSenha) || v.pedeCodigo }));
       if (!lista.some((v) => v.sozinha)) return null;
       const nome = qualLigarSozinha(lista, await this.sistema.conectividade(false), this.desligadasAMao);
       if (!nome) return null;

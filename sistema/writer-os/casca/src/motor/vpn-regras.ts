@@ -195,3 +195,110 @@ export function qualLigarSozinha(vpns: readonly VpnParaLigar[], conectividade: s
 
 /** Usuário de VPN que vai ao `vpn.data` do NetworkManager (sem vírgula, `=`, barra invertida nem controles). */
 export const usuarioValido = (u: string): boolean => u.length >= 1 && u.length <= 128 && !/[,=\\\u0000-\u001f\u007f]/.test(u);
+
+// ---------- a VPN de empresa (W5a; PLANO §7, "VPN de empresa"): Cisco AnyConnect, Palo Alto GlobalProtect e Fortinet ----------
+// Não há arquivo: a pessoa diz o tipo, o servidor, o usuário e a senha. A casca autentica como writer
+// (`openconnect --authenticate`, sem túnel nem root) e passa o cookie ao NetworkManager pelo `passwd-file`; quem cria a
+// conexão é o `ekfrase-vpn.sh` (root), com a mesma regra do servidor.
+
+/** Os protocolos do openconnect que a tela oferece (AnyConnect da Cisco, GlobalProtect da Palo Alto, Fortinet). */
+export const PROTOCOLOS_VPN = ['anyconnect', 'gp', 'fortinet'] as const;
+export type ProtocoloVpn = (typeof PROTOCOLOS_VPN)[number];
+export const protocoloValido = (p: unknown): p is ProtocoloVpn => typeof p === 'string' && (PROTOCOLOS_VPN as readonly string[]).includes(p);
+
+/**
+ * O servidor: um nome (rótulos de letras sem acento, números e `-`) ou um IPv4, ou um IPv6 entre colchetes; `:porta` e
+ * `/grupo` (o "grupo" da URL do AnyConnect) opcionais. O MESMO texto está no `ekfrase-vpn.sh` (`SERVIDOR=`): o
+ * `tests/casca.test.ts` compara. Sem espaço, sem `-` no começo, sem `https://` (a tela tira antes).
+ */
+export const SERVIDOR_VPN = String.raw`^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]{2,45}\])(:([0-9]{1,5}))?(/[A-Za-z0-9._~/-]{1,64})?$`;
+const RE_SERVIDOR = new RegExp(SERVIDOR_VPN);
+
+/** O servidor que a casca e o serviço aceitam (o nome até 253, a porta de 1 a 65535, sem zero à esquerda). */
+export function servidorValido(s: unknown): s is string {
+  if (typeof s !== 'string' || s.length > 330) return false;
+  const m = RE_SERVIDOR.exec(s);
+  if (!m) return false;
+  if ((m[1] ?? '').length > 253) return false;
+  const porta = m[6];
+  return porta === undefined || (/^[1-9][0-9]{0,4}$/.test(porta) && Number(porta) <= 65535);
+}
+
+/** O que a pessoa colou, do jeito que o serviço aceita: sem espaços nas pontas, sem `https://` e sem a `/` do fim. */
+export function limparServidor(s: string): string {
+  return s.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
+/** O nome do servidor (sem a porta nem o grupo, sem os colchetes do IPv6): vai ao `/run/ekfrase/vpn-servidores`. */
+export function hostDoServidor(s: string): string {
+  const m = RE_SERVIDOR.exec(s);
+  return (m?.[1] ?? s).replace(/^\[|\]$/g, '');
+}
+
+/** O nome da conexão de uma VPN de empresa: o do servidor, como o `nomeDaVpn` faria com um arquivo (até 15, sem repetir). */
+export const nomeDaVpnEmpresa = (servidor: string, existentes: readonly string[]): string =>
+  nomeDaVpn(`${hostDoServidor(servidor).replace(/[.:]/g, '-')}.vpn`, existentes);
+
+/** A impressão do certificado que o `--servercert` aceita (a que o openconnect sugere: `pin-sha256:` + SHA-256 em base64). */
+export const IMPRESSAO_VPN = /^pin-sha256:[A-Za-z0-9+/]{43}=$/;
+
+/** A impressão do `autoassinado.exemplo.local` do sistema simulado (os roteiros conferem que a tela a mostra). */
+export const IMPRESSAO_SIMULADA = 'pin-sha256:EkfraseWriterOSsimuladoAutoassinado01234567=';
+
+/** O código do segundo fator (o do aplicativo, do SMS ou do token): sem espaço nem controle, até 64. */
+export const codigoValido = (c: unknown): c is string => typeof c === 'string' && /^[\x21-\x7e]{1,64}$/.test(c);
+
+/** O que o `openconnect --authenticate` imprime (como atribuições de shell) e a casca passa ao NetworkManager. */
+export interface Autenticacao {
+  cookie: string;
+  /** O servidor para o túnel: o `CONNECT_URL` (com a porta e o grupo) ou, sem ele, o `HOST`. */
+  gateway: string;
+  /** O certificado do servidor (`FINGERPRINT`), que o túnel exige igual (`--servercert`). */
+  gwcert: string;
+  resolve: string | null;
+}
+
+/**
+ * Lê a saída do `openconnect --authenticate`: só as linhas `NOME='valor'` dos cinco nomes (`COOKIE`, `HOST`,
+ * `CONNECT_URL`, `FINGERPRINT`, `RESOLVE`), desfazendo o `'\''` das aspas; qualquer outra coisa é ignorada. Sem o
+ * cookie, o servidor ou o certificado, `null`.
+ */
+export function lerAutenticacao(saida: string): Autenticacao | null {
+  const v = new Map<string, string>();
+  for (const linha of saida.split(/\r?\n/)) {
+    const m = /^(COOKIE|HOST|CONNECT_URL|FINGERPRINT|RESOLVE)='((?:[^']|'\\'')*)'$/.exec(linha);
+    if (!m?.[1] || v.has(m[1])) continue;
+    const valor = (m[2] ?? '').replace(/'\\''/g, "'");
+    // nada de quebra de linha nem controle: o valor vai a uma linha do passwd-file
+    if (!valor || /[\u0000-\u001f\u007f]/.test(valor) || valor.length > 8192) continue;
+    v.set(m[1], valor);
+  }
+  const cookie = v.get('COOKIE');
+  const gateway = v.get('CONNECT_URL') ?? v.get('HOST');
+  const gwcert = v.get('FINGERPRINT');
+  if (!cookie || !gateway || !gwcert) return null;
+  return { cookie, gateway, gwcert, resolve: v.get('RESOLVE') ?? null };
+}
+
+export type ErroOpenconnect = 'certificado' | 'senha' | 'segundo-fator' | 'servidor' | 'sso' | 'falhou';
+
+/**
+ * O que deu errado, pelo que o openconnect escreveu no stderr (com `LC_ALL=C`, em inglês):
+ * - `certificado`: o sistema não conhece o certificado do servidor; o openconnect sugere `--servercert pin-sha256:…`,
+ *   que volta como `impressao` (a tela mostra, "confira com a TI", e "Confiar" liga com ele);
+ * - `sso`: o servidor só aceita o login pelo navegador (SAML), que o Writer OS não tem (o limite do PLANO);
+ * - `senha`: usuário, senha ou código recusados;
+ * - `segundo-fator`: a senha passou e o servidor pediu mais um campo (o código), que não havia (`--non-inter`);
+ * - `servidor`: o servidor não respondeu (nome que não existe, porta fechada, sem internet);
+ * - `falhou`: o resto.
+ */
+export function erroDoOpenconnect(stderr: string, comCodigo: boolean): { erro: ErroOpenconnect; impressao?: string } {
+  const pin = /--servercert\s+(pin-sha256:[A-Za-z0-9+/]{43}=)/.exec(stderr)?.[1];
+  if (pin) return { erro: 'certificado', impressao: pin };
+  if (/\bSAML\b|single sign-on|external browser|\bSSO\b/i.test(stderr)) return { erro: 'sso' };
+  const recusou = /login failed|authentication failed|auth(?:entication)? (?:error|rejected)|invalid (?:user|password|credential|login)|incorrect|access denied|wrong password|bad password|password (?:is )?incorrect|login error|unauthori[sz]ed/i.test(stderr);
+  if (recusou) return { erro: 'senha' };
+  if (/User input required in non-interactive mode/i.test(stderr)) return { erro: comCodigo ? 'senha' : 'segundo-fator' };
+  if (/Failed to (?:connect to|open HTTPS connection|reconnect)|getaddrinfo failed|Failed to resolve|Connection refused|Connection timed out|timed out|No route to host|Network is unreachable|SSL connection failure|Failed to establish/i.test(stderr)) return { erro: 'servidor' };
+  return { erro: 'falhou' };
+}
