@@ -18,12 +18,18 @@
  *   bootorder <lista>       o BootOrder do firmware (ao ligar e depois de instalar), como o efibootmgr mostra
  *   entrada-writer <n>      a entrada "Ekfrase Writer OS" que existe no firmware (Boot<n>)
  *   instalar ok | <erro>    o fim de uma instalação no computador
+ *   vpn empresa …           a VPN de empresa contra o ocserv do CI (W5a; só com /run/ekfrase/teste/vpn-empresa):
+ *                           `adicionar ok`, `ligar certificado <pin>`, `senha-errada senha`, `confiar ok`, `ok`,
+ *                           `ip <endereço do túnel>`, `desligar ok`, `2fa-sem-codigo segundo-fator`, `2fa ok`, `fim`;
+ *                           `saida <rótulo> <linha>` = o que o openconnect e o nmcli disseram quando falhou
  *   atualizacao …           as atualizações (atualizacoes-os.ts): `boot <lado> <versão> atual=… novo=… falhou=…`,
  *                           cada situação (`procurando`, `baixando <v>`, `pronta <v>`, `erro - <código>`…),
  *                           `confirmada <lado> <v>`, `sem-confirmar <lado>`, `voltou <de> <para>`
  */
 import { DONO_LOCAL, Escrita } from '@ekfrase/writer-nucleo';
+import { createHmac } from 'node:crypto';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Sistema } from '../motor/sistema.ts';
 import type { AtualizacoesOS } from './atualizacoes-os.ts';
@@ -159,6 +165,7 @@ export function ligarAgente(o: { relato: string; pagina: Pagina; dados: DadosDoW
     } else dizer('usb sem-disco');
     dizer(`interno ${await o.sistema.montarInterno()}`);
     if (o.os) await conferirVpn(o.os, o.sistema, dizer);
+    if (o.os) await conferirVpnEmpresa(o.os, o.sistema, dizer);
 
     // o laço: cada linha "gravado N" só sai depois de o banco confirmar a gravação
     for (let i = 0; i < VOLTAS && o.dados.aberta; i++) {
@@ -197,4 +204,97 @@ async function conferirVpn(os: WriterOS, sistema: Sistema, dizer: (l: string) =>
   const r = await os.importarVpn('ekfrase-teste.conf', new Uint8Array(bytes));
   dizer(`vpn importar ${r.ok ? 'ok' : r.erro}`);
   if (r.ok) dizer(`vpn dono ${(await sistema.donoDaConexao(r.nome)) ?? '?'}`);
+}
+
+/** O que o `qemu.py` passa pelo fw_cfg `opt/ekfrase/vpn-empresa` (o `ekfrase-teste.service` copia para cá). */
+export const VPN_EMPRESA_DE_TESTE = '/run/ekfrase/teste/vpn-empresa';
+
+/** O código TOTP (RFC 6238: HMAC-SHA1, 30 s, 6 dígitos) da chave em hexadecimal: o segundo fator do ocserv do CI. */
+export function totp(chaveHex: string, agora = Date.now()): string {
+  const passo = Buffer.alloc(8);
+  passo.writeBigUInt64BE(BigInt(Math.floor(agora / 1000 / 30)));
+  const h = createHmac('sha1', Buffer.from(chaveHex, 'hex')).update(passo).digest();
+  const i = (h[h.length - 1] ?? 0) & 0xf;
+  return String((h.readUInt32BE(i) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/**
+ * A VPN de empresa (W5a; PLANO §7, "VPN de empresa"), contra um ocserv de verdade no computador que roda o QEMU: criar
+ * (pelo `ekfrase-vpn.service`), o certificado autoassinado (`certificado` com a impressão), a senha errada, confiar e
+ * ligar (o NetworkManager com os segredos do `passwd-file`: o risco que o PLANO manda provar primeiro), o endereço do
+ * túnel, desligar e, no 2º servidor, o segundo fator (sem o código = `segundo-fator`; com o TOTP = liga).
+ */
+async function conferirVpnEmpresa(os: WriterOS, sistema: Sistema, dizer: (l: string) => void): Promise<void> {
+  if (sistema.simulado) return;
+  let d: Record<string, string>;
+  try {
+    d = JSON.parse(readFileSync(VPN_EMPRESA_DE_TESTE, 'utf8')) as Record<string, string>;
+  } catch {
+    return;
+  }
+  const contarSaida = (rotulo: string) => {
+    for (const l of (sistema.ultimaSaidaVpn ?? '').split('\n').filter((x) => x.trim()).slice(-30)) dizer(`vpn empresa saida ${rotulo} ${l.slice(0, 240)}`);
+  };
+  const resposta = (r: { ok: boolean; erro?: string; impressao?: string }) => (r.ok ? 'ok' : `${r.erro ?? '?'}${r.impressao ? ` ${r.impressao}` : ''}`);
+  const ipDoTunel = () =>
+    Object.values(networkInterfaces())
+      .flat()
+      .find((e) => e?.family === 'IPv4' && (e.address ?? '').startsWith(d['rede'] ?? '192.168.99.'))?.address ?? 'nenhum';
+  try {
+    const a = await os.adicionarVpnEmpresa({ protocolo: 'anyconnect', servidor: d['servidor'], usuario: d['usuario'], senha: d['senha'] });
+    dizer(`vpn empresa adicionar ${resposta(a)}`);
+    if (!a.ok) return;
+    let r = await os.ligarVpn(a.nome);
+    dizer(`vpn empresa ligar ${resposta(r)}`);
+    contarSaida('ligar');
+    const pin = !r.ok && r.erro === 'certificado' ? (r.impressao ?? null) : null;
+    if (pin) {
+      const e = await os.ligarVpn(a.nome, d['usuario'], 'senha-errada', { confiar: pin });
+      dizer(`vpn empresa senha-errada ${resposta(e)}`);
+      contarSaida('senha-errada');
+      r = await os.ligarVpn(a.nome, null, null, { confiar: pin });
+      dizer(`vpn empresa confiar ${resposta(r)}`);
+      contarSaida('confiar');
+      if (!r.ok) {
+        // a prova (W5a-1): o jeito B, os segredos gravados na conexão, para saber se o plugin os usa
+        const b = await sistema.ligarVpnEmpresa(a.nome, { protocolo: 'anyconnect', servidor: d['servidor'] ?? '', usuario: d['usuario'] ?? '', senha: d['senha'] ?? '', codigo: null, pin, segredosNaConexao: true });
+        dizer(`vpn empresa jeito-b ${resposta(b)}`);
+        contarSaida('jeito-b');
+        if (b.ok) {
+          dizer(`vpn empresa jeito-b-ip ${ipDoTunel()}`);
+          await os.desligarVpn(a.nome);
+        }
+      }
+    }
+    if (r.ok) {
+      const v = (await os.vpns()).find((x) => x.nome === a.nome);
+      dizer(`vpn empresa ${v?.ligada ? 'ok' : 'nao-ligada'}`);
+      dizer(`vpn empresa ip ${ipDoTunel()}`);
+      dizer(`vpn empresa desligar ${resposta(await os.desligarVpn(a.nome))}`);
+    }
+    if (d['servidor2'] && d['totp']) {
+      const b = await os.adicionarVpnEmpresa({ protocolo: 'anyconnect', servidor: d['servidor2'], usuario: d['usuario2'], senha: d['senha2'] });
+      dizer(`vpn empresa 2fa-adicionar ${resposta(b)}`);
+      if (!b.ok) return;
+      let r2 = await os.ligarVpn(b.nome, null, null, pin ? { confiar: pin } : undefined);
+      dizer(`vpn empresa 2fa-sem-codigo ${resposta(r2)}`);
+      contarSaida('2fa-sem-codigo');
+      r2 = await os.ligarVpn(b.nome, null, null, { confiar: pin, codigo: totp(d['totp']) });
+      dizer(`vpn empresa 2fa ${resposta(r2)}`);
+      contarSaida('2fa');
+      if (r2.ok) {
+        dizer(`vpn empresa 2fa-ip ${ipDoTunel()}`);
+        await os.desligarVpn(b.nome);
+      }
+    }
+  } catch (e) {
+    dizer(`vpn empresa erro ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    dizer('vpn empresa fim');
+    try {
+      writeFileSync('/run/ekfrase/teste/vpn-empresa-fim', '');
+    } catch {
+      // o relato da imagem espera por este arquivo para mandar o journal do NetworkManager
+    }
+  }
 }
