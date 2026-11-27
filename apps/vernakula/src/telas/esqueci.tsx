@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { BarraDaSenha, chaves, mostrarSituacao } from '@ekfrase/interface';
 import { useState } from 'preact/hooks';
 import { api, type Conta } from '../api.ts';
-import { avisoDoErro, type Aviso } from '../avisos.ts';
+import { avisoDaConta, avisoDoErro, type Aviso } from '../avisos.ts';
 import { enderecoDe, irPara } from '../rotas.ts';
 import { t, tr } from '../textos.ts';
 import { MostrarAviso } from './entrar.tsx';
@@ -44,11 +45,15 @@ export function Esqueci() {
   );
 }
 
-/** Chega pelo link do e-mail (/vernakula/redefinir/<código>): grava a senha nova e já entra. */
+/**
+ * Chega pelo link do e-mail (/vernakula/redefinir/<código>): grava a senha nova e já entra. A conta que já tinha
+ * chaves fica com o cofre trancado: a janela de abrir (kit, este aparelho, outro aparelho) aparece por cima.
+ */
 export function Redefinir({ codigo, aoEntrar }: { codigo: string; aoEntrar: (c: Conta) => void }) {
   const [nova, setNova] = useState('');
   const [repetir, setRepetir] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [progresso, setProgresso] = useState<number | null>(null);
   const [aviso, setAviso] = useState<Aviso | undefined>();
 
   async function enviar(e: Event) {
@@ -57,13 +62,16 @@ export function Redefinir({ codigo, aoEntrar }: { codigo: string; aoEntrar: (c: 
     if (nova !== repetir) return setAviso({ chave: 'vernakula.redefinir.erro.repetir' });
     setOcupado(true);
     setAviso(undefined);
-    const r = await api.redefinir(codigo, nova);
+    const r = await chaves.redefinir(codigo, nova, { idioma: tr.idioma(), aoProgredir: setProgresso });
     setOcupado(false);
+    setProgresso(null);
     if (r.ok) {
       irPara('inicio');
-      return aoEntrar(r.conta);
+      aoEntrar(r.conta);
+      mostrarSituacao(t, r.situacao, tr.idioma());
+      return;
     }
-    setAviso(avisoDoErro(r, 'vernakula.redefinir.erro', ['senha_curta', 'codigo_invalido']));
+    setAviso(avisoDaConta(r, 'vernakula.redefinir.erro', ['senha_curta', 'codigo_invalido']));
   }
 
   const vencido = aviso?.chave === 'vernakula.redefinir.erro.codigo_invalido';
@@ -80,6 +88,7 @@ export function Redefinir({ codigo, aoEntrar }: { codigo: string; aoEntrar: (c: 
           {t('vernakula.redefinir.repetir')}
           <input type="password" autocomplete="new-password" value={repetir} onInput={(e) => setRepetir(e.currentTarget.value)} />
         </label>
+        <BarraDaSenha t={t} fracao={progresso} />
         <MostrarAviso aviso={aviso} />
         {vencido ? (
           <a class="botao principal" href={enderecoDe('esqueci')}>

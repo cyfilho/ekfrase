@@ -10,7 +10,9 @@
     "./*": "./src/*"
   },
   "dependencies": {
+    "@ekfrase/identidade": "0.1.0",
     "@ekfrase/nucleo": "0.1.0",
+    "@noble/hashes": "2.4.0",
     "html2canvas-pro": "2.5.2",
     "preact": "11.1.0"
   }

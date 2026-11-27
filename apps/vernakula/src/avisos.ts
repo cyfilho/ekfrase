@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { chaveDoErro } from '@ekfrase/interface';
 import type { Parametros } from '@ekfrase/nucleo';
 
 /**
@@ -21,6 +22,15 @@ export function avisoDoErro(r: { erro: string; [k: string]: unknown }, prefixo: 
   if (conhecidos.includes(r.erro)) return { chave: `${prefixo}.${r.erro}` };
   if (r.erro === 'rede') return { chave: 'nucleo.erro.rede' };
   return { chave: 'nucleo.erro.servidor' };
+}
+
+/**
+ * Como o `avisoDoErro`, para as telas da conta (entrar, senha, perfil): o que não é dos `conhecidos` ganha o texto
+ * comum da conta Ekfrase (os erros das chaves, X2: `nucleo.conta.erro.*`).
+ */
+export function avisoDaConta(r: { erro: string; [k: string]: unknown }, prefixo: string, conhecidos: readonly string[]): Aviso {
+  if (r.erro === 'bloqueado' || r.erro === 'rede' || conhecidos.includes(r.erro)) return avisoDoErro(r, prefixo, conhecidos);
+  return { chave: chaveDoErro(r.erro) };
 }
 
 /** Os marcadores {x} de um texto, em ordem (para comparar com o padrão). */

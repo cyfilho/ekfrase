@@ -1,0 +1,78 @@
+{
+  "descricao": "a chave de caixa por gerações (HKDF da semente da pessoa, sal \"ekfrase/caixa/v1\", info \"geracao:<g>\"), a declaração assinada (contexto caixa-da-pessoa), o cofre assinado (cofre-da-pessoa, sobre o cofre de cofre.json), a guarda dividida, o código do aparelho e a prova da sessão (sessao-aparelho)",
+  "semente_da_pessoa": "000102030405060708090a0b0c0d0e0f",
+  "pessoa": {
+    "publicas": {
+      "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+      "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+    },
+    "endereco": "3b98041e2b6b0799c6db09d32d30a928"
+  },
+  "geracoes": [
+    {
+      "geracao": 1,
+      "segredo": "6ba34b00bd0e9ab9a11f785a3ee67c2c7617c53c8bba4f7a12f40b122b76a57c",
+      "publica": "g-1_XBaXha6mowzq4B8p4seGqgtTG057uhPeMC1-fko"
+    },
+    {
+      "geracao": 2,
+      "segredo": "7ec8aba9542c021c271cb108d22a26a0f2a51b92f93fabafed857a87269fa93a",
+      "publica": "Okq2GnO4Y-E89nB752TYYyA6HKSb6_NP2uVG2WLYUCQ"
+    }
+  ],
+  "declaracao": {
+    "v": 1,
+    "pessoa": {
+      "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+      "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+    },
+    "geracao": 1,
+    "cifrar": "g-1_XBaXha6mowzq4B8p4seGqgtTG057uhPeMC1-fko",
+    "quando": 1795000000000,
+    "assinatura": "PB16V0xuBK4-IoEUDMfeKhzDVB37k12WfBBm-lJnUx8eT560cjj-OEBs0QYIy-xDIk1G6w7pWDgl5i7pGPJPDw"
+  },
+  "cofre": {
+    "cofre": {
+      "v": 1,
+      "kdf": {
+        "alg": "argon2id",
+        "m": 19456,
+        "t": 2,
+        "p": 1,
+        "sal": "AgICAgICAgICAgICAgICAg"
+      },
+      "nonce": "rxN8vPq5E5IWQcTQFzCok9NTeqcj2ein",
+      "cifrado": "3ePQCxN4wMLstEar6LxLgz8buuzBUc91stFWXgj7UNA"
+    },
+    "assinatura": "nxaIVtnYWZg8syBd9dho39Y8XgLxAz26ogncx7QAADE8ibpgBfXY_2eW2-pSZgKaA5UHIhjg_VQNRAY7DPC_Bw"
+  },
+  "aparelho": {
+    "semente": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "publicas": {
+      "assinar": "EI2xZ2Gyg0APbfQBx6O2xVPzRgDOEaf5vzfW8HlHW1g",
+      "cifrar": "PGIG-dJCqVe_icPP6I93en03ZasiOfWuvQcfl1aB0kg"
+    },
+    "endereco": "fb314d9aa303c1f399d10355ba59a01b",
+    "codigo": "295 824"
+  },
+  "guarda": {
+    "aparelho": "fb314d9aa303c1f399d10355ba59a01b",
+    "guarda": "TlZIuddiUOECtWbWVeS5gb6SQkS7fbaIfK5_X8gkRqI",
+    "guardado": {
+      "v": 1,
+      "nonce": "UYB6pcW56k4-ChAzlcmMeiM77oLuR4N8",
+      "cifrado": "-sF9cSWcfphWU-5k9Ln_rXWj8H9kallfRAd0HR0p07Y"
+    },
+    "semente": "000102030405060708090a0b0c0d0e0f"
+  },
+  "entrega_de_geracao": {
+    "para": "fb314d9aa303c1f399d10355ba59a01b",
+    "contexto": "caixa-da-pessoa:2",
+    "caixa": "yh5EQnIzVl7gJHIzq7eqeeOshmJ6kPXVsLBTIm5I7Uxfh6lzVRuOZvK2v-JtsgRb1DKB8FZfhCj7r8RgK-wdbvtvhfpnnh7A-eZjlYgaWGU",
+    "segredo": "7ec8aba9542c021c271cb108d22a26a0f2a51b92f93fabafed857a87269fa93a"
+  },
+  "sessao": {
+    "desafio": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "prova": "f4COsvy5spyugiDeAPRaRi9XXiOWi7neU-11dL1T9BzA4ctt4769wldk8F1wkBf68JJnK0nfV2IQXp9YhWFaDg"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "descricao": "valor → JSON canônico (o que se assina); \"recusados\" não podem ser escritos",
+  "casos": [
+    {
+      "valor": {
+        "b": 1,
+        "a": [
+          true,
+          false,
+          null
+        ],
+        "c": "x"
+      },
+      "canonico": "{\"a\":[true,false,null],\"b\":1,\"c\":\"x\"}"
+    },
+    {
+      "valor": {
+        "nome": "Celular do João",
+        "aspas": "a \"b\" \\ c",
+        "vazio": {}
+      },
+      "canonico": "{\"aspas\":\"a \\\"b\\\" \\\\ c\",\"nome\":\"Celular do João\",\"vazio\":{}}"
+    },
+    {
+      "valor": {
+        "z": {
+          "y": 2,
+          "x": 1
+        },
+        "n": -9007199254740991
+      },
+      "canonico": "{\"n\":-9007199254740991,\"z\":{\"x\":1,\"y\":2}}"
+    }
+  ],
+  "recusados": [
+    {
+      "valor": 1.5
+    },
+    {
+      "valor": 9007199254740992
+    },
+    {
+      "valor": "sino\u0007"
+    },
+    {
+      "valor": "linha\u2028nova"
+    },
+    {
+      "valor": {
+        "a": "tab\tdentro"
+      }
+    }
+  ]
+}

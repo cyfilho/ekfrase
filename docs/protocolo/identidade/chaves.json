@@ -1,0 +1,55 @@
+{
+  "descricao": "semente → segredos (HKDF), públicas (Ed25519, X25519), endereço; e assinaturas com contexto",
+  "identidades": [
+    {
+      "semente": "000102030405060708090a0b0c0d0e0f",
+      "segredos": {
+        "assinar": "adf2a94c81c4398c931818975ee7face9a4ca4435b32b1dadaeae496ead204ff",
+        "cifrar": "88ff6c804efcf9b6dcfc015b9cbb1b0fa500978822721eeb9858f9919e9fbd5e"
+      },
+      "publicas": {
+        "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+        "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+      },
+      "endereco": "3b98041e2b6b0799c6db09d32d30a928"
+    },
+    {
+      "semente": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "segredos": {
+        "assinar": "bbbd4d8313d45ef9646eae985344f359873e0e20b84be366a89b0e7274469d02",
+        "cifrar": "927304162b80c30aa607bb369872457f9b514762eecae97c168a89dc40895581"
+      },
+      "publicas": {
+        "assinar": "EI2xZ2Gyg0APbfQBx6O2xVPzRgDOEaf5vzfW8HlHW1g",
+        "cifrar": "PGIG-dJCqVe_icPP6I93en03ZasiOfWuvQcfl1aB0kg"
+      },
+      "endereco": "fb314d9aa303c1f399d10355ba59a01b"
+    },
+    {
+      "semente": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "segredos": {
+        "assinar": "a8a64c6ab69f556da6a5765f9680439d9c7b03466246b3050f105c1bcaddc973",
+        "cifrar": "8d8d9ba3526ef585e051a025e58db0f444cb4b66d81bd191ac75c925abff4f4e"
+      },
+      "publicas": {
+        "assinar": "7N8y-ECkQedoT5OCbxGM3prqHprKpeGDOCw449lXSfU",
+        "cifrar": "gltilIVQu_lH7qmXvU_QjOb-SMGZeAyqQz7-5yuXXQ4"
+      },
+      "endereco": "e8bb70e0570e378d9878f8edfd4b9939"
+    }
+  ],
+  "assinaturas": [
+    {
+      "semente": "000102030405060708090a0b0c0d0e0f",
+      "contexto": "teste",
+      "mensagem": "456b6672617365",
+      "assinatura": "baef97ada4bdf72e475b7d2fe3f63d2b94d52b2fe0a85338efe165a19998de7799254c33c57d5c36bca994d02921fca3d044222c04e4a4ed2973af0a4542970f"
+    },
+    {
+      "semente": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "contexto": "envelope",
+      "mensagem": "",
+      "assinatura": "56f447028d402e43161e38783c936214e8338ca34d75258d46fccd8a43fb08046adab2804a7cc849efcacfddb5ddb3c68e9f33e51c96621f2c29a20928f03f06"
+    }
+  ]
+}

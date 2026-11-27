@@ -9,12 +9,40 @@ import type { VNode } from 'preact';
 import { useState } from 'preact/hooks';
 import { ambienteFechado } from './ambiente.ts';
 import { site } from './enderecos.ts';
-import { criarConta, entrar, esqueciSenha, redefinirSenha, type Conta } from './ponte.ts';
+import { criarConta, entrar, redefinir } from './chaves.ts';
+import { mostrarSituacao } from './Chaves.tsx';
+import { esqueciSenha, type Conta } from './ponte.ts';
 import type { T } from './tipos.ts';
 
-const ERROS = ['dados', 'vazio', 'email', 'senha_curta', 'email_usado', 'bloqueado', 'email_desligado', 'codigo_invalido', 'rede'];
-function textoDoErro(t: T, codigo: string, extra: Record<string, unknown>): string {
-  return ERROS.includes(codigo) ? t(`nucleo.conta.erro.${codigo}`, { minutos: Number(extra['minutos'] ?? 15) }) : t('nucleo.erro.servidor');
+/** Os códigos com texto em `nucleo.conta.erro.<código>` (os da conta de sempre e os das chaves, X2). */
+const ERROS = new Set([
+  'dados', 'vazio', 'email', 'senha_curta', 'email_usado', 'bloqueado', 'email_desligado', 'codigo_invalido', 'rede',
+  'senha_atual', 'antiga', 'versao', 'chaves', 'sem_sodium', 'kdf', 'assinatura', 'revogado', 'trancado', 'rebaixado', 'cofre',
+  'kit_quantidade', 'kit_palavra', 'kit_conferencia', 'kit_outra_pessoa', 'sem_copia', 'pedido_vencido', 'cancelado',
+  'nao_trancado', 'muitos', 'prova', 'outra_pessoa', 'nome', 'codigo_errado', 'codigo_recusado',
+]);
+/** A chave do texto de um código de erro da conta (para quem guarda o aviso como chave, como o Vernákula). */
+export function chaveDoErro(codigo: string): string {
+  return ERROS.has(codigo) ? `nucleo.conta.erro.${codigo}` : 'nucleo.erro.servidor';
+}
+/** O texto de um código de erro da conta (o que não tem texto vira "algo deu errado no servidor"). */
+export function textoDoErro(t: T, codigo: string, extra: Record<string, unknown> = {}): string {
+  return t(chaveDoErro(codigo), { minutos: Number(extra['minutos'] ?? 15) });
+}
+
+/** A barra "Protegendo a sua senha" (o Argon2id leva alguns segundos; `fracao` de 0 a 1, ou `null` = escondida). */
+export function BarraDaSenha({ t, fracao }: { t: T; fracao: number | null }) {
+  if (fracao === null) return null;
+  const pct = Math.round(Math.min(1, Math.max(0, fracao)) * 100);
+  return (
+    <div class="ekf-barra-senha" role="status">
+      <span id="ekf-barra-senha-rotulo">{t('nucleo.conta.protegendo')}</span>
+      <div class="ekf-barra" role="progressbar" aria-labelledby="ekf-barra-senha-rotulo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <small>{t('nucleo.conta.protegendo.dica')}</small>
+    </div>
+  );
 }
 
 export type ModoConta = 'entrar' | 'criar' | 'esqueci';
@@ -56,6 +84,7 @@ export function FormConta({
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [progresso, setProgresso] = useState<number | null>(null);
 
   const trocar = (m: ModoConta) => {
     setModo(m);
@@ -79,10 +108,14 @@ export function FormConta({
       else setErro(textoDoErro(t, r.erro, r));
       return;
     }
-    const r = modo === 'entrar' ? await entrar(email, senha) : await criarConta({ nome: v('nome').trim(), email, senha, idioma, site: v('site') });
+    const o = { idioma, aoProgredir: setProgresso };
+    const r = modo === 'entrar' ? await entrar(email, senha, o) : await criarConta({ nome: v('nome').trim(), email, senha, idioma, site: v('site') }, o);
     setOcupado(false);
-    if (r.ok) aoEntrar(r.conta);
-    else setErro(textoDoErro(t, r.erro, r));
+    setProgresso(null);
+    if (r.ok) {
+      aoEntrar(r.conta);
+      mostrarSituacao(t, r.situacao, idioma); // o kit (a pessoa nasceu) ou o cofre trancado, por cima de tudo
+    } else setErro(textoDoErro(t, r.erro, r));
   }
 
   return (
@@ -146,6 +179,7 @@ export function FormConta({
             )}
           </p>
         )}
+        <BarraDaSenha t={t} fracao={progresso} />
         {erro && (
           <p class="ekf-erro" role="alert">
             {erro}
@@ -186,21 +220,27 @@ export function FormConta({
 }
 
 /** A senha nova, pelo link do e-mail (`#/redefinir/<código>`). Já entra. */
-export function FormRedefinir({ t, codigo, aoEntrar }: { t: T; codigo: string; aoEntrar: (c: Conta) => void }) {
+export function FormRedefinir({ t, codigo, idioma, aoEntrar }: { t: T; codigo: string; idioma?: string; aoEntrar: (c: Conta) => void }) {
   const [nova, setNova] = useState('');
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [progresso, setProgresso] = useState<number | null>(null);
   return (
     <form
       class="ekf-form"
       noValidate
       onSubmit={async (e) => {
         e.preventDefault();
+        setErro('');
         setOcupado(true);
-        const r = await redefinirSenha(codigo, nova);
+        const r = await redefinir(codigo, nova, { aoProgredir: setProgresso, ...(idioma ? { idioma } : {}) });
         setOcupado(false);
-        if (r.ok) aoEntrar(r.conta);
-        else setErro(textoDoErro(t, r.erro, r));
+        setProgresso(null);
+        if (r.ok) {
+          aoEntrar(r.conta);
+          // a conta de antes nasce com o kit; a que já tinha chaves fica com o cofre trancado
+          mostrarSituacao(t, r.situacao, idioma);
+        } else setErro(textoDoErro(t, r.erro, r));
       }}
     >
       <label class="ekf-campo">
@@ -208,6 +248,7 @@ export function FormRedefinir({ t, codigo, aoEntrar }: { t: T; codigo: string; a
         <input type="password" autoComplete="new-password" required minLength={8} value={nova} onInput={(e) => setNova(e.currentTarget.value)} />
         <small>{t('nucleo.conta.senha.ajuda')}</small>
       </label>
+      <BarraDaSenha t={t} fracao={progresso} />
       {erro && (
         <p class="ekf-erro" role="alert">
           {erro}

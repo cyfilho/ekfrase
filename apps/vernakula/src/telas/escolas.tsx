@@ -58,11 +58,9 @@ export const nomeTurma = (c: { curso_nome: string | null; turma_nome: string | n
 export function MinhasEscolas({
   conta,
   aoEscolher,
-  aoMudarConta,
 }: {
   conta: Conta;
   aoEscolher: (id: number) => void;
-  aoMudarConta: (c: Conta) => void;
 }) {
   const [convites, setConvites] = useState<Convite[] | null>(null);
   const [pedidos, setPedidos] = useState<PedidoEscola[] | null>(null);
@@ -75,16 +73,9 @@ export function MinhasEscolas({
   }
   useEffect(carregar, [conta.id]);
 
-  async function responder(c: Convite, aceitar: boolean) {
+  async function recusar(c: Convite) {
     setOcupado(true);
     setAviso(undefined);
-    if (aceitar) {
-      const r = await api.aceitarConvite({ id: c.id });
-      setOcupado(false);
-      if (!r.ok) return setAviso(avisoEscola(r));
-      aoMudarConta(r.conta);
-      return aoEscolher(r.escola);
-    }
     const r = await api.recusarConvite({ id: c.id });
     setOcupado(false);
     if (!r.ok) return setAviso(avisoEscola(r));
@@ -121,6 +112,8 @@ export function MinhasEscolas({
       {convites && convites.length > 0 && (
         <section class="painel" aria-labelledby="titulo-convites">
           <h2 id="titulo-convites">{t('vernakula.escolas.convites.titulo')}</h2>
+          {/* A2: aceitar só pelo link do e-mail (o e-mail da conta ainda não é confirmado) */}
+          <p class="dica">{t('vernakula.escolas.convites.pelo_email', { email: conta.email })}</p>
           <ul class="lista">
             {convites.map((c) => (
               <li key={c.id} class="item-lista">
@@ -134,10 +127,7 @@ export function MinhasEscolas({
                   </span>
                 </div>
                 <div class="linha-acoes">
-                  <button type="button" class="botao principal pequeno" disabled={ocupado} onClick={() => void responder(c, true)}>
-                    {t('vernakula.convite.aceitar')}
-                  </button>
-                  <button type="button" class="botao pequeno" disabled={ocupado} onClick={() => void responder(c, false)}>
+                  <button type="button" class="botao pequeno" disabled={ocupado} onClick={() => void recusar(c)}>
                     {t('vernakula.convite.recusar')}
                   </button>
                 </div>

@@ -1,0 +1,17 @@
+{
+  "name": "@ekfrase/identidade",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A identidade por chaves da Ekfrase: a pessoa e os aparelhos (Ed25519 e X25519), certificados e revogação, assinar e conferir, a caixa para uma pessoa, a chave de documento por época, o kit de recuperação de 12 palavras e o cofre com Argon2id",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "@scure/bip39": "2.4.0"
+  }
+}

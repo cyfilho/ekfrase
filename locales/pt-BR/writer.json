@@ -757,5 +757,7 @@
   "os.vpn.erro.servidor": "O endereço do servidor não serve ou o servidor não respondeu. Confira o endereço e a internet.",
   "os.vpn.erro.certificado": "O sistema não conhece o certificado do servidor.",
   "os.vpn.erro.segundo-fator": "O servidor pediu um código.",
-  "os.vpn.erro.sso": "Esta VPN pede login pelo navegador, que o Writer OS não tem. Peça à TI uma VPN com usuário e senha."
+  "os.vpn.erro.sso": "Esta VPN pede login pelo navegador, que o Writer OS não tem. Peça à TI uma VPN com usuário e senha.",
+  "computador.aparelho": "Writer no computador",
+  "os.aparelho": "Writer OS (pendrive)"
 }

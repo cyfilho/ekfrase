@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * Conversa mínima com a ponte (`/api/v1/…`), comum a todos os apps: quem sou eu,
- * entrar, criar conta, sair, esqueci a senha, feedback e os documentos na nuvem.
+ * Conversa mínima com a ponte (`/api/v1/…`), comum a todos os apps: quem sou eu, sair, esqueci a senha, feedback e
+ * os documentos na nuvem. Entrar, criar conta e redefinir a senha estão no `chaves.ts` (X2: a senha não vai à ponte).
  * Guarda o token CSRF; falha de rede vira o código `rede`. O erro é sempre um
  * CÓDIGO: o texto sai dos idiomas (`nucleo.erro.<código>`).
  *
  * A conta fica num lugar só (`contaAtual`, `aoMudarConta`): o topo, a entrada do
  * app e o castelo veem a mesma coisa, e entrar num lugar vale para todos.
  */
+
+import { esquecerChavesDesteAparelho } from './aparelho.ts';
 
 export interface Conta {
   id: number;
@@ -92,30 +94,32 @@ export function eu(forcar = false): Promise<EstadoConta> {
   return pedido;
 }
 
-async function comConta(r: Promise<Resposta<{ conta: Conta }>>): Promise<Resposta<{ conta: Conta }>> {
-  const v = await r;
-  if (v.ok) mudar({ carregando: false, conta: v.conta });
-  return v;
+/**
+ * A conta mudou por outro caminho (entrar, criar conta e redefinir são do `chaves.ts`, X2: a senha não vai à ponte).
+ */
+export function mudarConta(conta: Conta | null): void {
+  mudar({ carregando: false, conta });
 }
 
-export const entrar = (email: string, senha: string) => comConta(pedir('POST', 'conta/entrar', { email, senha }));
-
-export const criarConta = (d: { nome: string; email: string; senha: string; idioma: string; site: string }) =>
-  comConta(pedir('POST', 'conta/criar', d));
-
-export const redefinirSenha = (codigo: string, nova: string) => comConta(pedir('POST', 'conta/redefinir', { codigo, nova }));
-
-/** Pede a exclusão da conta (7 dias para se arrepender). Já sai da conta neste aparelho. */
-export async function excluirConta(senhaAtual: string, confirmacao: string): Promise<Resposta<{ ate: string }>> {
-  const r = await pedir<{ ate: string }>('POST', 'conta/excluir', { senha_atual: senhaAtual, confirmacao });
-  if (r.ok) mudar({ carregando: false, conta: null });
+/**
+ * Pede a exclusão da conta (7 dias para se arrepender). Já sai da conta neste aparelho e apaga as chaves dele.
+ * `prova` = os campos de `provaDaSenha` (do `chaves.ts`): `entrar_atual` ou, na conta de antes, `senha_atual`.
+ */
+export async function excluirConta(prova: { entrar_atual: string } | { senha_atual: string }, confirmacao: string): Promise<Resposta<{ ate: string }>> {
+  const r = await pedir<{ ate: string }>('POST', 'conta/excluir', { ...prova, confirmacao });
+  if (r.ok) {
+    esquecerChavesDesteAparelho();
+    mudar({ carregando: false, conta: null });
+  }
   return r;
 }
 
 export const esqueciSenha = (email: string, app: string, idioma: string) => pedir('POST', 'conta/esqueci', { email, app, idioma });
 
+/** Sai da conta: a ponte tira este aparelho da conta, e as chaves dele somem daqui (no computador da escola, nada fica). */
 export async function sair(): Promise<void> {
   await pedir('POST', 'conta/sair', {});
+  esquecerChavesDesteAparelho();
   mudar({ carregando: false, conta: null });
 }
 

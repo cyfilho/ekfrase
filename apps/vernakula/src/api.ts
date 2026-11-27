@@ -80,7 +80,20 @@ export type Resultado<T> = ({ ok: true } & T) | { ok: false; erro: string; [extr
 
 let csrf = '';
 
+/**
+ * Pede; se o token CSRF venceu (a sessão mudou por outro caminho: entrar e trocar a senha agora passam pelo
+ * `chaves` de `@ekfrase/interface`, que tem o token dele), pega outro e tenta de novo uma vez.
+ */
 async function pedir<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<Resultado<T>> {
+  const r = await pedirUmaVez<T>(metodo, caminho, corpo);
+  if (metodo === 'POST' && !r.ok && r.erro === 'csrf') {
+    await pedirUmaVez('GET', 'conta/eu');
+    return pedirUmaVez<T>(metodo, caminho, corpo);
+  }
+  return r;
+}
+
+async function pedirUmaVez<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<Resultado<T>> {
   let resposta: Response;
   try {
     resposta = await fetch(`/api/v1/${caminho}`, {
@@ -143,19 +156,17 @@ function enviarArquivo(
   });
 }
 
+/**
+ * A senha nunca vai à ponte por aqui (X2): entrar, o primeiro acesso, a senha nova pelo e-mail, trocar a senha e a
+ * prova da senha são do `chaves` de `@ekfrase/interface` (a ponte recebe a chave de entrar, não a senha).
+ */
 export const api = {
   eu: () => pedir<{ conta: Conta | null; instalacao?: true }>('GET', 'conta/eu'),
-  /** Primeiro acesso de um site recém-instalado (só funciona enquanto não há conta nenhuma). */
-  primeira: (dados: { codigo: string; organizacao: string; nome: string; email: string; senha: string }) =>
-    pedir<{ conta: Conta }>('POST', 'conta/primeira', dados),
-  entrar: (email: string, senha: string) => pedir<{ conta: Conta }>('POST', 'conta/entrar', { email, senha }),
   sair: () => pedir<object>('POST', 'conta/sair', {}),
   /** Manda o link de senha nova (a ponte responde igual tenha ou não conta). */
   esqueci: (email: string, idioma: string) => pedir<object>('POST', 'conta/esqueci', { email, idioma, app: 'vernakula' }),
-  /** Grava a senha nova com o código do link do e-mail e já entra. */
-  redefinir: (codigo: string, nova: string) => pedir<{ conta: Conta }>('POST', 'conta/redefinir', { codigo, nova }),
-  perfil: (dados: { nome: string; email: string; senha_atual?: string }) => pedir<{ conta: Conta }>('POST', 'conta/perfil', dados),
-  senha: (dados: { senha_atual: string; nova: string }) => pedir<object>('POST', 'conta/senha', dados),
+  /** Trocar o e-mail pede a prova da senha (`chaves.provaDaSenha`: `entrar_atual`, ou `senha_atual` na conta de antes). */
+  perfil: (dados: { nome: string; email: string } & ({ entrar_atual?: string } | { senha_atual?: string })) => pedir<{ conta: Conta }>('POST', 'conta/perfil', dados),
   renomearEscola: (id: number, nome: string) => pedir<{ conta: Conta }>('POST', `organizacoes/${id}`, { nome }),
   /** As trocas de texto da escola (idioma → chave → texto). */
   textos: (organizacao: number) => pedir<{ textos: TextosEscola }>('GET', `textos?organizacao=${organizacao}`),
@@ -170,7 +181,7 @@ export const api = {
   convitesMeus: () => pedir<{ convites: Convite[] }>('GET', 'convites/meus'),
   verConvite: (codigo: string) => pedir<{ convite: Convite }>('GET', `convites/ver?codigo=${encodeURIComponent(codigo)}`),
   /** Pelo código do e-mail (qualquer conta) ou pelo número (a conta do e-mail convidado). */
-  aceitarConvite: (de: { codigo: string } | { id: number }) => pedir<{ escola: number; conta: Conta }>('POST', 'convites/aceitar', de),
+  aceitarConvite: (de: { codigo: string }) => pedir<{ escola: number; conta: Conta }>('POST', 'convites/aceitar', de),
   recusarConvite: (de: { codigo: string } | { id: number }) => pedir<object>('POST', 'convites/recusar', de),
   painel: (escola: number) => pedir<PainelEscola>('GET', `escolas/${escola}`),
   criarCurso: (escola: number, nome: string) => pedir<{ curso: { id: number } }>('POST', `escolas/${escola}/cursos`, { nome }),
