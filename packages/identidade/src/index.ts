@@ -84,4 +84,16 @@ export {
   type DeclaracaoConferida,
   type DeclaracaoDeCaixa,
 } from './geracoes.ts';
-export { abrirGuardado, codigoDoAparelho, CONTEXTO_SESSAO, guardarSemente, provarSessao, type Guardado } from './guarda.ts';
+export {
+  abrirGuardado,
+  assinarPedido,
+  codigoDoAparelho,
+  conferirPedido,
+  CONTEXTO_PEDIDO,
+  CONTEXTO_SESSAO,
+  guardarSemente,
+  provarSessao,
+  type AcaoDoPedido,
+  type Guardado,
+  type PedidoDoAparelho,
+} from './guarda.ts';

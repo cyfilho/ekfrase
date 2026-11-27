@@ -13,11 +13,14 @@
  *   entrega o próprio código da página; o Motor pareia com o PAKE do §9.3).
  * - **A prova da sessão:** o aparelho assina o desafio que a ponte sorteou para a sessão (contexto `sessao-aparelho`);
  *   assim a ponte liga a sessão ao aparelho (revogar o aparelho tira a sessão dele) sem confiar só na palavra dele.
+ * - **O pedido assinado pelo aparelho** (X2c-4): sem a senha e sem sessão, um aparelho da pessoa assina, sobre um
+ *   desafio da ponte, o pedido de ver o aviso da senha redefinida, de tirar outro aparelho ou de cancelar a redefinição.
  */
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { concatBytes, doBase64url, doBase64urlCom, paraBase64url, randomBytes, utf8ToBytes } from './bytes.ts';
-import { assinar, enderecoValido, type ChavesPublicas, type Identidade } from './chaves.ts';
+import { bytesCanonicos, type ValorCanonico } from './canonico.ts';
+import { assinar, conferirAssinatura, enderecoValido, type ChavesPublicas, type Identidade } from './chaves.ts';
 
 export type Guardado = {
   readonly v: 1;
@@ -70,4 +73,59 @@ export const CONTEXTO_SESSAO = 'sessao-aparelho';
 export function provarSessao(aparelho: Identidade, desafio: string): string {
   if (!/^[0-9a-f]{64}$/.test(desafio)) throw new RangeError('desafio inválido');
   return paraBase64url(assinar(aparelho, CONTEXTO_SESSAO, utf8ToBytes(desafio)));
+}
+
+// ---------- o pedido assinado pelo aparelho (X2c-4, ARQUITETURA §5.6) ----------
+
+export const CONTEXTO_PEDIDO = 'pedido-aparelho';
+
+/** O que um aparelho da pessoa pede à ponte sem a senha e sem sessão (a corrida contra quem tem o e-mail, M1). */
+export type AcaoDoPedido = 'ver' | 'tirar' | 'cancelar';
+
+export type PedidoDoAparelho = {
+  readonly v: 1;
+  /** O endereço da pessoa (a do certificado do aparelho). */
+  readonly pessoa: string;
+  /** O endereço do aparelho que assina. */
+  readonly aparelho: string;
+  readonly acao: AcaoDoPedido;
+  /** O aparelho a tirar (só no `tirar`; nos outros, `null`). */
+  readonly alvo: string | null;
+  /** O desafio que a ponte sorteou para este pedido (64 letras hex, vale uma vez). */
+  readonly desafio: string;
+  readonly assinatura: string;
+};
+
+const ACOES: readonly string[] = ['ver', 'tirar', 'cancelar'];
+
+/**
+ * O aparelho assina o pedido (contexto `pedido-aparelho`, sobre o JSON canônico sem a `assinatura`). Lança
+ * `RangeError` com endereço, ação ou desafio mal escritos, ou com o `alvo` fora da regra (só no `tirar`, e outro).
+ */
+export function assinarPedido(aparelho: Identidade, pessoa: string, acao: AcaoDoPedido, alvo: string | null, desafio: string): PedidoDoAparelho {
+  const corpo = { v: 1 as const, pessoa, aparelho: aparelho.endereco, acao, alvo, desafio };
+  if (!pedidoBemEscrito(corpo)) throw new RangeError('pedido inválido');
+  return { ...corpo, assinatura: paraBase64url(assinar(aparelho, CONTEXTO_PEDIDO, bytesCanonicos(corpo))) };
+}
+
+function pedidoBemEscrito(p: Record<string, unknown>): boolean {
+  const { pessoa, aparelho, acao, alvo, desafio } = p;
+  if (p['v'] !== 1 || !enderecoValido(pessoa) || !enderecoValido(aparelho) || typeof acao !== 'string' || !ACOES.includes(acao)) return false;
+  if (typeof desafio !== 'string' || !/^[0-9a-f]{64}$/.test(desafio)) return false;
+  return acao === 'tirar' ? enderecoValido(alvo) && alvo !== aparelho : alvo === null;
+}
+
+/**
+ * Confere o pedido com a pública de assinar do aparelho (a do certificado dele) e o desafio esperado. Exatamente os
+ * campos do tipo: campo a mais ou a menos é `false`. Quem confere ainda olha se o aparelho vale (não revogado nem tirado).
+ */
+export function conferirPedido(pedido: unknown, publicaDoAparelho: Uint8Array, desafio: string): pedido is PedidoDoAparelho {
+  if (!pedido || typeof pedido !== 'object' || Array.isArray(pedido)) return false;
+  const p = pedido as Record<string, unknown>;
+  const campos = Object.keys(p).sort().join(',');
+  if (campos !== 'acao,alvo,aparelho,assinatura,desafio,pessoa,v' || !pedidoBemEscrito(p) || p['desafio'] !== desafio) return false;
+  const assinatura = doBase64urlCom(p['assinatura'], 64);
+  if (!assinatura) return false;
+  const { assinatura: _, ...corpo } = p;
+  return conferirAssinatura(publicaDoAparelho, CONTEXTO_PEDIDO, bytesCanonicos(corpo as ValorCanonico), assinatura);
 }

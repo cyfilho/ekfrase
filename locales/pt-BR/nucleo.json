@@ -246,5 +246,21 @@
   "cadastro.confirmar_email.botao": "Mandar o link",
   "cadastro.confirmar_email.enviado": "Enviamos o link para {email}. Ele vale por 24 horas (confira também o spam).",
   "conta.erro.servidor_antigo": "Este servidor é de uma versão antiga e não sabe proteger a sua senha. Avise quem cuida dele.",
-  "conta.erro.recente": "Já mandamos um e-mail há pouco. Espere {minutos} minutos e tente de novo."
+  "conta.erro.recente": "Já mandamos um e-mail há pouco. Espere {minutos} minutos e tente de novo.",
+  "chaves.trancado.espera": "Por segurança, a cópia guardada nos seus aparelhos e as chaves novas só ficam disponíveis em {data}: 72 horas depois de redefinir a senha pelo e-mail. O kit de recuperação abre agora.",
+  "chaves.aparelhos.tirado_etiqueta": "Tirado",
+  "chaves.aparelhos.tirar.confirmar": "Tirar “{nome}” da conta? Ele perde as chaves e sai agora, sem precisar da senha. Sai de vez quando o cofre for aberto.",
+  "chaves.aparelhos.tirar.sim": "Sim, tirar",
+  "chaves.aviso.titulo": "A senha da sua conta foi redefinida",
+  "chaves.aviso.texto": "A senha da sua conta foi redefinida pelo e-mail em {data}. Não foi você?",
+  "chaves.aviso.espera": "Até {data}, quem redefiniu só abre as suas chaves com o kit de recuperação. Neste tempo, este aparelho pode desfazer a redefinição.",
+  "chaves.aviso.cancelar": "Não fui eu: cancelar a redefinição",
+  "chaves.aviso.cancelar.dica": "A senha de antes volta a valer, e quem redefiniu sai da conta. Depois, troque a senha do seu e-mail.",
+  "chaves.aviso.aparelhos": "Tirar um aparelho da conta",
+  "chaves.aviso.cancelada": "Pronto: a senha de antes voltou a valer, e quem redefiniu saiu da conta. Entre com a senha de antes e troque a senha do seu e-mail.",
+  "chaves.aviso.fui_eu": "Fui eu",
+  "conta.erro.espera": "Por segurança, isto só fica disponível em {data} (72 horas depois de redefinir a senha pelo e-mail). O kit de recuperação abre agora.",
+  "conta.erro.tirado": "Este aparelho já foi tirado da conta.",
+  "conta.erro.sem_aparelho": "Este navegador não tem as chaves de um aparelho seu. Use um aparelho em que você já entrou na conta.",
+  "conta.erro.nao_existe": "Esse aparelho não está mais na conta."
 }

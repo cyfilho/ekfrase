@@ -1,5 +1,5 @@
 {
-  "descricao": "a chave de caixa por gerações (HKDF da semente da pessoa, sal \"ekfrase/caixa/v1\", info \"geracao:<g>\"), a declaração assinada (contexto caixa-da-pessoa), o cofre assinado (cofre-da-pessoa, sobre o cofre de cofre.json), a guarda dividida, o código do aparelho e a prova da sessão (sessao-aparelho)",
+  "descricao": "a chave de caixa por gerações (HKDF da semente da pessoa, sal \"ekfrase/caixa/v1\", info \"geracao:<g>\"), a declaração assinada (contexto caixa-da-pessoa), o cofre assinado (cofre-da-pessoa, sobre o cofre de cofre.json), a guarda dividida, o código do aparelho, a prova da sessão (sessao-aparelho) e o pedido assinado pelo aparelho (pedido-aparelho)",
   "semente_da_pessoa": "000102030405060708090a0b0c0d0e0f",
   "pessoa": {
     "publicas": {
@@ -74,5 +74,25 @@
   "sessao": {
     "desafio": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
     "prova": "f4COsvy5spyugiDeAPRaRi9XXiOWi7neU-11dL1T9BzA4ctt4769wldk8F1wkBf68JJnK0nfV2IQXp9YhWFaDg"
+  },
+  "pedido": {
+    "tirar": {
+      "v": 1,
+      "pessoa": "3b98041e2b6b0799c6db09d32d30a928",
+      "aparelho": "fb314d9aa303c1f399d10355ba59a01b",
+      "acao": "tirar",
+      "alvo": "00112233445566778899aabbccddeeff",
+      "desafio": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "assinatura": "d07QWNvRvMddysyKG56RQqmaEylyuIHiHTSOXCCJ3vBbzczxOuVX5HQKZMA3gtDij9J8YgjTl-aJ19DSLajeAg"
+    },
+    "cancelar": {
+      "v": 1,
+      "pessoa": "3b98041e2b6b0799c6db09d32d30a928",
+      "aparelho": "fb314d9aa303c1f399d10355ba59a01b",
+      "acao": "cancelar",
+      "alvo": null,
+      "desafio": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "assinatura": "XmTGMhSQXWuJAOKI9QhTvzDFeyYjrDGqKZSPyxDgiXFhOTPvqihuDhxhwWuJckAA3j5ygmKOxHxfXKHcc1ZnCw"
+    }
   }
 }

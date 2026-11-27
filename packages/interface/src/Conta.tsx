@@ -21,6 +21,7 @@ const ERROS = new Set([
   'senha_atual', 'antiga', 'versao', 'chaves', 'sem_sodium', 'kdf', 'assinatura', 'revogado', 'trancado', 'rebaixado', 'cofre',
   'kit_quantidade', 'kit_palavra', 'kit_conferencia', 'kit_outra_pessoa', 'sem_copia', 'pedido_vencido', 'cancelado',
   'nao_trancado', 'muitos', 'prova', 'outra_pessoa', 'nome', 'codigo_errado', 'codigo_recusado', 'servidor_antigo', 'recente',
+  'espera', 'tirado', 'sem_aparelho', 'nao_existe',
 ]);
 /** A chave do texto de um código de erro da conta (para quem guarda o aviso como chave, como o Vernákula). */
 export function chaveDoErro(codigo: string): string {
@@ -28,7 +29,17 @@ export function chaveDoErro(codigo: string): string {
 }
 /** O texto de um código de erro da conta (o que não tem texto vira "algo deu errado no servidor"). */
 export function textoDoErro(t: T, codigo: string, extra: Record<string, unknown> = {}): string {
-  return t(chaveDoErro(codigo), { minutos: Number(extra['minutos'] ?? 15), restam: Number(extra['restam'] ?? 0) });
+  return t(chaveDoErro(codigo), { minutos: Number(extra['minutos'] ?? 15), restam: Number(extra['restam'] ?? 0), data: dataDoErro(extra['ate']) });
+}
+
+/** A data de um erro que diz "só a partir de" (`espera`, X2c-4: `ate` em milissegundos), para ler. */
+function dataDoErro(ate: unknown): string {
+  if (typeof ate !== 'number' || !Number.isFinite(ate)) return '';
+  try {
+    return new Intl.DateTimeFormat(typeof document === 'undefined' ? 'pt-BR' : document.documentElement.lang || 'pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ate));
+  } catch {
+    return new Date(ate).toLocaleString();
+  }
 }
 
 /** A barra "Protegendo a sua senha" (o Argon2id leva alguns segundos; `fracao` de 0 a 1, ou `null` = escondida). */
