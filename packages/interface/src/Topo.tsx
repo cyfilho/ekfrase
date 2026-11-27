@@ -8,6 +8,7 @@ import { BotaoTema } from './BotaoTema.tsx';
 import { BotaoFeedback } from './Feedback.tsx';
 import { IconePasseio, IconePessoa } from './icones.tsx';
 import { Menu } from './Menu.tsx';
+import { avisarSeRedefinida } from './Chaves.tsx';
 import { FormConta } from './Conta.tsx';
 import { Janela } from './Janela.tsx';
 import { ambienteFechado } from './ambiente.ts';
@@ -68,6 +69,10 @@ export function BotaoConta({ t, aoSair, comEntrar }: { t: T; aoSair?: () => void
   const { conta, carregando } = useConta();
   const foto = useFoto();
   const [entrando, setEntrando] = useState(false);
+  // X2c-4: um aparelho da pessoa que ficou sem sessão (a senha foi redefinida pelo e-mail) mostra o aviso
+  useEffect(() => {
+    if (!carregando && !conta) avisarSeRedefinida(t);
+  }, [carregando, conta]);
   if (!conta) {
     if (!comEntrar || carregando) return null;
     const rotulo = t('nucleo.conta.entrar.ekfrase');

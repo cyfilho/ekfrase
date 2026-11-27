@@ -8,6 +8,8 @@
  *   própria no `body`: o formulário que a chamou pode sumir na hora (a conta mudou), e a janela fica.
  * - `CofreTrancado`: abrir com o kit, com a cópia deste aparelho, pedindo a outro aparelho seu ou com chaves novas.
  * - `ChavesDaConta`: as seções de Minha conta (o cofre trancado, o kit de recuperação, "Seus aparelhos" com os pedidos).
+ * - `avisarSeRedefinida(t)` (X2c-4): num aparelho da pessoa que ficou sem sessão porque a senha foi redefinida pelo
+ *   e-mail, o aviso "Não foi você?" com cancelar a redefinição e tirar aparelhos, pelo pedido assinado (sem senha).
  *
  * Nenhum texto aqui: as chaves são `nucleo.chaves.*` e `nucleo.kit.*`.
  */
@@ -18,6 +20,7 @@ import {
   abrirComKit,
   aoMudarChaves,
   aprovarPedido,
+  cancelarRedefinicao,
   comecarPessoaNova,
   estadoDasChaves,
   listarAparelhos,
@@ -26,10 +29,15 @@ import {
   precisaDaSenha,
   recusarPedido,
   revogar,
+  temAparelhoGuardado,
   temCopiaDesteAparelho,
+  tirarAparelho,
+  verAvisoDoAparelho,
   verChaves,
   verKit,
   type Aparelho,
+  type AparelhoDoAviso,
+  type AvisoDoAparelho,
   type EstadoDasChaves,
   type KitParaMostrar,
   type PedidoAberto,
@@ -336,10 +344,13 @@ export function CofreTrancado({ t, idioma, temCopia, aoAbrir, fechar }: { t: T; 
     );
   }
 
-  // escolher
+  // escolher; M1c: durante a espera, só o kit (as outras saídas voltam na data)
+  const ate = estadoDasChaves()?.esperaAte ?? null;
+  const naEspera = ate !== null && ate > Date.now();
   return (
     <div class="ekf-form">
       <p>{t('nucleo.chaves.trancado.explicacao')}</p>
+      {naEspera && <p class="ekf-aviso">{t('nucleo.chaves.trancado.espera', { data: quando(idioma, ate, true) })}</p>}
       {campoDaSenha}
       <ul class="ekf-saidas">
         <li>
@@ -350,20 +361,20 @@ export function CofreTrancado({ t, idioma, temCopia, aoAbrir, fechar }: { t: T; 
         </li>
         {temCopia && (
           <li>
-            <button type="button" class="ekf-botao" disabled={ocupado} aria-busy={ocupado} onClick={() => void tentar((s, o) => abrirComCopia(s, o), abriu)}>
+            <button type="button" class="ekf-botao" disabled={ocupado || naEspera} aria-busy={ocupado} onClick={() => void tentar((s, o) => abrirComCopia(s, o), abriu)}>
               {t('nucleo.chaves.trancado.copia')}
             </button>
             <small>{t('nucleo.chaves.trancado.copia.dica')}</small>
           </li>
         )}
         <li>
-          <button type="button" class="ekf-botao" disabled={ocupado} onClick={() => void pedirAoOutro()}>
+          <button type="button" class="ekf-botao" disabled={ocupado || naEspera} onClick={() => void pedirAoOutro()}>
             {t('nucleo.chaves.trancado.outro')}
           </button>
           <small>{t('nucleo.chaves.trancado.outro.dica')}</small>
         </li>
         <li>
-          <button type="button" class="ekf-link" disabled={ocupado} onClick={() => ir('nova')}>
+          <button type="button" class="ekf-link" disabled={ocupado || naEspera} onClick={() => ir('nova')}>
             {t('nucleo.chaves.trancado.nova')}
           </button>
         </li>
@@ -538,7 +549,59 @@ function Pedido({ t, idioma, p, aoResolver }: { t: T; idioma: string; p: PedidoA
   );
 }
 
-function LinhaDoAparelho({ t, idioma, a, aoTirar }: { t: T; idioma: string; a: Aparelho; aoTirar: (nome: string) => void }) {
+/**
+ * "Tirar" sem a senha (X2c-4, com o cofre trancado): pergunta antes; o aparelho deste navegador assina o pedido. O
+ * tirado perde as chaves e sai agora; sai de vez (a revogação) quando o cofre abrir.
+ */
+function TirarSemSenha({ t, nome, endereco, aoTirar }: { t: T; nome: string; endereco: string; aoTirar: (nome: string) => void }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState('');
+  const sim = useFoco<HTMLButtonElement>(confirmando);
+  if (!confirmando) {
+    return (
+      <span class="ekf-linha">
+        <button type="button" class="ekf-botao" onClick={() => setConfirmando(true)}>
+          {t('nucleo.chaves.aparelhos.tirar')}
+        </button>
+      </span>
+    );
+  }
+  return (
+    <div class="ekf-form">
+      <p>{t('nucleo.chaves.aparelhos.tirar.confirmar', { nome })}</p>
+      {erro && (
+        <p class="ekf-erro" role="alert">
+          {erro}
+        </p>
+      )}
+      <div class="ekf-linha">
+        <button
+          type="button"
+          class="ekf-botao principal"
+          ref={sim}
+          disabled={ocupado}
+          aria-busy={ocupado}
+          onClick={async () => {
+            setOcupado(true);
+            setErro('');
+            const r = await tirarAparelho(endereco);
+            setOcupado(false);
+            if (r.ok) aoTirar(nome);
+            else setErro(textoDoErro(t, r.erro, r));
+          }}
+        >
+          {t('nucleo.chaves.aparelhos.tirar.sim')}
+        </button>
+        <button type="button" class="ekf-botao" disabled={ocupado} onClick={() => (setConfirmando(false), setErro(''))}>
+          {t('nucleo.chaves.cancelar')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LinhaDoAparelho({ t, idioma, a, trancado, aoTirar }: { t: T; idioma: string; a: Aparelho; trancado: boolean; aoTirar: (nome: string) => void }) {
   const [tirando, setTirando] = useState(false);
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
@@ -551,6 +614,7 @@ function LinhaDoAparelho({ t, idioma, a, aoTirar }: { t: T; idioma: string; a: A
       <span class="ekf-aparelho-nome">
         <strong>{nome}</strong>
         {a.este && <span class="ekf-etiqueta">{t('nucleo.chaves.aparelhos.este')}</span>}
+        {a.tirado && <span class="ekf-etiqueta">{t('nucleo.chaves.aparelhos.tirado_etiqueta')}</span>}
       </span>
       <small>
         {[a.criado ? t('nucleo.chaves.aparelhos.desde', { data: quando(idioma, a.criado) }) : '', a.vistoEm ? t('nucleo.chaves.aparelhos.visto', { data: quando(idioma, a.vistoEm, true) }) : '']
@@ -558,7 +622,9 @@ function LinhaDoAparelho({ t, idioma, a, aoTirar }: { t: T; idioma: string; a: A
           .join(' · ')}
       </small>
       {!a.confere && <small class="ekf-alerta">{t('nucleo.chaves.aparelhos.nao_confere')}</small>}
+      {!a.este && trancado && !a.tirado && <TirarSemSenha t={t} nome={nome} endereco={a.endereco} aoTirar={aoTirar} />}
       {!a.este &&
+        !trancado &&
         (!tirando ? (
           <span class="ekf-linha">
             <button type="button" class="ekf-botao" onClick={() => setTirando(true)}>
@@ -682,7 +748,7 @@ function SeusAparelhos({ t, idioma, classe, olhar }: { t: T; idioma: string; cla
         ) : (
           <ul class="ekf-lista-chaves">
             {(aparelhos ?? []).map((a) => (
-              <LinhaDoAparelho key={a.endereco} t={t} idioma={idioma} a={a} aoTirar={(nome) => resolvido(t('nucleo.chaves.aparelhos.tirado', { nome }))} />
+              <LinhaDoAparelho key={a.endereco} t={t} idioma={idioma} a={a} trancado={olhar} aoTirar={(nome) => resolvido(t('nucleo.chaves.aparelhos.tirado', { nome }))} />
             ))}
           </ul>
         )}
@@ -748,5 +814,134 @@ export function ChavesDaConta({ t, idioma, classe = 'ekf-secao' }: { t: T; idiom
       )}
       <SeusAparelhos t={t} idioma={idioma} classe={classe} olhar={estado.trancado} />
     </>
+  );
+}
+
+// ---------- o aviso da senha redefinida, num aparelho da pessoa sem sessão (X2c-4) ----------
+
+const AVISO_VISTO = 'ekfrase.aviso-redefinida';
+let avisoOlhado = false;
+
+function avisoJaVisto(em: number): boolean {
+  try {
+    return localStorage.getItem(AVISO_VISTO) === String(em);
+  } catch {
+    return false;
+  }
+}
+
+function marcarAvisoVisto(em: number): void {
+  try {
+    localStorage.setItem(AVISO_VISTO, String(em));
+  } catch {
+    // navegador que barra o armazenamento: o aviso volta na próxima vez
+  }
+}
+
+/**
+ * Quem não entrou, num navegador que guarda as chaves de um aparelho (a sessão caiu porque a senha foi redefinida
+ * pelo e-mail): pergunta à ponte pelo pedido assinado e, se a conta está trancada pela redefinição, mostra o aviso
+ * "Não foi você?". Uma vez por página; "Fui eu" não mostra de novo a mesma redefinição.
+ */
+export function avisarSeRedefinida(t: T, idioma: string = idiomaDaTela()): void {
+  if (avisoOlhado || !temAparelhoGuardado()) return;
+  avisoOlhado = true;
+  void verAvisoDoAparelho().then((r) => {
+    if (!r.ok) return;
+    const a = r.aviso;
+    const outros = a.aparelhos.filter((x) => !x.este && !x.tirado);
+    if (!a.trancado || a.redefinidaEm === null || avisoJaVisto(a.redefinidaEm) || (!a.podeCancelar && outros.length === 0)) return;
+    abrirJanela(t, t('nucleo.chaves.aviso.titulo'), (fechar) => <AvisoDaRedefinicao t={t} idioma={idioma} aviso={a} fechar={fechar} />);
+  });
+}
+
+function AvisoDaRedefinicao({ t, idioma, aviso, fechar }: { t: T; idioma: string; aviso: AvisoDoAparelho; fechar: () => void }) {
+  const [cancelada, setCancelada] = useState(false);
+  const [aparelhos, setAparelhos] = useState<readonly AparelhoDoAviso[]>(aviso.aparelhos);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState('');
+  const [ok, setOk] = useState('');
+  const primeiro = useFoco<HTMLButtonElement>(aviso.podeCancelar);
+  const soFuiEu = useFoco<HTMLButtonElement>(!aviso.podeCancelar);
+  if (cancelada) return <Pronto t={t} texto={t('nucleo.chaves.aviso.cancelada')} fechar={fechar} />;
+  const outros = aparelhos.filter((a) => !a.este);
+  const fuiEu = () => {
+    if (aviso.redefinidaEm !== null) marcarAvisoVisto(aviso.redefinidaEm);
+    fechar();
+  };
+  return (
+    <div class="ekf-form" data-ekf="aviso-redefinida">
+      <p>{t('nucleo.chaves.aviso.texto', { data: quando(idioma, aviso.redefinidaEm, true) })}</p>
+      {aviso.esperaAte !== null && <p class="ekf-dica">{t('nucleo.chaves.aviso.espera', { data: quando(idioma, aviso.esperaAte, true) })}</p>}
+      {aviso.podeCancelar && (
+        <>
+          <div class="ekf-linha">
+            <button
+              type="button"
+              class="ekf-botao principal"
+              ref={primeiro}
+              disabled={ocupado}
+              aria-busy={ocupado}
+              onClick={async () => {
+                setOcupado(true);
+                setErro('');
+                const r = await cancelarRedefinicao();
+                setOcupado(false);
+                if (r.ok) setCancelada(true);
+                else setErro(textoDoErro(t, r.erro, r));
+              }}
+            >
+              {t('nucleo.chaves.aviso.cancelar')}
+            </button>
+          </div>
+          <small>{t('nucleo.chaves.aviso.cancelar.dica')}</small>
+        </>
+      )}
+      {outros.length > 0 && (
+        <>
+          <h3>{t('nucleo.chaves.aviso.aparelhos')}</h3>
+          <ul class="ekf-lista-chaves">
+            {outros.map((a) => {
+              const nome = a.nome || t('nucleo.chaves.aparelhos.sem_nome');
+              return (
+                <li key={a.endereco} class="ekf-aparelho">
+                  <span class="ekf-aparelho-nome">
+                    <strong>{nome}</strong>
+                    {a.tirado && <span class="ekf-etiqueta">{t('nucleo.chaves.aparelhos.tirado_etiqueta')}</span>}
+                  </span>
+                  {a.vistoEm && <small>{t('nucleo.chaves.aparelhos.visto', { data: quando(idioma, a.vistoEm, true) })}</small>}
+                  {!a.tirado && (
+                    <TirarSemSenha
+                      t={t}
+                      nome={nome}
+                      endereco={a.endereco}
+                      aoTirar={(n) => {
+                        setOk(t('nucleo.chaves.aparelhos.tirado', { nome: n }));
+                        setAparelhos((l) => l.map((x) => (x.endereco === a.endereco ? { ...x, tirado: true } : x)));
+                      }}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      {ok && (
+        <p class="ekf-ok" role="status">
+          {ok}
+        </p>
+      )}
+      {erro && (
+        <p class="ekf-erro" role="alert">
+          {erro}
+        </p>
+      )}
+      <div class="ekf-linha">
+        <button type="button" class="ekf-link" onClick={fuiEu} ref={soFuiEu}>
+          {t('nucleo.chaves.aviso.fui_eu')}
+        </button>
+      </div>
+    </div>
   );
 }

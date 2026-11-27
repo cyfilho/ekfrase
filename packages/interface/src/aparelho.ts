@@ -109,6 +109,12 @@ export function marcarPessoaAtual(pessoa: string): void {
   if (ENDERECO.test(pessoa)) gravar(ATUAL, pessoa);
 }
 
+/** O endereço da pessoa que entrou por último neste navegador (o aviso da senha redefinida, X2c-4), ou `null`. */
+export function pessoaDesteAparelho(): string | null {
+  const p = ler(ATUAL);
+  return p && ENDERECO.test(p) ? p : null;
+}
+
 /** Sair (ou excluir a conta): as chaves da pessoa que estava aqui somem do navegador. */
 export function esquecerChavesDesteAparelho(): void {
   const p = ler(ATUAL);

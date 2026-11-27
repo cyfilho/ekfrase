@@ -246,5 +246,21 @@
   "cadastro.confirmar_email.botao": "Send the link",
   "cadastro.confirmar_email.enviado": "We sent the link to {email}. It's valid for 24 hours (check your spam folder too).",
   "conta.erro.servidor_antigo": "This server runs an old version and can't protect your password. Let whoever runs it know.",
-  "conta.erro.recente": "We just sent an email. Wait {minutos} minutes and try again."
+  "conta.erro.recente": "We just sent an email. Wait {minutos} minutes and try again.",
+  "chaves.trancado.espera": "For your safety, the copy kept on your devices and new keys are only available on {data}: 72 hours after the password was reset by email. Your recovery kit works right now.",
+  "chaves.aparelhos.tirado_etiqueta": "Removed",
+  "chaves.aparelhos.tirar.confirmar": "Remove “{nome}” from the account? It loses its keys and is signed out now, without the password. It leaves for good once the vault is opened.",
+  "chaves.aparelhos.tirar.sim": "Yes, remove",
+  "chaves.aviso.titulo": "Your account password was reset",
+  "chaves.aviso.texto": "Your account password was reset by email on {data}. Wasn’t you?",
+  "chaves.aviso.espera": "Until {data}, whoever reset it can only open your keys with the recovery kit. Meanwhile, this device can undo the reset.",
+  "chaves.aviso.cancelar": "It wasn’t me: cancel the reset",
+  "chaves.aviso.cancelar.dica": "Your previous password works again, and whoever reset it is signed out. Then change your email password.",
+  "chaves.aviso.aparelhos": "Remove a device from the account",
+  "chaves.aviso.cancelada": "Done: your previous password works again, and whoever reset it was signed out. Sign in with your previous password and change your email password.",
+  "chaves.aviso.fui_eu": "It was me",
+  "conta.erro.espera": "For your safety, this is only available on {data} (72 hours after the password was reset by email). Your recovery kit works right now.",
+  "conta.erro.tirado": "This device was already removed from the account.",
+  "conta.erro.sem_aparelho": "This browser doesn’t have the keys of one of your devices. Use a device where you have signed in before.",
+  "conta.erro.nao_existe": "That device is no longer on the account."
 }

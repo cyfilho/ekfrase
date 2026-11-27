@@ -27,10 +27,12 @@ import {
   ARGON2ID_PADRAO,
   assinar,
   assinarCofre,
+  assinarPedido,
   chaveDeCaixa,
   codigoDoAparelho,
   conferirCofreAssinado,
   conferirDeclaracaoDeCaixa,
+  conferirPedido,
   contextoDeGeracao,
   CONTEXTO_SESSAO,
   declararCaixa,
@@ -76,7 +78,9 @@ import {
   revogarAparelho,
   segredoReticulum,
   trocarSenha,
+  novaSementeDeAparelho,
   type ParametrosDaSenha,
+  type PedidoDoAparelho,
   type ValorCanonico,
 } from '@ekfrase/identidade';
 import { _abrirHpke, _derivarParHpke, _selarHpke } from '../packages/identidade/src/caixa.ts';
@@ -241,6 +245,7 @@ describe('os casos congelados do protocolo (docs/protocolo/identidade)', () => {
       guarda: { aparelho: string; guarda: string; guardado: unknown; semente: string };
       entrega_de_geracao: { contexto: string; caixa: string; segredo: string };
       sessao: { desafio: string; prova: string };
+      pedido: { tirar: PedidoDoAparelho; cancelar: PedidoDoAparelho };
     };
     const c = caso<G>('geracoes.json');
     const semente = h(c.semente_da_pessoa);
@@ -261,6 +266,33 @@ describe('os casos congelados do protocolo (docs/protocolo/identidade)', () => {
     expect(bytesToHex(abrirGuardado(c.guarda.guardado, doBase64url(c.guarda.guarda)!, c.guarda.aparelho)!)).toBe(c.guarda.semente);
     expect(bytesToHex(abrirCaixa(aparelho, c.entrega_de_geracao.contexto, doBase64url(c.entrega_de_geracao.caixa)!)!)).toBe(c.entrega_de_geracao.segredo);
     expect(provarSessao(aparelho, c.sessao.desafio)).toBe(c.sessao.prova);
+    // X2c-4: o pedido assinado pelo aparelho (determinístico) e a conferência dele
+    for (const p of [c.pedido.tirar, c.pedido.cancelar]) {
+      expect(assinarPedido(aparelho, p.pessoa, p.acao, p.alvo, p.desafio)).toEqual(p);
+      expect(conferirPedido(p, aparelho.publicas.assinar, p.desafio)).toBe(true);
+    }
+  });
+
+  it('o pedido assinado pelo aparelho: formato estrito, o desafio certo e a chave do aparelho (X2c-4)', () => {
+    const ap = identidadeDaSemente(novaSementeDeAparelho());
+    const outro = identidadeDaSemente(novaSementeDeAparelho());
+    const pessoa = '3b98041e2b6b0799c6db09d32d30a928';
+    const d = 'ab'.repeat(32);
+    const p = assinarPedido(ap, pessoa, 'tirar', outro.endereco, d);
+    expect(conferirPedido(p, ap.publicas.assinar, d)).toBe(true);
+    expect(conferirPedido(p, ap.publicas.assinar, 'cd'.repeat(32))).toBe(false); // outro desafio
+    expect(conferirPedido(p, outro.publicas.assinar, d)).toBe(false); // outra chave
+    expect(conferirPedido({ ...p, alvo: pessoa }, ap.publicas.assinar, d)).toBe(false); // mudou o que foi assinado
+    expect(conferirPedido({ ...p, extra: 1 }, ap.publicas.assinar, d)).toBe(false);
+    const { alvo: _, ...semAlvo } = p;
+    expect(conferirPedido(semAlvo, ap.publicas.assinar, d)).toBe(false);
+    expect(conferirPedido(assinarPedido(ap, pessoa, 'ver', null, d), ap.publicas.assinar, d)).toBe(true);
+    // o alvo só no tirar, e nunca o próprio aparelho
+    expect(() => assinarPedido(ap, pessoa, 'tirar', null, d)).toThrow(RangeError);
+    expect(() => assinarPedido(ap, pessoa, 'tirar', ap.endereco, d)).toThrow(RangeError);
+    expect(() => assinarPedido(ap, pessoa, 'cancelar', outro.endereco, d)).toThrow(RangeError);
+    expect(() => assinarPedido(ap, pessoa, 'ver', null, 'curto')).toThrow(RangeError);
+    expect(() => assinarPedido(ap, 'XYZ', 'ver', null, d)).toThrow(RangeError);
   });
 
   it('cofre.json: a senha dá as mesmas chaves e abre o cofre', async () => {

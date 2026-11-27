@@ -24,8 +24,8 @@ canônico (os bits de sobra do último caractere são zero; quem lê recusa qual
 ## 2. Assinar com contexto
 - `assinatura = Ed25519.sign(segredo_assinar, utf8("ekfrase/" + contexto) ‖ 0x00 ‖ mensagem)`, 64 bytes.
 - O contexto casa com `^[a-z][a-z0-9-]{0,62}$`. Os de hoje: `certificado-aparelho`, `revogacao-aparelho`,
-  `caixa-da-pessoa` (§9), `cofre-da-pessoa` (§10) e `sessao-aparelho` (§12) (os próximos: os envelopes, a lista de
-  membros, os pacotes).
+  `caixa-da-pessoa` (§9), `cofre-da-pessoa` (§10), `sessao-aparelho` (§12) e `pedido-aparelho` (§13) (os próximos:
+  os envelopes, a lista de membros, os pacotes).
 - **Conferir é estrito** (RFC 8032 §5.1.7, sem as folgas do ZIP-215): `S < L`, a pública e o `R` na codificação
   canônica, nada de ponto de ordem pequena, como no `crypto_sign_verify_detached` do libsodium. Ao ler as públicas
   (§1), uma chave de assinar de ordem pequena é recusada.
@@ -139,3 +139,20 @@ JSON_UNESCAPED_UNICODE)` (cuidado com o objeto vazio, que o `json_decode(…, tr
   `sessao-aparelho`); a ponte confere com a pública de assinar do certificado e liga a sessão ao aparelho (revogar o
   aparelho tira a sessão dele).
 - Casos: `geracoes.json` (`sessao`).
+
+## 13. O pedido assinado pelo aparelho (X2c-4)
+Sem a senha e sem sessão (a senha foi redefinida pelo e-mail e as sessões caíram), um aparelho da pessoa ainda prova quem
+é com a chave DELE e pede à ponte uma de três coisas:
+```json
+{ "v": 1, "pessoa": "<endereço da pessoa>", "aparelho": "<endereço de quem assina>", "acao": "tirar",
+  "alvo": "<endereço do aparelho a tirar>", "desafio": "<64 letras hex>", "assinatura": "<b64u>" }
+```
+- `acao`: `ver` (o aviso "a senha foi redefinida em <data>" e os aparelhos da conta), `tirar` (o `alvo` perde a guarda,
+  as sessões e o "lembrar" e fica marcado "tirado"; a revogação de verdade, com a geração nova, vem quando o cofre abrir)
+  ou `cancelar` (a senha de antes volta a valer e quem redefiniu perde a sessão). `alvo` só no `tirar`, e diferente de
+  `aparelho`; nos outros, `null`. Exatamente esses campos: campo a mais ou a menos é `formato`.
+- A assinatura é do **aparelho** (§2, contexto `pedido-aparelho`) sobre o JSON canônico (§3) do objeto **sem** o campo
+  `assinatura`. O `desafio` é o que a ponte sorteou para o pedido (vale uma vez e por poucos minutos).
+- **Conferir:** o formato; o desafio igual ao esperado; o aparelho da `pessoa` registrado na conta, sem revogação e sem
+  "tirado"; e a assinatura com a pública de assinar do certificado dele (§4). Qualquer falha tem a mesma resposta.
+- Casos: `geracoes.json` (`pedido`: um `tirar` e um `cancelar` assinados pelo `aparelho` do mesmo arquivo).

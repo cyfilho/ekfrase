@@ -47,6 +47,7 @@ import {
   paraBase64url,
   parametrosValidos,
   pessoaDoKit,
+  assinarPedido,
   provarSessao,
   publicaDaGeracao,
   publicasDoJson,
@@ -68,6 +69,7 @@ import {
   lembrarContaComChaves,
   lerAparelho,
   marcarPessoaAtual,
+  pessoaDesteAparelho,
   type AparelhoGuardado,
 } from './aparelho.ts';
 import { contaAtual, mudarConta, pedir as pedirNaPonte, type Conta, type Resposta } from './ponte.ts';
@@ -82,6 +84,13 @@ export interface EstadoDasChaves {
   readonly cofre: unknown;
   /** A senha foi redefinida pelo e-mail: o cofre ainda é o da senha de antes (abre com o kit ou outro aparelho). */
   readonly trancado: boolean;
+  /** Quando a senha foi redefinida pelo e-mail (milissegundos; só com o cofre trancado). */
+  readonly redefinidaEm: number | null;
+  /**
+   * M1c (X2c-4): até quando a ponte espera (72 h depois de redefinir) para entregar a guarda e aceitar a pessoa nova;
+   * `null` = não espera. O kit abre na hora.
+   */
+  readonly esperaAte: number | null;
   readonly caixa: unknown;
   readonly geracao: number;
   readonly kit_conferido: boolean;
@@ -210,6 +219,8 @@ function lerEstado(x: unknown): EstadoDasChaves | null {
     pessoa,
     cofre: e['cofre'],
     trancado: e['trancado'] === true,
+    redefinidaEm: milissegundos(e['redefinida_em']),
+    esperaAte: milissegundos(e['espera_ate']),
     caixa: e['caixa'],
     geracao: typeof e['geracao'] === 'number' && Number.isSafeInteger(e['geracao']) ? e['geracao'] : 0,
     kit_conferido: e['kit_conferido'] === true,
@@ -217,6 +228,8 @@ function lerEstado(x: unknown): EstadoDasChaves | null {
     desafio: typeof e['desafio'] === 'string' ? e['desafio'] : '',
   };
 }
+
+const milissegundos = (x: unknown): number | null => (typeof x === 'number' && Number.isSafeInteger(x) && x > 0 ? x : null);
 
 function mudar(e: EstadoDasChaves | null): EstadoDasChaves | null {
   estadoAtual = e;
@@ -690,9 +703,11 @@ async function refazerCofre(semente: Uint8Array, e: EstadoDasChaves, novaGuarda:
   const cofre = fecharCofre(semente, pendente.cofre, pendente.kdf);
   const r = await pedir<{ chaves: unknown }>('POST', 'chaves/cofre', { cofre, assinatura: assinarCofre(pessoa, cofre) });
   if (!r.ok) return r;
-  const est = lerEstado(r.chaves) ?? { ...e, trancado: false };
+  const est = lerEstado(r.chaves) ?? { ...e, trancado: false, esperaAte: null };
   mudar(est);
-  return ligarAparelho(semente, est, novaGuarda);
+  const l = await ligarAparelho(semente, est, novaGuarda);
+  if (l.ok) await revogarOsTirados(semente);
+  return l;
 }
 
 /** Abre o cofre trancado com as 12 palavras. `senha` só quando `precisaDaSenha()`. */
@@ -931,6 +946,8 @@ export interface Aparelho {
   readonly criado: number;
   readonly vistoEm: string | null;
   readonly revogado: boolean;
+  /** Tirado por outro aparelho da pessoa, sem a senha (X2c-4): sai de vez (a revogação) quando o cofre abrir. */
+  readonly tirado: boolean;
   /** É este aparelho (o da sessão). */
   readonly este: boolean;
   /** O certificado confere (assinado pela pessoa da conta). Um aparelho que não confere não recebe nada. */
@@ -953,6 +970,7 @@ export async function listarAparelhos(): Promise<Resposta<{ aparelhos: Aparelho[
       criado: Number(a['criado'] ?? 0),
       vistoEm: typeof a['visto_em'] === 'string' ? a['visto_em'] : null,
       revogado: a['revogacao'] !== null && a['revogacao'] !== undefined,
+      tirado: typeof a['tirado_em'] === 'string',
       este: a['este'] === true,
       confere,
       publicas: confere && c?.ok ? c.publicas : null,
@@ -972,26 +990,139 @@ export async function revogar(endereco: string, senha: string, o: Opcoes = {}): 
   if (!a.semente) return falha('trancado');
   const semente = a.semente;
   try {
-    const l = await listarAparelhos();
-    if (!l.ok) return l;
-    const g = a.estado.geracao + 1;
-    const nova = chaveDeCaixa(semente, g);
-    const pessoa = identidadeDaSemente(semente);
-    const entregas = l.aparelhos
-      .filter((x) => !x.revogado && x.endereco !== endereco && x.confere && x.publicas)
-      .map((x) => ({ para: x.endereco, caixa: b64(fecharCaixa(x.publicas!.cifrar, contextoDeGeracao(g), nova.segredo)) }));
-    const r = await pedir<{ chaves: unknown }>('POST', 'chaves/aparelhos/revogar', { revogacao: revogarAparelho(pessoa, endereco), caixa: declararCaixa(semente, g), entregas });
-    apagar(nova.segredo);
-    if (!r.ok) return r;
-    const est = lerEstado(r.chaves) ?? a.estado;
-    mudar(est);
-    const local = lerAparelho(pessoa.endereco);
-    if (local) gravarAparelho(pessoa.endereco, comGeracoes(local, semente, est.geracao));
-    await lerCaixaDeEntrada();
-    return { ok: true, chaves: est };
+    return await revogarComSemente(semente, a.estado, endereco);
   } finally {
     apagar(semente);
   }
+}
+
+/**
+ * Os aparelhos tirados sem a senha (X2c-4) saem de vez quando o cofre abre: cada um é revogado (a geração nova vai só
+ * para quem fica). Falhar aqui não desfaz o cofre aberto: o tirado já não tem guarda nem sessão.
+ */
+async function revogarOsTirados(semente: Uint8Array): Promise<void> {
+  const l = await listarAparelhos();
+  if (!l.ok) return;
+  for (const x of l.aparelhos.filter((y) => y.tirado && !y.revogado)) {
+    const e = estadoAtual;
+    if (!e || e.trancado) return;
+    const r = await revogarComSemente(semente, e, x.endereco);
+    if (!r.ok) return;
+  }
+}
+
+/** Revoga com a semente já aberta (quem chama a apaga). */
+async function revogarComSemente(semente: Uint8Array, estado: EstadoDasChaves, endereco: string): Promise<Resposta<{ chaves: EstadoDasChaves }>> {
+  const l = await listarAparelhos();
+  if (!l.ok) return l;
+  const g = estado.geracao + 1;
+  const nova = chaveDeCaixa(semente, g);
+  const pessoa = identidadeDaSemente(semente);
+  const entregas = l.aparelhos
+    .filter((x) => !x.revogado && !x.tirado && x.endereco !== endereco && x.confere && x.publicas)
+    .map((x) => ({ para: x.endereco, caixa: b64(fecharCaixa(x.publicas!.cifrar, contextoDeGeracao(g), nova.segredo)) }));
+  const r = await pedir<{ chaves: unknown }>('POST', 'chaves/aparelhos/revogar', { revogacao: revogarAparelho(pessoa, endereco), caixa: declararCaixa(semente, g), entregas });
+  apagar(nova.segredo);
+  if (!r.ok) return r;
+  const est = lerEstado(r.chaves) ?? estado;
+  mudar(est);
+  const local = lerAparelho(pessoa.endereco);
+  if (local) gravarAparelho(pessoa.endereco, comGeracoes(local, semente, est.geracao));
+  await lerCaixaDeEntrada();
+  return { ok: true, chaves: est };
+}
+
+// ---------- o pedido assinado por este aparelho, sem a senha e sem sessão (X2c-4: M1c e M1d) ----------
+
+/** Um aparelho da conta, visto pelo pedido assinado (`ver`). */
+export interface AparelhoDoAviso {
+  readonly endereco: string;
+  readonly nome: string;
+  readonly criado: number;
+  readonly vistoEm: string | null;
+  readonly tirado: boolean;
+  /** É este aparelho (o que assinou). */
+  readonly este: boolean;
+}
+
+/** O que a ponte diz a um aparelho da pessoa, sem sessão: a senha redefinida, a espera e os aparelhos da conta. */
+export interface AvisoDoAparelho {
+  readonly trancado: boolean;
+  readonly redefinidaEm: number | null;
+  readonly esperaAte: number | null;
+  /** A senha de antes ainda pode voltar (cancelar a redefinição). */
+  readonly podeCancelar: boolean;
+  readonly aparelhos: readonly AparelhoDoAviso[];
+}
+
+/** Este navegador tem as chaves de um aparelho de alguma conta (o par e o certificado)? Sem cifra, sem pedido. */
+export function temAparelhoGuardado(): boolean {
+  const p = pessoaDesteAparelho();
+  return p !== null && lerAparelho(p) !== null;
+}
+
+/**
+ * Assina e manda um pedido (§13 da especificação): o desafio da ponte, a assinatura do par deste aparelho. O
+ * aparelho que a ponte não reconhece mais (revogado, tirado, de outra pessoa) dá `assinatura`, e as chaves daqui,
+ * que não servem mais, são apagadas.
+ */
+async function pedidoAssinado<T extends object>(acao: 'ver' | 'tirar' | 'cancelar', alvo: string | null): Promise<Resposta<T>> {
+  const pessoa = pessoaDesteAparelho();
+  const local = pessoa ? lerAparelho(pessoa) : null;
+  const ap = local ? sementeDoAparelho(local) : null;
+  if (!pessoa || !ap) return falha('sem_aparelho');
+  const d = await pedir<{ desafio: string }>('POST', 'chaves/desafio', {});
+  if (!d.ok) return d;
+  if (typeof d.desafio !== 'string' || !/^[0-9a-f]{64}$/.test(d.desafio)) return falha('servidor');
+  let pedido;
+  try {
+    pedido = assinarPedido(ap, pessoa, acao, alvo, d.desafio);
+  } catch {
+    return falha('nao_existe'); // o alvo mal escrito ou este mesmo aparelho
+  }
+  const r = await pedir<T>('POST', 'chaves/assinado', { pedido });
+  if (!r.ok && r.erro === 'assinatura') apagarAparelho(pessoa);
+  return r;
+}
+
+/** `ver`: o aviso da senha redefinida (para os aparelhos da pessoa que ficaram sem sessão). */
+export async function verAvisoDoAparelho(): Promise<Resposta<{ aviso: AvisoDoAparelho }>> {
+  const r = await pedidoAssinado<Record<string, unknown>>('ver', null);
+  if (!r.ok) return r;
+  const lista = Array.isArray(r['aparelhos']) ? (r['aparelhos'] as Record<string, unknown>[]) : [];
+  return {
+    ok: true,
+    aviso: {
+      trancado: r['trancado'] === true,
+      redefinidaEm: milissegundos(r['redefinida_em']),
+      esperaAte: milissegundos(r['espera_ate']),
+      podeCancelar: r['pode_cancelar'] === true,
+      aparelhos: lista.map((a) => ({
+        endereco: String(a['endereco'] ?? ''),
+        nome: String(a['nome'] ?? ''),
+        criado: Number(a['criado'] ?? 0),
+        vistoEm: typeof a['visto_em'] === 'string' ? a['visto_em'] : null,
+        tirado: a['tirado'] === true,
+        este: a['este'] === true,
+      })),
+    },
+  };
+}
+
+/**
+ * "Tirar este aparelho" por outro aparelho da pessoa, sem a senha (só com o cofre trancado): o tirado perde a guarda,
+ * as sessões e o "lembrar"; sai de vez (a revogação) quando o cofre abrir.
+ */
+export async function tirarAparelho(endereco: string): Promise<Resposta> {
+  return pedidoAssinado('tirar', endereco);
+}
+
+/**
+ * "Não fui eu": cancela a redefinição da senha pelo e-mail. A senha de antes volta a valer, quem redefiniu sai da
+ * conta (todas as sessões caem) e a pessoa recebe um e-mail.
+ */
+export async function cancelarRedefinicao(): Promise<Resposta> {
+  return pedidoAssinado('cancelar', null);
 }
 
 export interface PedidoAberto {
