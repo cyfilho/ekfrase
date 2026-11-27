@@ -125,7 +125,7 @@ function Pronto({ t, texto, fechar }: { t: T; texto: string; fechar: () => void 
   );
 }
 
-/** Mostra o kit numa janela por cima (a pessoa nasceu agora, ou trocou a conta de antes pela senha). */
+/** Mostra o kit numa janela por cima (a pessoa nasceu agora: criar conta, o cadastro pelo e-mail, a pessoa nova). */
 export function mostrarKit(t: T, kit: KitParaMostrar): void {
   abrirJanela(t, t('nucleo.kit.titulo'), (fechar) => <KitNaJanela t={t} kit={kit} fechar={fechar} />);
 }

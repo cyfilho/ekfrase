@@ -20,6 +20,8 @@ export interface Conta {
   organizacoes: { id: number; nome: string; papeis: string[] }[];
   /** Quem cuida do site Ekfrase (lê os feedbacks). */
   equipe: boolean;
+  /** X2c-2: o e-mail foi confirmado (pelo link ou pelo código). Uma ponte de antes não diz. */
+  email_confirmado?: boolean;
 }
 
 export type Resposta<T = object> = ({ ok: true } & T) | { ok: false; erro: string; [extra: string]: unknown };
@@ -103,9 +105,9 @@ export function mudarConta(conta: Conta | null): void {
 
 /**
  * Pede a exclusão da conta (7 dias para se arrepender). Já sai da conta neste aparelho e apaga as chaves dele.
- * `prova` = os campos de `provaDaSenha` (do `chaves.ts`): `entrar_atual` ou, na conta de antes, `senha_atual`.
+ * `prova` = os campos de `provaDaSenha` (do `chaves.ts`): `entrar_atual` (a senha nunca vai em claro).
  */
-export async function excluirConta(prova: { entrar_atual: string } | { senha_atual: string }, confirmacao: string): Promise<Resposta<{ ate: string }>> {
+export async function excluirConta(prova: { entrar_atual: string }, confirmacao: string): Promise<Resposta<{ ate: string }>> {
   const r = await pedir<{ ate: string }>('POST', 'conta/excluir', { ...prova, confirmacao });
   if (r.ok) {
     esquecerChavesDesteAparelho();

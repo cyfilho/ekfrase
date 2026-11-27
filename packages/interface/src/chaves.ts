@@ -10,8 +10,11 @@
  * - **A semente da pessoa não mora em aparelho nenhum.** Ela abre por instantes (entrar num aparelho novo, trocar a
  *   senha, revogar, refazer o cofre, ver o kit) e é apagada logo. Este aparelho guarda só o par DELE, a cópia
  *   cifrada da semente (a guarda fica na ponte) e as gerações da chave de caixa (`aparelho.ts`).
- * - **Um servidor não rebaixa o login:** o e-mail que já entrou com chaves neste navegador nunca mais manda a senha em
- *   claro, nem se a ponte disser que a conta é "antiga" ou não souber as rotas novas.
+ * - **A senha nunca vai em claro** (M3, X2c-2: as contas de antes acabaram em 27/11/2026): nem se a ponte disser que a
+ *   conta é "antiga", nem se ela não souber as rotas novas. Quem sobrou sem chaves entra pelo "esqueci a senha".
+ * - **Criar conta é em dois passos** num servidor com e-mail (`modoDoCadastro` "email"): `pedirCadastro` (nome e
+ *   e-mail; a resposta é sempre a mesma), e o link ou o código que chega (`verCadastro`, `terminarCadastro`: a senha, e
+ *   a pessoa nasce aqui). Sem e-mail no servidor ("direto") ou com o convite de escola, `criarConta` cria na hora.
  * - Dado de fora estragado vira `{ok:false, erro}`, nunca exceção. Os códigos de erro novos têm texto em
  *   `nucleo.conta.erro.<código>`.
  */
@@ -61,7 +64,6 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
   apagarAparelho,
-  contaComChavesLembrada,
   gravarAparelho,
   lembrarContaComChaves,
   lerAparelho,
@@ -144,12 +146,6 @@ export function nomePadraoDoAparelho(): string {
 }
 
 const hashDoEmail = (email: string) => bytesToHex(sha256(utf8ToBytes(`ekfrase/email:${email.trim().toLowerCase()}`)));
-
-/** A conta de agora já entrou com chaves neste navegador? (então a senha em claro nunca mais sai daqui) */
-function contaAtualTemChaves(): boolean {
-  const c = contaAtual();
-  return !c.carregando && c.conta !== null && contaComChavesLembrada(hashDoEmail(c.conta.email));
-}
 
 // ---------- a senha: o Argon2id num Worker (com a barra) ----------
 
@@ -443,50 +439,14 @@ async function ligarCopia(e: EstadoDasChaves): Promise<boolean> {
 type ComConta = Resposta<{ conta: Conta; situacao: Situacao }>;
 
 /**
- * Entra com e-mail e senha. A ponte diz os parâmetros da conta (`conta/parametros`); a conta de antes ("antigo")
- * manda a senha uma última vez, junto do pacote que a troca para as chaves; as outras mandam só a chave de entrar.
- * Um servidor sem as rotas novas entra do jeito de antes, só se este e-mail nunca entrou aqui com chaves.
+ * Entra com e-mail e senha. A ponte diz os parâmetros da conta (`conta/parametros`) e recebe só a chave de entrar. A
+ * senha nunca vai em claro (M3): um servidor de antes, sem as rotas novas, recebe só o erro.
  */
 export async function entrar(email: string, senha: string, o: Opcoes = {}): Promise<ComConta> {
   const e = email.trim().toLowerCase();
   if (!e || !senha) return falha('vazio');
-  const p = await pedir<{ kdf: unknown; antigo: unknown }>('POST', 'conta/parametros', { email: e });
-  if (!p.ok) {
-    if (p.erro !== 'rota') return p;
-    if (contaComChavesLembrada(hashDoEmail(e))) return falha('rebaixado');
-    const r = await pedir<{ conta: Conta }>('POST', 'conta/entrar', { email: e, senha });
-    if (!r.ok) return r;
-    mudarConta(r.conta);
-    return { ok: true, conta: r.conta, situacao: { tipo: 'antiga' } };
-  }
-  if (p.antigo === true) {
-    if (contaComChavesLembrada(hashDoEmail(e))) return falha('rebaixado');
-    const desafio = await desafioDaSessao();
-    if (!desafio) return falha('servidor');
-    const kdf = novosParametros();
-    const k = await derivar(senha, kdf, o.aoProgredir);
-    const nova = novaPessoa(idiomaDoKit(o.idioma ?? 'pt-BR'));
-    const pac = fazerPacote(nova.kit.semente, k, kdf, desafio);
-    apagar(k.entrar, k.cofre);
-    const r = await pedir<{ conta: Conta; chaves: unknown }>('POST', 'conta/entrar', { email: e, senha, chaves: pac.chaves });
-    const kit = kitDe(nova.kit.semente, nova.kit.idioma);
-    apagar(nova.kit.semente);
-    if (!r.ok && r.erro === 'sem_sodium') {
-      // o servidor ainda não confere chaves (o sodium do PHP desligado): entra do jeito de antes, como num servidor de
-      // antes (este e-mail nunca entrou com chaves aqui: conferido acima); a conta troca quando ele puder
-      const v = await pedir<{ conta: Conta }>('POST', 'conta/entrar', { email: e, senha });
-      if (!v.ok) return v;
-      mudarConta(v.conta);
-      return { ok: true, conta: v.conta, situacao: { tipo: 'antiga' } };
-    }
-    if (!r.ok) return r;
-    gravarAparelho(pac.pessoa, pac.local);
-    lembrarContaComChaves(hashDoEmail(e));
-    mudar(lerEstado(r.chaves));
-    mudarConta(r.conta);
-    await lerCaixaDeEntrada();
-    return { ok: true, conta: r.conta, situacao: { tipo: 'aberto', kitConferido: false, kit } };
-  }
+  const p = await pedir<{ kdf: unknown }>('POST', 'conta/parametros', { email: e });
+  if (!p.ok) return p.erro === 'rota' ? falha('servidor_antigo') : p;
   if (!parametrosValidos(p.kdf)) return falha('kdf');
   let k: ChavesDaSenha;
   try {
@@ -507,8 +467,12 @@ export async function entrar(email: string, senha: string, o: Opcoes = {}): Prom
   }
 }
 
-/** Cria a conta: a pessoa nasce aqui (o kit volta para a tela mostrar). A senha não vai; vai o pacote. */
-export async function criarConta(d: { nome: string; email: string; senha: string; idioma: string; site?: string }, o: Opcoes = {}): Promise<ComConta> {
+/**
+ * Cria a conta NA HORA: num servidor sem e-mail (`modoDoCadastro()` "direto") ou com o `convite` de escola (o código do
+ * link, que já provou o e-mail). A pessoa nasce aqui (o kit volta para a tela mostrar). A senha não vai; vai o pacote.
+ * Num servidor com e-mail e sem convite, a ponte responde `versao`: o caminho é o `pedirCadastro`.
+ */
+export async function criarConta(d: { nome: string; email: string; senha: string; idioma: string; site?: string; convite?: string; app?: string }, o: Opcoes = {}): Promise<ComConta> {
   const email = d.email.trim().toLowerCase();
   if (!d.nome.trim() || !email || !d.senha) return falha('vazio');
   if (d.senha.length < 8) return falha('senha_curta');
@@ -521,13 +485,102 @@ export async function criarConta(d: { nome: string; email: string; senha: string
   apagar(k.entrar, k.cofre);
   const kit = kitDe(nova.kit.semente, nova.kit.idioma);
   apagar(nova.kit.semente);
-  const r = await pedir<{ conta: Conta; chaves: unknown }>('POST', 'conta/criar', { nome: d.nome.trim(), email, idioma: d.idioma, site: d.site ?? '', chaves: pac.chaves });
+  const r = await pedir<{ conta: Conta; chaves: unknown }>('POST', 'conta/criar', {
+    nome: d.nome.trim(),
+    email,
+    idioma: d.idioma,
+    site: d.site ?? '',
+    ...(d.app ? { app: d.app } : {}),
+    ...(d.convite ? { convite: d.convite } : {}),
+    chaves: pac.chaves,
+  });
   if (!r.ok) return r;
+  return depoisDeNascer(r, pac, kit, email);
+}
+
+/** A conta nasceu (criar conta, o cadastro pelo e-mail): guarda o par deste aparelho e liga a conta. */
+function depoisDeNascer(r: { conta: Conta; chaves: unknown }, pac: ReturnType<typeof fazerPacote>, kit: KitParaMostrar, email: string): ComConta {
   gravarAparelho(pac.pessoa, pac.local);
   lembrarContaComChaves(hashDoEmail(email));
   mudar(lerEstado(r.chaves));
   mudarConta(r.conta);
   return { ok: true, conta: r.conta, situacao: { tipo: 'aberto', kitConferido: false, kit } };
+}
+
+// ---------- criar conta pelo e-mail (X2c-2, `docs/revisao/seguranca-chaves.md` §5) ----------
+
+/** Como este servidor cria conta: "email" (em dois passos, pelo e-mail) ou "direto" (na hora). Diz o `conta/eu`. */
+export async function modoDoCadastro(): Promise<Resposta<{ modo: 'email' | 'direto' }>> {
+  const r = await pedir<{ cadastro?: unknown }>('GET', 'conta/eu');
+  if (!r.ok) return r;
+  // um servidor de antes não diz: ele cria na hora
+  return { ok: true, modo: r.cadastro === 'email' ? 'email' : 'direto' };
+}
+
+/**
+ * Passo 1: o nome e o e-mail. A ponte responde sempre igual (`modo` "email"), tenha ou não conta o e-mail; o e-mail leva
+ * o link e o código de 8 letras (ou o "você já tem conta"). `app` = o app de onde a pessoa veio (o link abre nele).
+ */
+export async function pedirCadastro(d: { nome: string; email: string; idioma: string; app: string; site?: string }): Promise<Resposta<{ modo: 'email' | 'direto' }>> {
+  const email = d.email.trim().toLowerCase();
+  if (!d.nome.trim() || !email) return falha('vazio');
+  const r = await pedir<{ modo?: unknown }>('POST', 'conta/criar', { nome: d.nome.trim(), email, idioma: d.idioma, app: d.app, site: d.site ?? '' });
+  if (!r.ok) return r;
+  return { ok: true, modo: r.modo === 'email' ? 'email' : 'direto' };
+}
+
+/** O que o link (ou o código) leva: o cadastro da conta nova, ou o e-mail confirmado, trocado ou devolvido. */
+export type Cadastro =
+  | { readonly tipo: 'conta'; readonly nome: string; readonly email: string; readonly app: string }
+  | { readonly tipo: 'confirmar' | 'email' | 'desfazer'; readonly email: string };
+
+/** O código do link (64 hex) ou o e-mail com o código de 8 letras que a pessoa digitou. */
+export type CodigoDoCadastro = { readonly codigo: string } | { readonly email: string; readonly codigo: string };
+
+const pedidoDoCodigo = (c: CodigoDoCadastro) => ('email' in c ? { email: c.email.trim().toLowerCase(), codigo: c.codigo.trim() } : { codigo: c.codigo.trim() });
+
+/**
+ * Abre o link (ou confere o código digitado). Na conta nova, só mostra (o nome e o e-mail; a tela pede a senha); no
+ * confirmar, no trocar e no desfazer, já termina. O código errado dá `codigo_invalido` (com `restam`, se digitado).
+ */
+export async function verCadastro(c: CodigoDoCadastro): Promise<Resposta<{ cadastro: Cadastro }>> {
+  if (!c.codigo.trim()) return falha('vazio');
+  const r = await pedir<{ cadastro?: unknown }>('POST', 'conta/cadastro', pedidoDoCodigo(c));
+  if (!r.ok) return r;
+  const x = r.cadastro as Record<string, unknown> | undefined;
+  if (!x || typeof x['email'] !== 'string') return falha('servidor');
+  if (x['tipo'] === 'conta') return { ok: true, cadastro: { tipo: 'conta', nome: String(x['nome'] ?? ''), email: x['email'], app: String(x['app'] ?? '') } };
+  if (x['tipo'] === 'confirmar' || x['tipo'] === 'email' || x['tipo'] === 'desfazer') {
+    const agora = contaAtual();
+    if (x['tipo'] !== 'desfazer' && !agora.carregando && agora.conta) mudarConta({ ...agora.conta, email: x['email'], email_confirmado: true });
+    return { ok: true, cadastro: { tipo: x['tipo'], email: x['email'] } };
+  }
+  return falha('servidor');
+}
+
+/** Passo 2: a senha. As chaves nascem aqui, a conta nasce com o e-mail confirmado e já entra (o kit volta). */
+export async function terminarCadastro(c: CodigoDoCadastro, senha: string, o: Opcoes = {}): Promise<ComConta> {
+  if (!senha) return falha('vazio');
+  if (senha.length < 8) return falha('senha_curta');
+  const desafio = await desafioDaSessao();
+  if (!desafio) return falha('servidor');
+  const kdf = novosParametros();
+  const k = await derivar(senha, kdf, o.aoProgredir);
+  const nova = novaPessoa(idiomaDoKit(o.idioma ?? 'pt-BR'));
+  const pac = fazerPacote(nova.kit.semente, k, kdf, desafio);
+  apagar(k.entrar, k.cofre);
+  const kit = kitDe(nova.kit.semente, nova.kit.idioma);
+  apagar(nova.kit.semente);
+  const r = await pedir<{ conta: Conta; chaves: unknown }>('POST', 'conta/cadastro', { ...pedidoDoCodigo(c), chaves: pac.chaves });
+  if (!r.ok) return r;
+  return depoisDeNascer(r, pac, kit, r.conta.email);
+}
+
+/** A conta de antes do e-mail confirmado: manda o link "Confirme o seu e-mail" (`confirmado` = já estava). */
+export async function pedirConfirmacaoDoEmail(app: string, idioma: string): Promise<Resposta<{ confirmado: boolean }>> {
+  const r = await pedir<{ confirmado?: unknown }>('POST', 'conta/confirmar-email', { app, idioma });
+  if (!r.ok) return r;
+  return { ok: true, confirmado: r.confirmado === true };
 }
 
 /**
@@ -777,14 +830,14 @@ async function abrirComSenhaAtual(senha: string, o: Opcoes): Promise<Resposta<{ 
 }
 
 /**
- * Os campos que provam a senha de agora para a ponte (excluir a conta, trocar o e-mail): `entrar_atual` numa conta
- * com chaves, `senha_atual` (em claro) só na conta de antes e só se este e-mail nunca entrou aqui com chaves.
+ * Os campos que provam a senha de agora para a ponte (excluir a conta, trocar o e-mail): `entrar_atual`. A conta de
+ * antes (sem chaves) não tem como provar sem mandar a senha em claro (M3): `antiga` (a tela leva ao "esqueci a senha").
  */
-export async function provaDaSenha(senha: string, o: Opcoes = {}): Promise<Resposta<{ campos: { entrar_atual: string } | { senha_atual: string } }>> {
+export async function provaDaSenha(senha: string, o: Opcoes = {}): Promise<Resposta<{ campos: { entrar_atual: string } }>> {
   if (!senha) return falha('senha_atual');
   const v = await verChaves();
-  if ((!v.ok && v.erro === 'rota') || (v.ok && v.chaves.antiga)) return contaAtualTemChaves() ? falha('rebaixado') : { ok: true, campos: { senha_atual: senha } };
-  if (!v.ok) return v;
+  if (!v.ok) return v.erro === 'rota' ? falha('servidor_antigo') : v;
+  if (v.chaves.antiga) return falha('antiga');
   if (!parametrosValidos(v.chaves.kdf)) return falha('kdf');
   const k = await derivar(senha, v.chaves.kdf, o.aoProgredir);
   const campos = { entrar_atual: b64(k.entrar) };
@@ -792,33 +845,15 @@ export async function provaDaSenha(senha: string, o: Opcoes = {}): Promise<Respo
   return { ok: true, campos };
 }
 
-/**
- * Troca a senha: o cofre é refeito com a nova (assinado pela pessoa). Na conta de antes, a troca também cria as
- * chaves (a pessoa nasce: o kit volta). Com o cofre trancado, só os parâmetros mudam.
- */
-export async function trocarSenha(atual: string, nova: string, o: Opcoes = {}): Promise<Resposta<{ chaves: EstadoDasChaves; kit?: KitParaMostrar }>> {
+/** Troca a senha: o cofre é refeito com a nova (assinado pela pessoa). Com o cofre trancado, só os parâmetros mudam. */
+export async function trocarSenha(atual: string, nova: string, o: Opcoes = {}): Promise<Resposta<{ chaves: EstadoDasChaves }>> {
   if (!atual) return falha('senha_atual');
   if (!nova) return falha('vazio');
   if (nova.length < 8) return falha('senha_curta');
   const v = await verChaves();
   if (!v.ok) return v;
   const kdf = novosParametros();
-  if (v.chaves.antiga) {
-    if (contaAtualTemChaves()) return falha('rebaixado');
-    const k = await derivar(nova, kdf, o.aoProgredir);
-    const pessoa = novaPessoa(idiomaDoKit(o.idioma ?? 'pt-BR'));
-    const pac = fazerPacote(pessoa.kit.semente, k, kdf, v.chaves.desafio);
-    apagar(k.entrar, k.cofre);
-    const kit = kitDe(pessoa.kit.semente, pessoa.kit.idioma);
-    apagar(pessoa.kit.semente);
-    const r = await pedir<{ chaves: unknown }>('POST', 'conta/senha', { senha_atual: atual, chaves: pac.chaves });
-    if (!r.ok) return r;
-    gravarAparelho(pac.pessoa, pac.local);
-    const est = lerEstado(r.chaves);
-    if (!est) return falha('servidor');
-    mudar(est);
-    return { ok: true, chaves: est, kit };
-  }
+  if (v.chaves.antiga) return falha('antiga'); // M3: a conta de antes troca pelo "esqueci a senha"
   const a = await abrirComSenhaAtual(atual, o);
   if (!a.ok) return a;
   const k = await derivar(nova, kdf, o.aoProgredir);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { EntradaApp, FormConta, entradaPedida, limparEntradaPedida, ponte } from '@ekfrase/interface';
+import { EntradaApp, FormConta, TelaDoCadastro, entradaPedida, limparEntradaPedida, ponte } from '@ekfrase/interface';
 import { useEffect, useState } from 'preact/hooks';
 import { api, type Conta, type Escola, type TextosEscola } from './api.ts';
 import { Cabecalho, Rodape } from './casca.tsx';
@@ -133,6 +133,11 @@ export function App() {
             }}
           />
         )}
+        {(estado.fase === 'fora' || estado.fase === 'dentro') && rota === 'cadastro' && (
+          <section class="painel entrar">
+            <TelaDoCadastro t={t} codigo={parametro} idioma={tr.idioma()} app="vernakula" aoEntrar={sincronizar} />
+          </section>
+        )}
         {estado.fase === 'fora' && rota === 'criar' && (
           <section class="painel entrar" aria-labelledby="titulo-criar">
             <h1 id="titulo-criar">{t('vernakula.criar.titulo')}</h1>
@@ -140,8 +145,8 @@ export function App() {
             <FormConta t={t} app="vernakula" idioma={tr.idioma()} inicial="criar" podeCriar aoEntrar={sincronizar} />
           </section>
         )}
-        {estado.fase === 'fora' && !['esqueci', 'redefinir', 'convite', 'criar'].includes(rota) && <Entrar aviso={estado.aviso} aoEntrar={entrou} />}
-        {dentro && rota !== 'redefinir' && rota !== 'convite' && (
+        {estado.fase === 'fora' && !['esqueci', 'redefinir', 'convite', 'criar', 'cadastro'].includes(rota) && <Entrar aviso={estado.aviso} aoEntrar={entrou} />}
+        {dentro && rota !== 'redefinir' && rota !== 'convite' && rota !== 'cadastro' && (
           <Dentro conta={dentro} escola={escola} rota={rota} trocas={trocas} mudarTrocas={mudarTrocas} entrou={entrou} escolher={escolher} sair={sair} />
         )}
       </main>
@@ -164,7 +169,17 @@ function Dentro(p: {
   const { conta, escola, rota } = p;
   if (rota === 'conta') return <MinhaConta conta={conta} escola={escola} aoMudar={p.entrou} />;
   if (rota === 'pedir') return <PedirEscola temEscola={conta.organizacoes.length > 0} />;
-  if (rota === 'escolas' || !escola) return <MinhasEscolas conta={conta} aoEscolher={p.escolher} />;
+  if (rota === 'escolas' || !escola)
+    return (
+      <MinhasEscolas
+        conta={conta}
+        aoEscolher={p.escolher}
+        aoAceitar={(c, id) => {
+          p.entrou(c);
+          p.escolher(id);
+        }}
+      />
+    );
   if (rota === 'textos' && podeEditarTextos(escola)) return <TextosDaEscola escola={escola} trocas={p.trocas} aoMudar={p.mudarTrocas} />;
   if (rota === 'admin' && podeAdministrar(escola)) return <Administracao key={escola.id} escola={escola} />;
   return <Inicio conta={conta} escola={escola} aoSair={p.sair} />;

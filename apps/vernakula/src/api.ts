@@ -10,6 +10,8 @@ export interface Conta {
   id: number;
   nome: string;
   email: string;
+  /** X2c-2: o e-mail foi confirmado (as contas de antes, não, até abrirem o link "Confirme o seu e-mail"). */
+  email_confirmado?: boolean;
   papeis: string[];
   organizacoes: { id: number; nome: string; papeis: string[] }[];
 }
@@ -165,8 +167,12 @@ export const api = {
   sair: () => pedir<object>('POST', 'conta/sair', {}),
   /** Manda o link de senha nova (a ponte responde igual tenha ou não conta). */
   esqueci: (email: string, idioma: string) => pedir<object>('POST', 'conta/esqueci', { email, idioma, app: 'vernakula' }),
-  /** Trocar o e-mail pede a prova da senha (`chaves.provaDaSenha`: `entrar_atual`, ou `senha_atual` na conta de antes). */
-  perfil: (dados: { nome: string; email: string } & ({ entrar_atual?: string } | { senha_atual?: string })) => pedir<{ conta: Conta }>('POST', 'conta/perfil', dados),
+  /**
+   * Trocar o e-mail pede a prova da senha (`chaves.provaDaSenha`: `entrar_atual`). Num servidor com e-mail, o novo só
+   * vale depois do link que chega nele (`email_pendente`, X2c-2/M6).
+   */
+  perfil: (dados: { nome: string; email: string; app: string; idioma: string; entrar_atual?: string }) =>
+    pedir<{ conta: Conta; email_pendente?: string }>('POST', 'conta/perfil', dados),
   renomearEscola: (id: number, nome: string) => pedir<{ conta: Conta }>('POST', `organizacoes/${id}`, { nome }),
   /** As trocas de texto da escola (idioma → chave → texto). */
   textos: (organizacao: number) => pedir<{ textos: TextosEscola }>('GET', `textos?organizacao=${organizacao}`),
@@ -181,7 +187,7 @@ export const api = {
   convitesMeus: () => pedir<{ convites: Convite[] }>('GET', 'convites/meus'),
   verConvite: (codigo: string) => pedir<{ convite: Convite }>('GET', `convites/ver?codigo=${encodeURIComponent(codigo)}`),
   /** Pelo código do e-mail (qualquer conta) ou pelo número (a conta do e-mail convidado). */
-  aceitarConvite: (de: { codigo: string }) => pedir<{ escola: number; conta: Conta }>('POST', 'convites/aceitar', de),
+  aceitarConvite: (de: { codigo: string } | { id: number }) => pedir<{ escola: number; conta: Conta }>('POST', 'convites/aceitar', de),
   recusarConvite: (de: { codigo: string } | { id: number }) => pedir<object>('POST', 'convites/recusar', de),
   painel: (escola: number) => pedir<PainelEscola>('GET', `escolas/${escola}`),
   criarCurso: (escola: number, nome: string) => pedir<{ curso: { id: number } }>('POST', `escolas/${escola}/cursos`, { nome }),

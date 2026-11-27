@@ -200,6 +200,6 @@
   "admin.permissoes.sai": "With no role, the person leaves the school and its classes.",
   "admin.permissoes.sai_confirma": "Remove {nome} from the school and its classes?",
   "admin.permissoes.salvo": "Permissions for {nome} saved.",
-  "escolas.convites.pelo_email": "To accept, open the invitation link sent to {email}. That way the school knows it really is you who gets the emails at that address.",
+  "escolas.convites.pelo_email": "To accept, open the invitation link that arrived at {email}, or confirm your email in My account: once it's confirmed, you can accept right here.",
   "escolas.erro.pelo_email": "Accept the invitation through the link sent to your email."
 }

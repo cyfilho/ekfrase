@@ -6,7 +6,8 @@
  *
  * MODO NORMAL = caminho limpo, sem `#`:
  *   ekfrase.com/                       a página inicial
- *   ekfrase.com/<página>               página do site (apps, conta, equipe, sobre, contato, privacidade, termos…)
+ *   ekfrase.com/<página>               página do site (apps, conta, equipe, sobre, contato, privacidade, termos,
+ *                                      redefinir/<código> e cadastro/<código>: os links dos e-mails da conta…)
  *   ekfrase.com/<app>/                 a entrada do app (o "hall" do modo normal: as formas de usar)
  *   ekfrase.com/<app>/<página>         página pública do app, fora dele (computador, os, convite, redefinir…)
  *   ekfrase.com/<app>/app              o app aberto (a tela principal)
@@ -24,7 +25,7 @@
  */
 
 /** As páginas do site na raiz (modo normal). Nenhum app pode ter um destes nomes como id. */
-export const PAGINAS_DO_SITE = ['apps', 'conta', 'equipe', 'feedback', 'sobre', 'contato', 'privacidade', 'termos', 'redefinir'] as const;
+export const PAGINAS_DO_SITE = ['apps', 'conta', 'equipe', 'feedback', 'sobre', 'contato', 'privacidade', 'termos', 'redefinir', 'cadastro'] as const;
 
 /** Páginas do site (modo normal). */
 export const site = {

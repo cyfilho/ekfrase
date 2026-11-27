@@ -9,13 +9,14 @@ import { useEffect, useState } from 'preact/hooks';
  *
  *   /vernakula/                    'entrada'    a entrada (online, computador)
  *   /vernakula/<página>            públicas, de quem ainda não entrou: entrar, criar, esqueci,
- *                                  redefinir/<código do e-mail>, convite/<código do e-mail>
+ *                                  redefinir/<código do e-mail>, convite/<código do e-mail>,
+ *                                  cadastro/<código do e-mail> (criar conta, confirmar ou trocar o e-mail; X2c-2)
  *   /vernakula/app                 'inicio'     o app: a tela principal de quem entrou
  *   /vernakula/app/<tela>          conta, textos, escolas, pedir, admin
  */
-export type Rota = 'entrada' | 'inicio' | 'entrar' | 'criar' | 'conta' | 'textos' | 'esqueci' | 'redefinir' | 'escolas' | 'pedir' | 'admin' | 'convite';
+export type Rota = 'entrada' | 'inicio' | 'entrar' | 'criar' | 'conta' | 'textos' | 'esqueci' | 'redefinir' | 'escolas' | 'pedir' | 'admin' | 'convite' | 'cadastro';
 
-const PUBLICAS: readonly Rota[] = ['entrar', 'criar', 'esqueci', 'redefinir', 'convite'];
+const PUBLICAS: readonly Rota[] = ['entrar', 'criar', 'esqueci', 'redefinir', 'convite', 'cadastro'];
 const NO_APP: readonly Rota[] = ['conta', 'textos', 'escolas', 'pedir', 'admin'];
 
 export interface Endereco {
