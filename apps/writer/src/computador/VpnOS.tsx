@@ -166,10 +166,15 @@ export function ParteVpn() {
     if (certificado) botaoConfiar.current?.focus();
   }, [certificado]);
 
-  /** O foco vai ao botão Ligar/Desligar de uma VPN (ou ao Importar, se ela sumiu). */
-  const focarNa = (nome: string | null) =>
+  /**
+   * O foco vai ao botão Ligar/Desligar de uma VPN (ou ao Importar, se ela sumiu). Com `respeitar`, quem já está com o
+   * foco dentro da linha dessa VPN fica onde está: a pessoa pode ter apertado Tab logo depois de Ligar (no CI lento, o
+   * Enter seguinte caía no Desligar, puxado de volta pelo foco que chegava atrasado).
+   */
+  const focarNa = (nome: string | null, respeitar = false) =>
     setTimeout(() => {
       const linha = [...(raiz.current?.querySelectorAll<HTMLElement>('[data-teste="os-vpn"]') ?? [])].find((l) => l.dataset['nome'] === nome);
+      if (respeitar && linha && linha.contains(document.activeElement)) return;
       (linha?.querySelector<HTMLElement>('.vpn-alternar') ?? botaoImportar.current)?.focus();
     }, 0);
 
@@ -217,7 +222,7 @@ export function ParteVpn() {
         texto: t('writer.os.vpn.ligou', { nome: v.nome }),
         erro: false,
       });
-      focarNa(v.nome);
+      focarNa(v.nome, true);
       return;
     }
     // a VPN de empresa pede o código do segundo fator, ou a confiança num certificado novo
@@ -237,7 +242,7 @@ export function ParteVpn() {
     }
     setAviso({ texto: textoDoErroVpn(r), erro: true });
     if (r.erro === 'sso' || r.erro === 'servidor') {
-      focarNa(v.nome);
+      focarNa(v.nome, true);
       return;
     }
     // o código não serviu: o campo, de novo
@@ -253,7 +258,7 @@ export function ParteVpn() {
         setSenha('');
         setPedindo(v);
       }
-    } else focarNa(v.nome);
+    } else focarNa(v.nome, true);
   };
 
   const alternar = async (v: VpnOS) => {
@@ -270,7 +275,7 @@ export function ParteVpn() {
             }
           : { texto: textoDoErroVpn(r), erro: true },
       );
-      focarNa(v.nome);
+      focarNa(v.nome, true);
       return;
     }
     if (v.pedeCodigo) {
