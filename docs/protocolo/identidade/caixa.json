@@ -1,0 +1,12 @@
+{
+  "descricao": "HPKE (RFC 9180) modo base, X25519 + HKDF-SHA256 + ChaCha20-Poly1305; info = \"ekfrase/caixa/\" + contexto; aad vazio; caixa = enc ‖ cifrado",
+  "casos": [
+    {
+      "semente_destino": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "contexto": "chave-doc:0193a5c0-0000-7000-8000-000000000001:0",
+      "efemero": "7778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f90919293949596",
+      "dados": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "caixa": "4eba782a2cb40e00bf2a5cb6cc0daf894fe096ee6f027006b5d0b65883d2bf299e44c125f918fcfbce1875c6d48b18dc71376535533febc6f352878c6e7f379b3113d2bf757870cd96851b68764f9bee"
+    }
+  ]
+}

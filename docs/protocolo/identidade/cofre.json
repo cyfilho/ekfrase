@@ -1,0 +1,31 @@
+{
+  "descricao": "senha (NFC) → Argon2id (mestra) → HKDF-SHA256: entrar (info \"ekfrase/senha/entrar\") e cofre (\"ekfrase/senha/cofre\"); o cofre abre e dá o segredo",
+  "casos": [
+    {
+      "senha": "Coração de pão 2026",
+      "kdf": {
+        "alg": "argon2id",
+        "m": 19456,
+        "t": 2,
+        "p": 1,
+        "sal": "AgICAgICAgICAgICAgICAg"
+      },
+      "mestra": "60782901fb88559856aa29df407e2e9989792fc170f32b3324fc7c4b768f9d1d",
+      "entrar": "c1f85fbc1c49cdf22f521af41e7da094e98325b7d62bf43abf5b3234f4cd2983",
+      "chave_do_cofre": "46e75b8b7435c965f6c48ad0e68c36fe6ce5b5ad1fa1dd55414a2221d91442cf",
+      "cofre": {
+        "v": 1,
+        "kdf": {
+          "alg": "argon2id",
+          "m": 19456,
+          "t": 2,
+          "p": 1,
+          "sal": "AgICAgICAgICAgICAgICAg"
+        },
+        "nonce": "rxN8vPq5E5IWQcTQFzCok9NTeqcj2ein",
+        "cifrado": "3ePQCxN4wMLstEar6LxLgz8buuzBUc91stFWXgj7UNA"
+      },
+      "segredo": "000102030405060708090a0b0c0d0e0f"
+    }
+  ]
+}

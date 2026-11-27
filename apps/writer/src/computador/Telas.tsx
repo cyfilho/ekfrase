@@ -13,7 +13,7 @@
  * - `Baixar`: a página de download (`/writer/computador`), com o passo a passo do aviso do SmartScreen
  *   (sem certificado de assinatura, DEC-P064).
  */
-import { LINKS, PaginaApp, definirAntesDoEntrar, entradaDoApp, paginaDoApp } from '@ekfrase/interface';
+import { LINKS, PaginaApp, chaves, definirAntesDoEntrar, entradaDoApp, paginaDoApp } from '@ekfrase/interface';
 import { SENHA_MINIMA, type ErroCasca, type EscolhaEspelho, type InfoServidor, type PonteCasca, type RespostaCasca } from '@ekfrase/writer-nucleo';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -21,7 +21,7 @@ import logo from '../img/logo-writer.png';
 import { atualizacoesDaCasca, ParteAtualizacoes } from './Atualizacoes.tsx';
 import { enderecoDe, useRelease } from './releases.ts';
 import { t, tr } from '../textos.ts';
-import { casca as pontePossivel, mudarEstado, naCasca, trancar, useEstadoCasca } from './casca.ts';
+import { casca as pontePossivel, mudarEstado, naCasca, noOS, trancar, useEstadoCasca } from './casca.ts';
 
 /** A ponte da casca (só é usada com `naCasca`; cada tela confere antes, em tempo de execução). */
 const casca = pontePossivel as PonteCasca;
@@ -307,8 +307,12 @@ export function EscolhaServidor() {
   );
 }
 
-// na casca, o servidor aparece acima do formulário de entrar e de criar conta (não no "esqueci a senha")
-if (naCasca) definirAntesDoEntrar((modo) => (modo === 'esqueci' ? null : <EscolhaServidor />));
+if (naCasca) {
+  // na casca, o servidor aparece acima do formulário de entrar e de criar conta (não no "esqueci a senha")
+  definirAntesDoEntrar((modo) => (modo === 'esqueci' ? null : <EscolhaServidor />));
+  // o nome com que este aparelho aparece em "Seus aparelhos" (X2), no idioma da tela na hora de se apresentar
+  chaves.definirNomeDoAparelho(() => t(noOS ? 'writer.os.aparelho' : 'writer.computador.aparelho'));
+}
 
 // ---------- dentro dos Ajustes ----------
 

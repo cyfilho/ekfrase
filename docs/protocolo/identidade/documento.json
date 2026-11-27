@@ -1,0 +1,13 @@
+{
+  "descricao": "XChaCha20-Poly1305 com a chave da época; dados associados = \"ekfrase/doc/v1\" 00 doc 00 época (u32 big-endian) ‖ aad; cifrado = nonce (24) ‖ cifrado",
+  "casos": [
+    {
+      "doc": "0193a5c0-0000-7000-8000-000000000001",
+      "epoca": 3,
+      "chave": "1112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "aad": "6361626563616c686f",
+      "dados": "45726120756d612076657a",
+      "cifrado": "70875ef586a06f1d88dbe59668de1ae127115333965cf8e9e6b36ff72ec1cdf2d0e653e49605587a02a3c9721f93acb99723bf"
+    }
+  ]
+}

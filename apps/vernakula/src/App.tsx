@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { EntradaApp, FormConta, entradaPedida, limparEntradaPedida } from '@ekfrase/interface';
+import { EntradaApp, FormConta, entradaPedida, limparEntradaPedida, ponte } from '@ekfrase/interface';
 import { useEffect, useState } from 'preact/hooks';
 import { api, type Conta, type Escola, type TextosEscola } from './api.ts';
 import { Cabecalho, Rodape } from './casca.tsx';
@@ -66,6 +66,8 @@ export function App() {
 
   function entrou(conta: Conta) {
     setEstado({ fase: 'dentro', conta });
+    // entrar passou pelo `chaves` (a sessão nova): este app relê o token dele
+    void api.eu();
   }
 
   function escolher(id: number) {
@@ -81,8 +83,9 @@ export function App() {
     });
   }
 
+  // o `sair` comum: além da sessão, apaga as chaves deste aparelho (no computador da escola, nada fica)
   const sair = () => {
-    void api.sair().finally(() => {
+    void ponte.sair().finally(() => {
       irPara('entrada');
       setEstado({ fase: 'fora' });
     });
@@ -161,7 +164,7 @@ function Dentro(p: {
   const { conta, escola, rota } = p;
   if (rota === 'conta') return <MinhaConta conta={conta} escola={escola} aoMudar={p.entrou} />;
   if (rota === 'pedir') return <PedirEscola temEscola={conta.organizacoes.length > 0} />;
-  if (rota === 'escolas' || !escola) return <MinhasEscolas conta={conta} aoEscolher={p.escolher} aoMudarConta={p.entrou} />;
+  if (rota === 'escolas' || !escola) return <MinhasEscolas conta={conta} aoEscolher={p.escolher} />;
   if (rota === 'textos' && podeEditarTextos(escola)) return <TextosDaEscola escola={escola} trocas={p.trocas} aoMudar={p.mudarTrocas} />;
   if (rota === 'admin' && podeAdministrar(escola)) return <Administracao key={escola.id} escola={escola} />;
   return <Inicio conta={conta} escola={escola} aoSair={p.sair} />;

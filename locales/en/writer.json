@@ -757,5 +757,7 @@
   "os.vpn.erro.servidor": "The server address is not valid or the server did not answer. Check the address and the internet.",
   "os.vpn.erro.certificado": "The system does not know the server's certificate.",
   "os.vpn.erro.segundo-fator": "The server asked for a code.",
-  "os.vpn.erro.sso": "This VPN asks you to sign in through a web browser, which Writer OS does not have. Ask IT for a VPN with user name and password."
+  "os.vpn.erro.sso": "This VPN asks you to sign in through a web browser, which Writer OS does not have. Ask IT for a VPN with user name and password.",
+  "computador.aparelho": "Writer on the computer",
+  "os.aparelho": "Writer OS (USB drive)"
 }

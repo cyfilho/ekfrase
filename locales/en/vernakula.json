@@ -199,5 +199,7 @@
   "admin.permissoes.explicacao": "What each person can do in the school. Only the administration sees and changes this list. The coordination takes care of courses, classes and registrations; the administration, of permissions.",
   "admin.permissoes.sai": "With no role, the person leaves the school and its classes.",
   "admin.permissoes.sai_confirma": "Remove {nome} from the school and its classes?",
-  "admin.permissoes.salvo": "Permissions for {nome} saved."
+  "admin.permissoes.salvo": "Permissions for {nome} saved.",
+  "escolas.convites.pelo_email": "To accept, open the invitation link sent to {email}. That way the school knows it really is you who gets the emails at that address.",
+  "escolas.erro.pelo_email": "Accept the invitation through the link sent to your email."
 }

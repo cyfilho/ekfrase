@@ -1,0 +1,102 @@
+{
+  "descricao": "certificados de aparelho e revogações assinados pela pessoa (sementes de chaves.json); o que cada conferência deve dizer",
+  "pessoa": {
+    "semente": "000102030405060708090a0b0c0d0e0f",
+    "endereco": "3b98041e2b6b0799c6db09d32d30a928"
+  },
+  "certificados": [
+    {
+      "v": 1,
+      "pessoa": {
+        "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+        "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+      },
+      "aparelho": {
+        "assinar": "EI2xZ2Gyg0APbfQBx6O2xVPzRgDOEaf5vzfW8HlHW1g",
+        "cifrar": "PGIG-dJCqVe_icPP6I93en03ZasiOfWuvQcfl1aB0kg"
+      },
+      "nome": "Notebook da Ana",
+      "criado": 1795000000000,
+      "assinatura": "qepsXwSviFDV0aIxh2O7Jqo4xGnchyX9hPs1ff8X12sVPmUcmAIgyiyucIpRRHFK3Lj1re7u4Uz0BIkgDzYKBA"
+    },
+    {
+      "v": 1,
+      "pessoa": {
+        "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+        "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+      },
+      "aparelho": {
+        "assinar": "7N8y-ECkQedoT5OCbxGM3prqHprKpeGDOCw449lXSfU",
+        "cifrar": "gltilIVQu_lH7qmXvU_QjOb-SMGZeAyqQz7-5yuXXQ4"
+      },
+      "nome": "Celular do João",
+      "criado": 1795000100000,
+      "assinatura": "mW1Tq7nLxkGa8ddSU-5luQcCoX-0tZ-EW6lzQOqrc8qD34y4628h9HjERedqrFqKOs0accer9rW7s6cqOc7XBA"
+    }
+  ],
+  "revogacoes": [
+    {
+      "v": 1,
+      "pessoa": {
+        "assinar": "kEPeECKnOlErtNbShFgfqN4f1gk2x7QDMyeocP7RFCU",
+        "cifrar": "ISQWuu6kGbwf09gCUTSXPsQ4lDpqH5BCcdGbxqxDvic"
+      },
+      "aparelho": "e8bb70e0570e378d9878f8edfd4b9939",
+      "quando": 1795100000000,
+      "assinatura": "n039B506joJjTOHTWRpojgB_Wx-5Bn9IeZAOhMJ8FS4qYdIae4fY6bBC-otIgcXbd9_JqAisFx-g3B4ZTAgeDA"
+    },
+    {
+      "v": 1,
+      "pessoa": {
+        "assinar": "KcEKpk5ncE9H2Z_HAXbhCxmIQ1gwxHTfIzkddGEok5I",
+        "cifrar": "v1eiI_k50UDj77wxItBbbjDF1lBuyIYNcSAz8ZOLlQ8"
+      },
+      "aparelho": "fb314d9aa303c1f399d10355ba59a01b",
+      "quando": 1795100000000,
+      "assinatura": "GCQVunpE7RVNOhUlCq3rusMvzbOIYr_JxAZH5fVXfujVeQNdiw8kDhciTSH-OXBGJXMUTZdJXAEmB8lQlAKKDA"
+    }
+  ],
+  "conferir": [
+    {
+      "certificado": 0,
+      "revogacoes": [
+        0,
+        1
+      ],
+      "pessoa": "3b98041e2b6b0799c6db09d32d30a928",
+      "resultado": {
+        "ok": true,
+        "aparelho": "fb314d9aa303c1f399d10355ba59a01b"
+      }
+    },
+    {
+      "certificado": 1,
+      "revogacoes": [],
+      "pessoa": "3b98041e2b6b0799c6db09d32d30a928",
+      "resultado": {
+        "ok": true,
+        "aparelho": "e8bb70e0570e378d9878f8edfd4b9939"
+      }
+    },
+    {
+      "certificado": 1,
+      "revogacoes": [
+        0
+      ],
+      "pessoa": "3b98041e2b6b0799c6db09d32d30a928",
+      "resultado": {
+        "ok": false,
+        "erro": "revogado"
+      }
+    },
+    {
+      "certificado": 0,
+      "revogacoes": [],
+      "pessoa": "b5b1671315739f4df7477b8e66d6f8a3",
+      "resultado": {
+        "ok": false,
+        "erro": "outra-pessoa"
+      }
+    }
+  ]
+}

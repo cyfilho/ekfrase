@@ -362,6 +362,170 @@
   color: var(--tinta-suave);
 }
 
+/* A barra "Protegendo a sua senha" (Conta.tsx, BarraDaSenha). */
+.ekf-barra-senha {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ekf-barra-senha small {
+  color: var(--tinta-suave);
+}
+
+.ekf-barra {
+  height: 0.75rem;
+  border: var(--px) solid var(--borda);
+  overflow: hidden;
+}
+
+.ekf-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--destaque);
+  transition: width 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ekf-barra > span {
+    transition: none;
+  }
+}
+
+/* O kit de recuperação (Kit.tsx): as 12 palavras em duas colunas (três no PC), e só ele no papel. */
+.ekf-kit {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.ekf-kit-titulo {
+  margin: 0;
+}
+
+.ekf-kit-palavras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* o número de cada coluna fica no vão da coluna de antes: o vão do tamanho da margem */
+  gap: 0.4rem 2.6rem;
+  margin: 0;
+  padding-left: 2.6rem;
+  font-size: 1.1rem;
+}
+
+.ekf-kit-palavras li::marker {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 40rem) {
+  .ekf-kit-palavras {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* O kit no papel não usa esta página: sai num iframe só dele (`imprimirKit`, Kit.tsx; A4 da revisão das chaves). */
+.ekf-kit-papel {
+  position: fixed;
+}
+
+/* ---------- as chaves da conta (Chaves.tsx) ---------- */
+.ekf-camada-chaves .ekf-janela {
+  width: min(36rem, 100%);
+}
+
+.ekf-saidas {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ekf-saidas li {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}
+
+.ekf-saidas small {
+  color: var(--tinta-suave);
+}
+
+/* o código de 6 algarismos que as duas telas mostram ("123 456") */
+.ekf-codigo {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* M8: no aparelho antigo, a pessoa digita o código do novo */
+.ekf-pedido-form {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ekf-codigo-campo {
+  width: 9ch;
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ekf-lista-chaves {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ekf-aparelho,
+.ekf-pedido {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem;
+  border: var(--px) solid var(--borda);
+  background: var(--papel-forte);
+  overflow-wrap: anywhere;
+}
+
+.ekf-pedido {
+  border-color: var(--destaque);
+  border-width: 2px;
+}
+
+.ekf-aparelho-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.6rem;
+}
+
+.ekf-aparelho small {
+  color: var(--tinta-suave);
+}
+
+.ekf-etiqueta {
+  padding: 0 0.4rem;
+  border: var(--px) solid var(--frio);
+  background: var(--frio-claro);
+  color: var(--tinta);
+  font-size: 0.85rem;
+}
+
+.ekf-aparelho .ekf-alerta {
+  color: var(--erro);
+  font-weight: 700;
+}
+
+.ekf-secao {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .ekf-aviso {
   margin: 0;
   padding: 0.5rem 0.7rem;

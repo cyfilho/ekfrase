@@ -199,5 +199,7 @@
   "admin.permissoes.explicacao": "O que cada pessoa pode fazer na escola. Só a administração vê e muda esta lista. A coordenação cuida dos cursos, das turmas e dos cadastros; a administração, das permissões.",
   "admin.permissoes.sai": "Sem nenhum papel, a pessoa sai da escola e das turmas.",
   "admin.permissoes.sai_confirma": "Tirar {nome} da escola e das turmas?",
-  "admin.permissoes.salvo": "Permissões de {nome} salvas."
+  "admin.permissoes.salvo": "Permissões de {nome} salvas.",
+  "escolas.convites.pelo_email": "Para aceitar, abra o link do convite que chegou em {email}. Assim a escola sabe que é você mesmo quem recebe os e-mails desse endereço.",
+  "escolas.erro.pelo_email": "Aceite o convite pelo link que chegou no seu e-mail."
 }

@@ -1,0 +1,20 @@
+{
+  "descricao": "semente (16 bytes) ↔ 12 palavras (BIP39, listas oficiais em português e inglês)",
+  "casos": [
+    {
+      "semente": "00000000000000000000000000000000",
+      "pt": "abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abater",
+      "en": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    },
+    {
+      "semente": "000102030405060708090a0b0c0d0e0f",
+      "pt": "abacate afivelar inativo afivelar donzela achatar barulho beber albergue exalar cuidado banir",
+      "en": "abandon amount liar amount expire adjust cage candy arch gather drum buyer"
+    },
+    {
+      "semente": "ffffffffffffffffffffffffffffffff",
+      "pt": "zumbido zumbido zumbido zumbido zumbido zumbido zumbido zumbido zumbido zumbido zumbido xeque",
+      "en": "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong"
+    }
+  ]
+}

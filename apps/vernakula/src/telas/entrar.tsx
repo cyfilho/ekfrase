@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { BarraDaSenha, chaves, mostrarSituacao } from '@ekfrase/interface';
 import { useState } from 'preact/hooks';
-import { api, type Conta } from '../api.ts';
-import { avisoDoErro, type Aviso } from '../avisos.ts';
+import type { Conta } from '../api.ts';
+import { avisoDaConta, type Aviso } from '../avisos.ts';
 import { enderecoDe } from '../rotas.ts';
-import { t } from '../textos.ts';
+import { t, tr } from '../textos.ts';
 
 export function MostrarAviso({ aviso }: { aviso: Aviso | undefined }) {
   if (!aviso) return null;
@@ -15,10 +16,15 @@ export function MostrarAviso({ aviso }: { aviso: Aviso | undefined }) {
   );
 }
 
+/**
+ * Entrar com e-mail e senha. A senha não vai à ponte (X2): o `chaves.entrar` tira dela a chave de entrar (a barra
+ * "Protegendo a sua senha" anda enquanto isso) e, se for o caso, abre o kit ou o cofre trancado por cima.
+ */
 export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntrar: (c: Conta) => void }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [progresso, setProgresso] = useState<number | null>(null);
   const [erro, setErro] = useState<Aviso | undefined>(aviso ? { chave: aviso } : undefined);
 
   async function enviar(e: Event) {
@@ -26,10 +32,15 @@ export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntr
     if (!email.trim() || !senha) return setErro({ chave: 'vernakula.entrar.erro.vazio' });
     setOcupado(true);
     setErro(undefined);
-    const r = await api.entrar(email.trim(), senha);
+    const r = await chaves.entrar(email.trim(), senha, { idioma: tr.idioma(), aoProgredir: setProgresso });
     setOcupado(false);
-    if (r.ok) return aoEntrar(r.conta);
-    setErro(avisoDoErro(r, 'vernakula.entrar.erro', ['dados', 'vazio']));
+    setProgresso(null);
+    if (r.ok) {
+      aoEntrar(r.conta);
+      mostrarSituacao(t, r.situacao, tr.idioma());
+      return;
+    }
+    setErro(avisoDaConta(r, 'vernakula.entrar.erro', ['dados', 'vazio']));
   }
 
   return (
@@ -45,6 +56,7 @@ export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntr
           {t('vernakula.entrar.senha')}
           <input type="password" autocomplete="current-password" value={senha} onInput={(e) => setSenha(e.currentTarget.value)} />
         </label>
+        <BarraDaSenha t={t} fracao={progresso} />
         <MostrarAviso aviso={erro} />
         <button type="submit" class="botao principal" disabled={ocupado} aria-busy={ocupado}>
           {ocupado ? t('vernakula.entrar.ocupado') : t('vernakula.entrar.botao')}
@@ -63,10 +75,12 @@ export function Entrar({ aviso, aoEntrar }: { aviso?: string | undefined; aoEntr
 /**
  * Site recém-instalado, sem conta nenhuma: cria a conta de administração.
  * O código de instalação é o que o dono escreveu no arquivo de segredos do servidor.
+ * Como criar conta: a pessoa nasce aqui (o kit aparece depois) e a senha não vai à ponte.
  */
 export function PrimeiroAcesso({ aoCriar }: { aoCriar: (c: Conta) => void }) {
   const [d, setD] = useState({ codigo: '', organizacao: '', nome: '', email: '', senha: '', repetir: '' });
   const [ocupado, setOcupado] = useState(false);
+  const [progresso, setProgresso] = useState<number | null>(null);
   const [erro, setErro] = useState<Aviso | undefined>();
   const campo = (k: keyof typeof d) => ({
     value: d[k],
@@ -79,10 +93,18 @@ export function PrimeiroAcesso({ aoCriar }: { aoCriar: (c: Conta) => void }) {
     if (d.senha !== d.repetir) return setErro({ chave: 'vernakula.primeiro.erro.repetir' });
     setOcupado(true);
     setErro(undefined);
-    const r = await api.primeira({ codigo: d.codigo.trim(), organizacao: d.organizacao.trim(), nome: d.nome.trim(), email: d.email.trim(), senha: d.senha });
+    const r = await chaves.primeiroAcesso(
+      { codigo: d.codigo.trim(), organizacao: d.organizacao.trim(), nome: d.nome.trim(), email: d.email.trim(), senha: d.senha, idioma: tr.idioma() },
+      { idioma: tr.idioma(), aoProgredir: setProgresso },
+    );
     setOcupado(false);
-    if (r.ok) return aoCriar(r.conta);
-    setErro(avisoDoErro(r, 'vernakula.primeiro.erro', ['codigo', 'sem_codigo', 'ja_instalado', 'email', 'senha_curta', 'vazio']));
+    setProgresso(null);
+    if (r.ok) {
+      aoCriar(r.conta);
+      mostrarSituacao(t, r.situacao, tr.idioma());
+      return;
+    }
+    setErro(avisoDaConta(r, 'vernakula.primeiro.erro', ['codigo', 'sem_codigo', 'ja_instalado', 'email', 'senha_curta', 'vazio']));
   }
 
   return (
@@ -114,6 +136,7 @@ export function PrimeiroAcesso({ aoCriar }: { aoCriar: (c: Conta) => void }) {
           {t('vernakula.primeiro.repetir')}
           <input type="password" autocomplete="new-password" {...campo('repetir')} />
         </label>
+        <BarraDaSenha t={t} fracao={progresso} />
         <MostrarAviso aviso={erro} />
         <button type="submit" class="botao principal" disabled={ocupado} aria-busy={ocupado}>
           {ocupado ? t('vernakula.primeiro.ocupado') : t('vernakula.primeiro.botao')}

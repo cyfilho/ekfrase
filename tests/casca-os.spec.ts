@@ -335,6 +335,8 @@ export async function percorrerCascaOS(abrir: Abrir, falar: (linha: string) => v
     await irPara(p, '/writer/app/arquivos');
     if (await r.esperar('exportar-md', 6000)) {
       if (await r.tabAte('exportar-md')) await r.tecla('Enter');
+      // no Linux do CI o Enter às vezes chega antes de a tela assentar: uma segunda vez, se o foco ainda está no botão
+      if (!(await r.esperar('os-pendrive', 2500)) && (await r.focoEm('exportar-md'))) await r.tecla('Enter');
       r.ok(await r.esperar('os-pendrive', 5000), 'exportar abre a tela dos pendrives');
       if (await r.esperar('os-pendrive-disco', 5000)) {
         // o foco vai ao pendrive depois que a lista de discos chega; Enter antes disso caía no "exportar" de trás
