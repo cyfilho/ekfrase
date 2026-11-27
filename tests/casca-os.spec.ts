@@ -1074,20 +1074,31 @@ async function percorrerVpnEmpresa(abrir: Abrir, base: string, comum: Record<str
   };
   /** O botão "Adicionar VPN de empresa" → o servidor, o usuário e a senha, tudo digitado; Enter envia. */
   const adicionar = async (servidor: string, usuario: string, senha: string): Promise<boolean> => {
-    if (!(await r.focoEm('os-vpn-empresa')) && !(await r.tabAte('os-vpn-empresa', 30))) return false;
+    const onde = () => p.evaluate(() => document.activeElement?.getAttribute('data-teste') ?? document.activeElement?.tagName ?? '?');
+    const parou = async (passo: string) => {
+      r.ok(false, `adicionar parou em "${passo}" (foco em ${await onde()})`);
+      return false;
+    };
+    if (!(await r.focoChega('os-vpn-empresa')) && !(await r.tabAte('os-vpn-empresa', 30))) return parou('chegar no botão Adicionar VPN de empresa');
     await r.tecla('Enter');
-    if (!(await r.esperar('os-vpn-empresa-form', 3000))) return false;
-    await p.waitForFunction(() => document.activeElement?.getAttribute('data-teste') === 'os-vpn-empresa-servidor', null, { timeout: 3000 }).catch(() => undefined);
-    if (!(await r.focoEm('os-vpn-empresa-servidor'))) return false;
+    if (!(await r.esperar('os-vpn-empresa-form', 3000))) return parou('abrir o formulário');
+    if (!(await r.focoChega('os-vpn-empresa-servidor'))) return parou('foco no servidor');
     // no Linux do CI o foco anda um quadro depois do Tab: espera chegar em cada campo antes de digitar nele
     const campo = (teste: string) => p.waitForFunction((x) => document.activeElement?.getAttribute('data-teste') === x, teste, { timeout: 3000, polling: 30 }).then(() => true, () => false);
-    await p.keyboard.type(servidor);
+    // e digita e CONFERE que o campo ficou com o texto: o que se digita antes de a tela assentar se perde
+    const digitar = async (teste: string, texto: string) => {
+      await p.keyboard.type(texto);
+      return p
+        .waitForFunction(([x, v]) => (document.querySelector(`[data-teste="${x}"]`) as HTMLInputElement | null)?.value === v, [teste, texto] as [string, string], { timeout: 3000, polling: 30 })
+        .then(() => true, () => false);
+    };
+    if (!(await digitar('os-vpn-empresa-servidor', servidor))) return parou('digitar o servidor');
     await r.tecla('Tab');
-    if (!(await campo('os-vpn-usuario'))) return false;
-    await p.keyboard.type(usuario);
+    if (!(await campo('os-vpn-usuario'))) return parou('Tab até o usuário');
+    if (!(await digitar('os-vpn-usuario', usuario))) return parou('digitar o usuário');
     await r.tecla('Tab');
-    if (!(await campo('os-vpn-senha'))) return false;
-    await p.keyboard.type(senha);
+    if (!(await campo('os-vpn-senha'))) return parou('Tab até a senha');
+    if (!(await digitar('os-vpn-senha', senha))) return parou('digitar a senha');
     await r.tecla('Enter');
     return true;
   };
