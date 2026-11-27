@@ -200,6 +200,6 @@
   "admin.permissoes.sai": "Sem nenhum papel, a pessoa sai da escola e das turmas.",
   "admin.permissoes.sai_confirma": "Tirar {nome} da escola e das turmas?",
   "admin.permissoes.salvo": "Permissões de {nome} salvas.",
-  "escolas.convites.pelo_email": "Para aceitar, abra o link do convite que chegou em {email}. Assim a escola sabe que é você mesmo quem recebe os e-mails desse endereço.",
+  "escolas.convites.pelo_email": "Para aceitar, abra o link do convite que chegou em {email}, ou confirme o seu e-mail em Minha conta: com ele confirmado, dá para aceitar aqui mesmo.",
   "escolas.erro.pelo_email": "Aceite o convite pelo link que chegou no seu e-mail."
 }

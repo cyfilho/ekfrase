@@ -94,7 +94,17 @@ export function TelaConvite({
       {conta === null ? (
         <>
           <p>{t(c.tem_conta ? 'vernakula.convite.entre' : 'vernakula.convite.crie', { email: c.email })}</p>
-          <FormConta t={t} app="vernakula" idioma={tr.idioma()} inicial={c.tem_conta ? 'entrar' : 'criar'} podeCriar emailInicial={c.email} aoEntrar={aoEntrar} />
+          {/* criar conta com o convite: na hora, sem outro e-mail (o convite já provou o e-mail; X2c-2) */}
+          <FormConta
+            t={t}
+            app="vernakula"
+            idioma={tr.idioma()}
+            inicial={c.tem_conta ? 'entrar' : 'criar'}
+            podeCriar
+            emailInicial={c.email}
+            convite={codigo}
+            aoEntrar={aoEntrar}
+          />
         </>
       ) : (
         <>

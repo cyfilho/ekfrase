@@ -58,9 +58,12 @@ export const nomeTurma = (c: { curso_nome: string | null; turma_nome: string | n
 export function MinhasEscolas({
   conta,
   aoEscolher,
+  aoAceitar,
 }: {
   conta: Conta;
   aoEscolher: (id: number) => void;
+  /** Aceitou um convite pela lista: a conta nova (com a escola) e a escola. */
+  aoAceitar: (c: Conta, escola: number) => void;
 }) {
   const [convites, setConvites] = useState<Convite[] | null>(null);
   const [pedidos, setPedidos] = useState<PedidoEscola[] | null>(null);
@@ -72,6 +75,16 @@ export function MinhasEscolas({
     void api.meusPedidos().then((r) => setPedidos(r.ok ? r.pedidos : []));
   }
   useEffect(carregar, [conta.id]);
+
+  // X2c-2: aceitar pela lista só com o e-mail da conta confirmado (A2); senão, pelo link do e-mail
+  async function aceitar(c: Convite) {
+    setOcupado(true);
+    setAviso(undefined);
+    const r = await api.aceitarConvite({ id: c.id });
+    setOcupado(false);
+    if (!r.ok) return setAviso(avisoEscola(r));
+    aoAceitar(r.conta, r.escola);
+  }
 
   async function recusar(c: Convite) {
     setOcupado(true);
@@ -112,8 +125,8 @@ export function MinhasEscolas({
       {convites && convites.length > 0 && (
         <section class="painel" aria-labelledby="titulo-convites">
           <h2 id="titulo-convites">{t('vernakula.escolas.convites.titulo')}</h2>
-          {/* A2: aceitar só pelo link do e-mail (o e-mail da conta ainda não é confirmado) */}
-          <p class="dica">{t('vernakula.escolas.convites.pelo_email', { email: conta.email })}</p>
+          {/* A2: sem o e-mail confirmado, aceitar só pelo link do e-mail (ou confirmar em Minha conta) */}
+          {!conta.email_confirmado && <p class="dica">{t('vernakula.escolas.convites.pelo_email', { email: conta.email })}</p>}
           <ul class="lista">
             {convites.map((c) => (
               <li key={c.id} class="item-lista">
@@ -127,6 +140,11 @@ export function MinhasEscolas({
                   </span>
                 </div>
                 <div class="linha-acoes">
+                  {conta.email_confirmado && (
+                    <button type="button" class="botao pequeno principal" disabled={ocupado} onClick={() => void aceitar(c)}>
+                      {t('vernakula.convite.aceitar')}
+                    </button>
+                  )}
                   <button type="button" class="botao pequeno" disabled={ocupado} onClick={() => void recusar(c)}>
                     {t('vernakula.convite.recusar')}
                   </button>

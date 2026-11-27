@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { BarraDaSenha, ChavesDaConta, chaves, mostrarKit } from '@ekfrase/interface';
+import { BarraDaSenha, ChavesDaConta, ConfirmarEmail, chaves } from '@ekfrase/interface';
 import { aplicarTema, temaAtual, type Tema } from '@ekfrase/nucleo';
 import { useState } from 'preact/hooks';
 import { api, type Conta, type Escola } from '../api.ts';
@@ -22,6 +22,7 @@ export function MinhaConta({ conta, escola, aoMudar }: { conta: Conta; escola: E
         <a href="#">← {t('vernakula.menu.voltar')}</a>
       </p>
       <h1>{t('vernakula.conta.titulo')}</h1>
+      <ConfirmarEmail t={t} app="vernakula" idioma={tr.idioma()} conta={conta} classe="painel" />
       <Perfil conta={conta} aoMudar={aoMudar} />
       <Senha />
       <ChavesDaConta t={t} idioma={tr.idioma()} classe="painel" />
@@ -53,11 +54,15 @@ function Perfil({ conta, aoMudar }: { conta: Conta; aoMudar: (c: Conta) => void 
       setOcupado(false);
       return setAviso(avisoDaConta(prova, 'vernakula.conta.erro', ERROS));
     }
-    const r = await api.perfil({ nome: nome.trim(), email: email.trim(), ...(prova?.ok ? prova.campos : {}) });
+    const r = await api.perfil({ nome: nome.trim(), email: email.trim(), app: 'vernakula', idioma: tr.idioma(), ...(prova?.ok ? prova.campos : {}) });
     setOcupado(false);
     if (!r.ok) return setAviso(avisoDaConta(r, 'vernakula.conta.erro', ERROS));
     setSenha('');
-    setAviso({ chave: 'vernakula.conta.salvo', tipo: 'ok' });
+    // M6: o e-mail novo só vale depois do link que chega nele; até lá, a conta segue com o de agora
+    if (r.email_pendente) {
+      setEmail(r.conta.email);
+      setAviso({ chave: 'nucleo.cadastro.email_pendente', p: { email: r.email_pendente }, tipo: 'ok' });
+    } else setAviso({ chave: 'vernakula.conta.salvo', tipo: 'ok' });
     aoMudar(r.conta);
   }
 
@@ -90,7 +95,7 @@ function Perfil({ conta, aoMudar }: { conta: Conta; aoMudar: (c: Conta) => void 
   );
 }
 
-/** Trocar a senha: o cofre das chaves é refeito com a nova (a conta de antes ganha as chaves e o kit aparece). */
+/** Trocar a senha: o cofre das chaves é refeito com a nova. */
 function Senha() {
   const [d, setD] = useState({ atual: '', nova: '', repetir: '' });
   const [ocupado, setOcupado] = useState(false);
@@ -113,7 +118,6 @@ function Senha() {
     if (!r.ok) return setAviso(avisoDaConta(r, 'vernakula.conta.erro', ERROS));
     setD({ atual: '', nova: '', repetir: '' });
     setAviso({ chave: 'vernakula.conta.senha_trocada', tipo: 'ok' });
-    if (r.kit) mostrarKit(t, r.kit);
   }
 
   return (

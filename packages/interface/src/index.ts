@@ -8,6 +8,7 @@ export { Menu } from './Menu.tsx';
 export { Janela } from './Janela.tsx';
 export { BotaoFeedback } from './Feedback.tsx';
 export { BarraDaSenha, FormConta, FormRedefinir, chaveDoErro, definirAntesDoEntrar, textoDoErro, type ModoConta } from './Conta.tsx';
+export { ConfirmarEmail, PassosDoCadastro, TelaDoCadastro, erroDoCadastro } from './Cadastro.tsx';
 export { TelaDoKit } from './Kit.tsx';
 export { ChavesDaConta, CofreTrancado, mostrarKit, mostrarSituacao } from './Chaves.tsx';
 export { ambienteFechado, definirAmbienteFechado } from './ambiente.ts';
